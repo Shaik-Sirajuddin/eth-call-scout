@@ -29,9 +29,9 @@
       <div class="hero-copy">
         <div class="eyebrow"><span class="live-dot"></span> Open source · GitHub Actions</div>
         <h1>Every pull request<br>gets a <em>second set of eyes.</em></h1>
-        <p class="hero-lede">Secu finds smart contract calls in changed code, checks them against your trusted terms, and leaves a readable review right on the pull request.</p>
+        <p class="hero-lede">Secu statically analyzes each pull request against your custom rules for protocols, wallet addresses, and trusted function names. Detected function signatures and unfamiliar calls appear in a source-linked GitHub review.</p>
         <div class="hero-actions"><a class="button button-dark" href="./setup.html">Add Secu to your repo <span>→</span></a><a class="text-link" href="#reviews">See example reviews <span>↓</span></a></div>
-        <div class="hero-facts"><span><b>01</b> Scan changed calls</span><span><b>02</b> Apply your rules</span><span><b>03</b> Review in GitHub</span></div>
+        <div class="hero-facts"><span><b>01</b> Static PR analysis</span><span><b>02</b> Your allowed terms</span><span><b>03</b> Review in GitHub</span></div>
       </div>
       <div class="hero-preview" aria-label="Example Secu pull request review">
         <div class="preview-top"><div class="window-dots"><i></i><i></i><i></i></div><span>github.com / pull / 18</span><b class="review-pill">SECU REVIEW</b></div>
@@ -51,10 +51,10 @@
 
     <section class="section wrap how-section" id="how-it-works">
       <div class="section-kicker">A small workflow. A useful signal.</div>
-      <div class="section-intro"><h2>Catch risky calls<br>before they ship.</h2><p>Secu compares the base branch with the proposed changes. The analyzer and rules are loaded from the trusted base revision so a pull request cannot rewrite the checks used to review itself.</p></div>
+        <div class="section-intro"><h2>Check every new call<br>against your rules.</h2><p>Secu statically compares the base branch with proposed changes. Set rules for protocol contracts, known wallet addresses, and trusted function names; inspect detected function signatures in the review. The analyzer and rules come from the trusted base revision so a pull request cannot rewrite its own review.</p></div>
       <div class="steps-grid">
         <article class="step-card"><span class="step-number">01</span><div class="step-graphic scan-graphic"><i></i><i></i><i></i><b>TS</b><span>src / changed files</span></div><h3>Find calls in code</h3><p>Parse configured paths and detect contract interactions, targets, methods, and source locations.</p></article>
-        <article class="step-card"><span class="step-number">02</span><div class="step-graphic terms-graphic"><b>.secu</b><span>known targets</span><span>blacklist</span><span>scan paths</span></div><h3>Apply your terms</h3><p>Use a reviewed base-branch ruleset to label known, unknown, and blacklisted targets.</p></article>
+        <article class="step-card"><span class="step-number">02</span><div class="step-graphic terms-graphic"><b>.secu</b><span>protocol contracts</span><span>wallet addresses</span><span>function signatures</span></div><h3>Set your allowed rules</h3><p>Use a reviewed base-branch ruleset for protocols and wallet addresses; review trusted functions and detected signatures.</p></article>
         <article class="step-card"><span class="step-number">03</span><div class="step-graphic review-graphic"><span>Risk score</span><b>30 <small>/ 100</small></b><i><em></em></i><strong>MAINTAINER REVIEW</strong></div><h3>Show the diff in GitHub</h3><p>Get a concise review with only newly added calls, risk context, and links back to code.</p></article>
       </div>
     </section>
@@ -64,6 +64,7 @@
         <div class="reviews-heading"><div><div class="section-kicker">Real pull requests · review previews</div><h2>Different changes.<br><em>Different signals.</em></h2></div><p>Explore review examples from this repository. Each preview links to the pull request that exercises that case.</p></div>
         <div class="carousel" data-carousel>
           <div class="carousel-stage">
+            <div class="carousel-track" data-track>
             <article class="report-slide active" data-slide="0" aria-label="Review preview: blacklisted target">
               <div class="slide-head"><span class="github-mark">⌘</span><div><small>EXAMPLE REVIEW · PR #15</small><b>Detect a blacklisted target</b></div><a href="https://github.com/x0rc1ph3r/eth-call-scout/pull/15" aria-label="Open pull request 15">↗</a></div>
               <div class="report-body"><div class="report-status blocked"><span>!</span><div><b>BLOCKED · BLACKLISTED / HIGH RISK</b><small>One newly added call matches a blacklist term.</small></div></div><div class="report-metrics"><div><small>RISK</small><b class="red">100 <i>/ 100</i></b></div><div><small>NEW CALLS</small><b>1</b></div><div><small>DECISION</small><b class="red">BLOCKED</b></div></div><div class="code-snippet"><span>examples/blacklisted-target-demo.ts</span><code><i>12</i> provider.<mark>call</mark>({ to: <b>"0x1111…"</b> }) <span class="code-alert">← blacklisted target</span></code></div><div class="report-note"><b>Why it matters</b><span>Known blacklist entry found in the proposed diff. Maintainer review is required.</span></div></div>
@@ -84,6 +85,7 @@
               <div class="report-body"><div class="report-status blocked"><span>!</span><div><b>BLOCKED · BLACKLISTED / HIGH RISK</b><small>One blacklist hit outweighs the unknown target.</small></div></div><div class="report-metrics"><div><small>RISK</small><b class="red">100 <i>/ 100</i></b></div><div><small>NEW CALLS</small><b>2</b></div><div><small>BLACKLISTED</small><b class="red">1 target</b></div></div><div class="code-snippet"><span>examples/blacklisted-and-unknown.ts</span><code><i>12, 18</i> <mark>2 added calls</mark> · blacklist + unknown</code></div><div class="report-note"><b>Why this is blocked</b><span>The blacklist rule sets risk to 100; unknown addresses are reported alongside it.</span></div></div>
               <div class="slide-foot"><span><i class="dot-red"></i> BLACKLIST + UNKNOWN</span><a href="https://github.com/x0rc1ph3r/eth-call-scout/pull/18">View PR #18 <b>→</b></a></div>
             </article>
+            </div>
           </div>
           <div class="carousel-controls"><div class="slide-dots" role="tablist" aria-label="Choose a review preview"><button type="button" class="selected" role="tab" aria-selected="true" aria-label="Review 1" data-go-to="0"></button><button type="button" role="tab" aria-selected="false" aria-label="Review 2" data-go-to="1"></button><button type="button" role="tab" aria-selected="false" aria-label="Review 3" data-go-to="2"></button><button type="button" role="tab" aria-selected="false" aria-label="Review 4" data-go-to="3"></button></div><span class="slide-count"><b data-slide-current>01</b> / 04</span><div class="carousel-arrows"><button type="button" data-prev aria-label="Previous review">←</button><button type="button" data-next aria-label="Next review">→</button></div></div>
         </div>
