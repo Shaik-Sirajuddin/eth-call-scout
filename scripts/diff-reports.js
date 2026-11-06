@@ -48,19 +48,20 @@ const protocolsAdded = difference(after.protocols, before.protocols);
 const protocolsRemoved = difference(before.protocols, after.protocols);
 const signaturesAdded = difference(after.signatures, before.signatures);
 const signaturesRemoved = difference(before.signatures, after.signatures);
-const rb = summarizeRisk(base.findings);
-const rh = summarizeRisk(head.findings);
-const list = (items, render) => items.length ? items.slice(0, 30).map((item) => `- ${render(item)}`).join('\n') + (items.length > 30 ? `\n- …and ${items.length - 30} more` : '') : '- None';
+const risk = summarizeRisk(parsedAdded);
+const list = (items, render) => items.slice(0, 30).map((item) => `- ${render(item)}`).join('\n') + (items.length > 30 ? `\n- …and ${items.length - 30} more` : '');
 const inline = (value) => `\`${String(value).replaceAll('`', '\\`')}\``;
-const riskDelta = rh.score - rb.score;
-const status = rh.blacklisted > 0 || rh.band === 'high'
-  ? '⛔ BLOCKED · BLACKLISTED / HIGH RISK'
-  : rh.band === 'mid' || riskDelta > 0 || rh.unknown > rb.unknown || rh.unresolved > rb.unresolved
-    ? '🟠 MAINTAINER REVIEW REQUIRED'
-    : '✅ READY TO APPROVE';
+const status = parsedAdded.length === 0
+  ? '✅ LOW RISK · NO NEW CALLS'
+  : risk.blacklisted > 0 || risk.band === 'high'
+    ? '⛔ BLACKLISTED / HIGH RISK · MAINTAINER REQUIRED'
+    : risk.band === 'mid'
+      ? '🟠 MAINTAINER REVIEW REQUIRED'
+      : '✅ READY TO APPROVE';
 const summary = parsedAdded.length || parsedRemoved.length || protocolsAdded.length || protocolsRemoved.length || signaturesAdded.length || signaturesRemoved.length
-  ? `Added ${parsedAdded.length} parsed call site(s), removed ${parsedRemoved.length}; ${protocolsAdded.length} protocol(s) added and ${protocolsRemoved.length} removed; ${signaturesAdded.length} function name/signature(s) added and ${signaturesRemoved.length} removed.`
-  : 'No parsed calls, protocols, or function signatures changed in the configured scan paths.';
-const markdown = `## Secu scan diff\n\n## **Risk score: ${rh.score}/100 · ${rh.band.toUpperCase()}**\n\n**${status}**\n\nBase: ${rb.score}/100 · ${rb.band.toUpperCase()} · change: ${riskDelta > 0 ? '+' : ''}${riskDelta}\n\n${rh.blacklisted} blacklisted · ${rh.known} known · ${rh.unknown} unknown · ${rh.unresolved} unresolved\n\n### Summary\n\n${summary}\n\nStatic source analysis only; calls are not confirmed on-chain transactions.\n\n### Parsed transactions added\n\n${list(parsedAdded, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}\n\n### Parsed transactions removed\n\n${list(parsedRemoved, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}\n\n### Protocols added\n\n${list(protocolsAdded, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}\n\n### Protocols removed\n\n${list(protocolsRemoved, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}\n\n### Function signatures added\n\n${list(signaturesAdded, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}\n\n### Function signatures removed\n\n${list(signaturesRemoved, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}\n`;
+  ? `+${parsedAdded.length} calls · −${parsedRemoved.length} · +${protocolsAdded.length} protocols · +${signaturesAdded.length}/−${signaturesRemoved.length} functions.`
+  : 'No parsed call, protocol, or function changes.';
+const section = (title, items, render) => items.length ? `\n### ${title}\n\n${list(items, render)}\n` : '';
+const markdown = `## Secu scan diff\n\n## **Risk score: ${risk.score}/100 · ${risk.band.toUpperCase()}**\n\n**${status}**\n\n${risk.blacklisted} blacklisted · ${risk.known} known · ${risk.unknown} unknown · ${risk.unresolved} unresolved\n\n**Diff:** ${summary}\n${section('Calls added', parsedAdded, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Calls removed', parsedRemoved, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Protocols added', protocolsAdded, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Protocols removed', protocolsRemoved, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Function signatures added', signaturesAdded, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}${section('Function signatures removed', signaturesRemoved, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}\n_Risk is scored from newly added parsed calls in this diff only. A zero-call diff scores 0/100; static analysis does not prove runtime behavior._\n`;
 fs.mkdirSync(path.dirname(path.resolve(outputFile)), { recursive: true });
 fs.writeFileSync(outputFile, markdown, 'utf8');
