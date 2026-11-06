@@ -8,6 +8,7 @@ const types = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
   ['.svg', 'image/svg+xml'],
 ]);
 
@@ -34,6 +35,7 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(port, '127.0.0.1', () => {
   process.stdout.write(`CallScout demo: http://127.0.0.1:${port}/\n`);
+  process.stdout.write(`Agent control room (example evidence): http://127.0.0.1:${port}/demo.html\n`);
   process.stdout.write(`Example report: http://127.0.0.1:${port}/report.html\n`);
   process.stdout.write(`Policy builder: http://127.0.0.1:${port}/ruleset.html\n`);
   process.stdout.write(`PR Review Agent ruleset: http://127.0.0.1:${port}/pr-review-ruleset.html\n`);

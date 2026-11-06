@@ -19,12 +19,25 @@ requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.')
 requireMatch(/data-tour/, 'Landing page requires the end-to-end product tour.');
 requireMatch(/data-tour-slide="3"/, 'Product tour must cover the complete four-stage trust path.');
 requireMatch(/id="review-agent"/, 'Landing page requires the PR Review Agent evidence gallery.');
+requireMatch(/href="\.\/demo\.html"/, 'Landing page must link to the agent control room.');
 for (const pr of ['20', '24', '11']) requireMatch(new RegExp(`pull/${pr}`), `Review gallery must link to source PR #${pr}.`);
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
-for (const required of ['report.html', 'ruleset.html', 'pr-review-ruleset.html']) {
+for (const required of ['demo.html', 'demo.css', 'demo.js', 'report.html', 'ruleset.html', 'pr-review-ruleset.html']) {
   if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
+}
+const demoPath = path.join(root, 'demo.html');
+if (fs.existsSync(demoPath)) {
+  const demo = fs.readFileSync(demoPath, 'utf8');
+  const demoCss = fs.readFileSync(path.join(root, 'demo.css'), 'utf8');
+  const demoJs = fs.readFileSync(path.join(root, 'demo.js'), 'utf8');
+  if (!/data-run-form/.test(demo)) errors.push('Agent control room must include the runnable trade form.');
+  if (!/data-run-list/.test(demo) || !/data-run-detail/.test(demo)) errors.push('Agent control room must include run history and evidence detail.');
+  if (!/\/api\/runs/.test(demoJs) || !/\/api\/health/.test(demoJs)) errors.push('Agent control room must connect to the live runtime API.');
+  if (!/EXAMPLE EVIDENCE/.test(demoJs) || !/Stored example evidence/.test(demoJs)) errors.push('Static fallback evidence must be clearly labeled.');
+  if (!/@media \(max-width: 680px\)/.test(demoCss)) errors.push('Agent control room requires a mobile responsive layout.');
+  if (!/prefers-reduced-motion/.test(demoCss)) errors.push('Agent control room styles must respect reduced motion.');
 }
 const reviewRulesetPath = path.join(root, 'pr-review-ruleset.html');
 if (fs.existsSync(reviewRulesetPath)) {

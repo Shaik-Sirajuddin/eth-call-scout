@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Run an AI-authored trade through CallScout executable policy, signed live protocol state, full dual-node EVM simulation, and the guarded wallet boundary.">
+  <meta name="theme-color" content="#07110f">
+  <title>Live agent control room — CallScout</title>
+  <link rel="stylesheet" href="./demo.css">
+  <script src="./demo.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#demo-main">Skip to demo</a>
+  <div class="demo-shell">
+    <aside class="sidebar" aria-label="CallScout product navigation">
+      <a class="brand" href="./index.html" aria-label="CallScout home">
+        <svg viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2.5 31 7.7v9.5c0 8.1-5.4 13.5-13 16.3-7.6-2.8-13-8.2-13-16.3V7.7L18 2.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 18h4l2-6 3 12 2-6h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>CallScout</span>
+      </a>
+      <nav class="side-nav">
+        <a class="active" href="./demo.html"><span>01</span>Agent runs</a>
+        <a href="./report.html"><span>02</span>Call report</a>
+        <a href="./ruleset.html"><span>03</span>Policy studio</a>
+        <a href="./pr-review-ruleset.html"><span>04</span>Review rules</a>
+      </nav>
+      <div class="boundary-note">
+        <span>TRUST BOUNDARY</span>
+        <p>The agent proposes. Deterministic code alone can authorize.</p>
+      </div>
+      <a class="repo-link" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">Source &amp; docs <span aria-hidden="true">↗</span></a>
+    </aside>
+
+    <main id="demo-main" class="workspace">
+      <header class="topbar">
+        <div>
+          <span class="topbar-kicker">ETHGLOBAL DEMO / CONTROL ROOM</span>
+          <h1>Agent transaction runs</h1>
+        </div>
+        <div class="environment" aria-live="polite">
+          <div class="mode-badge checking" data-mode-badge><i></i><span>CHECKING ENGINE</span></div>
+          <div class="chain-badge"><span>CHAIN</span><strong data-chain-id>—</strong></div>
+        </div>
+      </header>
+
+      <div class="mode-notice" data-mode-notice hidden></div>
+
+      <section class="command-panel" aria-labelledby="command-title">
+        <div class="command-copy">
+          <span class="section-label">UNTRUSTED AGENT INPUT</span>
+          <h2 id="command-title">Tell the agent what to trade.</h2>
+          <p>It may construct one exact transaction. It never receives the signer or direct provider access.</p>
+        </div>
+        <form class="prompt-form" data-run-form>
+          <label for="trade-prompt">Trading request</label>
+          <div class="prompt-row">
+            <textarea id="trade-prompt" name="prompt" rows="3" maxlength="500">Swap 100 dUSD for at least 190 dETH to my wallet</textarea>
+            <button class="run-button" type="submit" data-run-button>
+              <span data-run-button-label>Run guarded trade</span>
+              <b aria-hidden="true">→</b>
+            </button>
+          </div>
+          <fieldset class="scenario-picker">
+            <legend>Choose the chain condition</legend>
+            <label class="scenario active"><input type="radio" name="scenario" value="safe" checked><span><b>Safe path</b><small>All gates pass; one tx is mined</small></span><i>ALLOW</i></label>
+            <label class="scenario"><input type="radio" name="scenario" value="compromised"><span><b>Protocol paused</b><small>Signed live state vetoes first</small></span><i>DENY</i></label>
+            <label class="scenario"><input type="radio" name="scenario" value="hidden-call"><span><b>Hidden call</b><small>Full trace finds unsafe target</small></span><i>DENY</i></label>
+            <label class="scenario"><input type="radio" name="scenario" value="slippage"><span><b>Slippage revert</b><small>Exact call fails on both nodes</small></span><i>DENY</i></label>
+          </fieldset>
+          <p class="form-status" data-form-status aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="engine-strip" aria-label="Active security gates">
+        <div><i class="green"></i><span>POLICY</span><strong>Executable</strong></div>
+        <div><i class="aqua"></i><span>LIVE STATE</span><strong>2 / 2 signed</strong></div>
+        <div><i class="amber"></i><span>SIMULATION</span><strong>2 independent traces</strong></div>
+        <div><i class="green"></i><span>EIP-7702</span><strong>Denied in demo</strong></div>
+      </section>
+
+      <section class="runs-layout" aria-label="Run explorer">
+        <aside class="run-rail">
+          <div class="rail-heading">
+            <div><span class="section-label">SESSION</span><h2>Runs</h2></div>
+            <span class="run-count" data-run-count>0</span>
+          </div>
+          <div class="run-list" data-run-list aria-live="polite"></div>
+        </aside>
+
+        <article class="run-detail" data-run-detail aria-live="polite">
+          <div class="empty-state">
+            <span>NO RUN SELECTED</span>
+            <h2>Evidence will appear here.</h2>
+            <p>Start a guarded trade or select a previous run to inspect every deterministic decision.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <div class="toast" data-toast role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -88,6 +88,7 @@ const server = http.createServer(async (request, response) => {
 await runtime.start();
 server.listen(port, '127.0.0.1', () => {
   process.stdout.write(`CallScout product site: http://127.0.0.1:${port}/\n`);
+  process.stdout.write(`Live agent control room: http://127.0.0.1:${port}/demo.html\n`);
   process.stdout.write(`Run API: http://127.0.0.1:${port}/api/health\n`);
 });
 
