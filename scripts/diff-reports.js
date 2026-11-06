@@ -49,19 +49,25 @@ const protocolsRemoved = difference(before.protocols, after.protocols);
 const signaturesAdded = difference(after.signatures, before.signatures);
 const signaturesRemoved = difference(before.signatures, after.signatures);
 const risk = summarizeRisk(parsedAdded);
+// The PR review score is intentionally based on distinct newly introduced addresses.
+// A blacklisted target is an unconditional high-risk finding; unknown addresses have
+// a small capped penalty so a large set cannot overwhelm the score.
+const riskScore = risk.blacklisted > 0 ? 100 : Math.min(30, risk.unknown * 3);
+const riskBand = risk.blacklisted > 0 ? 'high' : riskScore >= 10 ? 'mid' : 'low';
+const safetyScore = 100 - riskScore;
 const list = (items, render) => items.slice(0, 30).map((item) => `- ${render(item)}`).join('\n') + (items.length > 30 ? `\n- …and ${items.length - 30} more` : '');
 const inline = (value) => `\`${String(value).replaceAll('`', '\\`')}\``;
 const status = parsedAdded.length === 0
   ? '✅ LOW RISK · NO NEW CALLS'
-  : risk.blacklisted > 0 || risk.band === 'high'
+  : risk.blacklisted > 0
     ? '⛔ BLACKLISTED / HIGH RISK · MAINTAINER REQUIRED'
-    : risk.band === 'mid'
+    : riskScore >= 10
       ? '🟠 MAINTAINER REVIEW REQUIRED'
       : '✅ READY TO APPROVE';
 const summary = parsedAdded.length || parsedRemoved.length || protocolsAdded.length || protocolsRemoved.length || signaturesAdded.length || signaturesRemoved.length
   ? `+${parsedAdded.length} calls · −${parsedRemoved.length} · +${protocolsAdded.length} protocols · +${signaturesAdded.length}/−${signaturesRemoved.length} functions.`
   : 'No parsed call, protocol, or function changes.';
 const section = (title, items, render) => items.length ? `\n### ${title}\n\n${list(items, render)}\n` : '';
-const markdown = `## Secu scan diff\n\n## **Risk score: ${risk.score}/100 · ${risk.band.toUpperCase()}**\n\n**${status}**\n\n${risk.blacklisted} blacklisted · ${risk.known} known · ${risk.unknown} unknown · ${risk.unresolved} unresolved\n\n**Diff:** ${summary}\n${section('Calls added', parsedAdded, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Calls removed', parsedRemoved, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Protocols added', protocolsAdded, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Protocols removed', protocolsRemoved, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Function signatures added', signaturesAdded, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}${section('Function signatures removed', signaturesRemoved, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}\n_Risk is scored from newly added parsed calls in this diff only. A zero-call diff scores 0/100; static analysis does not prove runtime behavior._\n`;
+const markdown = `## Secu scan diff\n\n## **Risk score: ${riskScore}/100 · ${riskBand.toUpperCase()}**\n\n**${status}**\n\n**Safety score: ${safetyScore}/100 · ${riskBand.toUpperCase()}**\n\n${risk.blacklisted} blacklisted · ${risk.known} known · ${risk.unknown} unknown · ${risk.unresolved} unresolved\n\n**Diff:** ${summary}\n${section('Calls added', parsedAdded, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Calls removed', parsedRemoved, (f) => `${inline(f.functionName ?? f.rpcMethod ?? 'Raw call')} at ${inline(relFile(f.file))} · ${inline(f.address ?? f.transaction?.to ?? 'unresolved target')} · ${inline(f.library)}`)}${section('Protocols added', protocolsAdded, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Protocols removed', protocolsRemoved, (p) => `${inline(p.name)}${p.address ? ` · ${inline(p.address)}` : ''}`)}${section('Function signatures added', signaturesAdded, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}${section('Function signatures removed', signaturesRemoved, (s) => `${inline(s.signature)} · ${inline(s.protocol)}`)}\n_Risk is calculated from newly added parsed calls in this PR diff: each distinct unknown address adds 3 points, capped at 30; any blacklisted address sets risk to 100. Safety is 100 minus risk. Static analysis does not prove runtime behavior._\n`;
 fs.mkdirSync(path.dirname(path.resolve(outputFile)), { recursive: true });
 fs.writeFileSync(outputFile, markdown, 'utf8');
