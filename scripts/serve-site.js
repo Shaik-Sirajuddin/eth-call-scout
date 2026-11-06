@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const root = path.resolve('site');
+const root = path.resolve('dist');
 const port = Number(process.env.CALLSCOUT_SITE_PORT ?? 4173);
 const types = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -32,4 +32,9 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, '127.0.0.1', () => process.stdout.write(`CallScout landing page: http://127.0.0.1:${port}\n`));
+server.listen(port, '127.0.0.1', () => {
+  process.stdout.write(`CallScout demo: http://127.0.0.1:${port}/\n`);
+  process.stdout.write(`Example report: http://127.0.0.1:${port}/report.html\n`);
+  process.stdout.write(`Policy builder: http://127.0.0.1:${port}/ruleset.html\n`);
+  process.stdout.write(`Scanner terms: http://127.0.0.1:${port}/scanner-ruleset.html\n`);
+});

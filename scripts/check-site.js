@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = path.resolve('site');
+const root = path.resolve(process.argv[2] ?? 'site');
 const htmlPath = path.join(root, 'index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -19,6 +19,24 @@ requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.')
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
+for (const required of ['report.html', 'ruleset.html', 'scanner-ruleset.html']) {
+  if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
+}
+const policyBuilderPath = path.join(root, 'ruleset.html');
+if (fs.existsSync(policyBuilderPath)) {
+  const builder = fs.readFileSync(policyBuilderPath, 'utf8');
+  if (!/id="canvas"/.test(builder)) errors.push('Policy builder must include the visual block canvas.');
+  if (!/id="zoomIn"/.test(builder) || !/id="fitView"/.test(builder)) errors.push('Policy builder must include zoom and fit-view controls.');
+  if (!/__callScoutPolicyBuilder/.test(builder)) errors.push('Policy builder must expose deterministic compile and validation hooks.');
+  if (!/callscout policy validate/.test(builder)) errors.push('Policy builder must disclose the authoritative CLI validation boundary.');
+}
+const reportPath = path.join(root, 'report.html');
+if (fs.existsSync(reportPath)) {
+  const report = fs.readFileSync(reportPath, 'utf8');
+  if (!/const DATA=\{/.test(report)) errors.push('Generated report must embed its scan data.');
+  if (!/function drawGraph\(\)/.test(report)) errors.push('Generated report must include the interactive call graph.');
+  if (!/href="ruleset\.html"/.test(report)) errors.push('Generated report must link to the ruleset builder.');
+}
 for (const match of html.matchAll(/<(?:a|link|script)\b[^>]*(?:href|src)="([^"]+)"/g)) {
   const reference = match[1];
   if (/^(?:https?:|#|mailto:|tel:|data:)/.test(reference)) continue;

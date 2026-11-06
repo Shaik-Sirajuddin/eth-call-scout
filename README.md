@@ -54,9 +54,16 @@ npm run verify
 
 An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; CallScout never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by CallScout is the request forwarded to the wallet.
 
-## Landing page
+## Web demo
 
-The responsive product site is buildless and lives in `site/`:
+The deployed demo includes the responsive product site, a generated monitoring report, and two purpose-separated authoring tools:
+
+- [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
+- [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
+- [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
+- [Scanner registry and risk terms](https://shaik-sirajuddin.github.io/eth-call-scout/scanner-ruleset.html)
+
+Build and serve the same pages locally:
 
 ```sh
 npm run site:check
@@ -64,7 +71,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-Its interactive decision lab is an illustrative presentation of the real receipt pipeline. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
+`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/scanner-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate scanner editor changes only monitoring mappings and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
 
 ## Architecture
 
@@ -254,7 +261,7 @@ npx callscout registry search uniswap
 npm run ruleset:build
 ```
 
-The standalone `ruleset.html` editor controls report mappings. It does not grant wallet access.
+`npm run ruleset:build` generates two standalone tools. `ruleset.html` is the visual wallet-policy canvas; `scanner-ruleset.html` controls report mappings and cannot grant wallet access. A policy exported from the canvas is still untrusted input until the deterministic CLI validator and guarded provider accept it.
 
 ## Security posture
 
