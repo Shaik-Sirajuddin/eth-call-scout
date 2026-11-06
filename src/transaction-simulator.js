@@ -50,7 +50,7 @@ function validateUrl(value) {
 async function rpc(url, method, params, { fetchImpl, timeoutMs }) {
   const response = await fetchImpl(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'callscout-simulator/0.1' },
+    headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'keybound-simulator/0.1' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),
@@ -133,6 +133,31 @@ function stateDiffStats(diff, denyCodeChanges, expectedCodeChanges = new Map(), 
   }
   const missingExpectedCodeChanges = [...expectedCodeChanges].filter(([address, code]) => observedCodeChanges.get(address) !== code).map(([address]) => address);
   return { accounts: accounts.size, storageWrites, codeChanges, unexpectedCodeChanges, missingExpectedCodeChanges, walletBalanceDecrease: walletBalanceDecrease.toString(), deniedCodeChange: denyCodeChanges && unexpectedCodeChanges > 0 };
+}
+
+function normalizedStateEffects(diff, volatileBalanceAddresses = new Set()) {
+  const keys = new Set([...Object.keys(diff.pre ?? {}), ...Object.keys(diff.post ?? {})].map((address) => address.toLowerCase()));
+  const find = (side, address) => side[address] ?? side[Object.keys(side).find((key) => key.toLowerCase() === address)] ?? {};
+  return [...keys].sort().map((address) => {
+    const pre = find(diff.pre ?? {}, address);
+    const post = find(diff.post ?? {}, address);
+    const effect = { address };
+    if (pre.balance != null && post.balance != null && !volatileBalanceAddresses.has(address)) {
+      effect.balanceDelta = (BigInt(post.balance) - BigInt(pre.balance)).toString();
+    }
+    if (pre.nonce != null && post.nonce != null) effect.nonceDelta = (BigInt(post.nonce) - BigInt(pre.nonce)).toString();
+    const beforeCode = String(pre.code ?? '0x').toLowerCase();
+    const afterCode = String(post.code ?? pre.code ?? '0x').toLowerCase();
+    if (beforeCode !== afterCode) effect.code = { before: beforeCode, after: afterCode };
+    const slots = new Set([...Object.keys(pre.storage ?? {}), ...Object.keys(post.storage ?? {})]);
+    const storage = [...slots].sort().flatMap((slot) => {
+      const before = pre.storage?.[slot] ?? null;
+      const after = post.storage?.[slot] ?? null;
+      return before === after ? [] : [{ slot: slot.toLowerCase(), before, after }];
+    });
+    if (storage.length) effect.storage = storage;
+    return effect;
+  });
 }
 
 function analyzeAssets(logs, wallet, limits, chainId) {
@@ -227,6 +252,14 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   if (BigInt(state.walletBalanceDecrease) > maximumWalletBalanceDecrease) failures.push(`Wallet balance decrease ${state.walletBalanceDecrease} exceeds bounded native value plus maximum gas cost ${maximumWalletBalanceDecrease}.`);
   const assets = analyzeAssets(aggregate.logs, intent.from, config.assetLimits, intent.chainId);
   failures.push(...assets.violations);
+  // The sender pays execution fees. Independent nodes can legitimately simulate
+  // a slightly different base fee while agreeing on every contract effect. Each
+  // source still enforces the sender's total balance decrease above; the quorum
+  // fingerprint binds the nonce, call tree, logs, code, storage, and all other
+  // balance effects without treating bounded gas accounting as semantic drift.
+  const stateEffects = normalizedStateEffects(diffTrace, new Set([intent.from]));
+  const traceFingerprint = sha256({ callResult: normalizedTrace.output, trace: normalizedTrace });
+  const stateFingerprint = sha256(stateEffects);
   return {
     failures,
     metrics: {
@@ -244,8 +277,9 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
       outflows: assets.outflows,
       approvals: assets.approvals,
       walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })),
+      consensusEvidence: { traceFingerprint, stateFingerprint },
     },
-    fingerprint: sha256({ callResult: normalizedTrace.output, trace: normalizedTrace, stateDiff: diffTrace }),
+    fingerprint: sha256({ traceFingerprint, stateFingerprint }),
   };
 }
 
@@ -411,7 +445,14 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
       quorum: config.quorum,
       agreeingSources: consensus[1].map((result) => result.sourceId),
       metrics: selected?.metrics ?? null,
-      sources: results.map((result) => ({ id: result.sourceId, status: result.kind, failures: result.failures })),
+      sources: results.map((result) => ({
+        id: result.sourceId,
+        status: result.kind,
+        fingerprint: result.fingerprint,
+        consensusEvidence: result.metrics?.consensusEvidence ?? null,
+        blockNumber: result.blockNumber?.toString() ?? null,
+        failures: result.failures,
+      })),
     },
   };
 }

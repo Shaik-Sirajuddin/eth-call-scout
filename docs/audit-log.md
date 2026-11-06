@@ -5,7 +5,7 @@ Every wallet decision should be retained outside the agent's authority. `createA
 ```js
 import { createAuditLog } from './src/audit-log.js';
 
-const audit = createAuditLog('/trusted/callscout/receipts.jsonl');
+const audit = createAuditLog('/trusted/keybound/receipts.jsonl');
 const guarded = createGuardedProvider({
   provider: walletProvider,
   policy,
@@ -17,7 +17,7 @@ const guarded = createGuardedProvider({
 Verify the chain at startup, during monitoring, or after an incident:
 
 ```sh
-callscout audit verify /trusted/callscout/receipts.jsonl
+keybound audit verify /trusted/keybound/receipts.jsonl
 ```
 
 Receipts should retain the authenticated live-state hash/sequence and simulation fingerprint/source summary alongside deterministic checks. This lets incident response distinguish a policy denial, live-state veto, simulation violation, quorum failure, and wallet-forwarded allow.

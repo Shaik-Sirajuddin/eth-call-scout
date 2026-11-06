@@ -17,7 +17,7 @@ function response(idValue, result) {
   return { ok: true, headers: { get: () => String(body.length) }, arrayBuffer: async () => body };
 }
 
-function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat(20)}`, delegateCode = '0x6001600055', currentNonce = '0x7', rpcChainId = '0x1', traceFrom = null, unauthorizedInternalCall = false, outputByHost = {}, walletBalanceDecrease = null } = {}) {
+function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat(20)}`, delegateCode = '0x6001600055', currentNonce = '0x7', rpcChainId = '0x1', traceFrom = null, unauthorizedInternalCall = false, outputByHost = {}, walletBalanceDecrease = null, walletBalanceDecreaseByHost = {}, walletBalanceByHost = {} } = {}) {
   const methods = [];
   const transactions = [];
   const fetchImpl = async (url, options) => {
@@ -58,23 +58,25 @@ function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat
     if (request.method === 'debug_traceCall' && request.params[2].tracer === 'prestateTracer') {
       const tx = request.params[0];
       const authorization = tx.authorizationList?.[0];
-      const walletBalance = 10n ** 19n;
+      const host = new URL(url).hostname;
+      const walletBalance = walletBalanceByHost[host] ?? 10n ** 19n;
+      const balanceDecrease = walletBalanceDecreaseByHost[host] ?? walletBalanceDecrease;
       const walletPre = {
         ...(authorization ? { code: '0x' } : {}),
-        ...(walletBalanceDecrease == null ? {} : { balance: `0x${walletBalance.toString(16)}` }),
+        ...(balanceDecrease == null ? {} : { balance: `0x${walletBalance.toString(16)}` }),
       };
       const walletPost = {
         ...(authorization ? { code: `0xef0100${authorization.address.slice(2).toLowerCase()}` } : {}),
-        ...(walletBalanceDecrease == null ? {} : { balance: `0x${(walletBalance - walletBalanceDecrease).toString(16)}` }),
+        ...(balanceDecrease == null ? {} : { balance: `0x${(walletBalance - balanceDecrease).toString(16)}` }),
       };
       return response(request.id, {
         pre: {
           [intent.to.toLowerCase()]: { storage: { [ZERO_WORD]: ZERO_WORD } },
-          ...((authorization || walletBalanceDecrease != null) ? { [tx.from.toLowerCase()]: walletPre } : {}),
+          ...((authorization || balanceDecrease != null) ? { [tx.from.toLowerCase()]: walletPre } : {}),
         },
         post: {
           [intent.to.toLowerCase()]: { storage: { [ZERO_WORD]: ONE_WORD } },
-          ...((authorization || walletBalanceDecrease != null) ? { [tx.from.toLowerCase()]: walletPost } : {}),
+          ...((authorization || balanceDecrease != null) ? { [tx.from.toLowerCase()]: walletPost } : {}),
         },
       });
     }
@@ -104,6 +106,23 @@ test('allows wallet balance reduction for bounded gas but denies unexplained nat
   const denied = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: excessive.fetchImpl });
   assert.equal(denied.valid, false);
   assert.ok(denied.summary.sources.every((source) => source.failures.some((failure) => failure.includes('maximum gas cost'))));
+});
+
+test('reaches consensus across bounded provider-specific sender gas charges', async () => {
+  const fake = simulationFetch({
+    walletBalanceByHost: {
+      'primary.example': 10n ** 19n,
+      'secondary.example': 11n * (10n ** 18n),
+    },
+    walletBalanceDecreaseByHost: {
+      'primary.example': 98_398_660_252_872n,
+      'secondary.example': 98_399_604_422_504n,
+    },
+  });
+  const result = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fake.fetchImpl });
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.summary.agreeingSources, ['sim-primary', 'sim-secondary']);
+  assert.equal(result.summary.sources[0].consensusEvidence.stateFingerprint, result.summary.sources[1].consensusEvidence.stateFingerprint);
 });
 
 test('denies an unauthorized internal call observed by the simulation quorum', async () => {

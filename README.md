@@ -1,12 +1,12 @@
-# CallScout
+# Keybound
 
 Deterministic wallet authorization and live protocol defense for AI agents.
 
-AI agents are useful planners, but they should not be wallet security boundaries. CallScout lets an agent propose transactions through a restricted provider while ordinary code—not a prompt—decides whether the exact transaction may reach the wallet.
+AI agents are useful planners, but they should not be wallet security boundaries. Keybound lets an agent propose transactions through a restricted provider while ordinary code—not a prompt—decides whether the exact transaction may reach the wallet.
 
 > **AI proposes. Policy decides. Wallet signs.**
 
-CallScout combines four layers:
+Keybound combines four layers:
 
 1. **Executable wallet policy** — exact chains, wallets, contracts, selectors, value and fee ceilings, expiries, and ABI-word constraints.
 2. **Authenticated protocol state** — fresh, signed protocol health can veto a whitelisted target when it is degraded, paused, compromised, stale, or unknown.
@@ -17,7 +17,7 @@ The call scanner in this repository is one monitoring feature. It does not autho
 
 ## Why this is different from an agent instruction file
 
-Markdown instructions and system prompts are advisory. They can be ignored, misread, injected, or lost between model calls. CallScout policies are executable JSON evaluated outside the model at the EIP-1193 provider boundary.
+Markdown instructions and system prompts are advisory. They can be ignored, misread, injected, or lost between model calls. Keybound policies are executable JSON evaluated outside the model at the EIP-1193 provider boundary.
 
 The guarded provider:
 
@@ -30,7 +30,7 @@ The guarded provider:
 
 Missing data, invalid policies, unknown targets, unknown selectors, malformed calldata, and failed checks deny by default.
 
-Version 1 has a mandatory secure activation profile: an executable policy must be wallet-bound, expiring, gas-capped, protected by at least two live-state keys with a threshold of two, and configured with at least two simulation sources and a quorum of two. Drafts that do not yet satisfy activation can still be inspected with `callscout policy audit`, but they cannot authorize a wallet.
+Version 1 has a mandatory secure activation profile: an executable policy must be wallet-bound, expiring, gas-capped, protected by at least two live-state keys with a threshold of two, and configured with at least two simulation sources and a quorum of two. Drafts that do not yet satisfy activation can still be inspected with `keybound policy audit`, but they cannot authorize a wallet.
 
 ## Quick start
 
@@ -40,41 +40,46 @@ Requirements: Node.js 22 or newer. The real local-chain demo also requires [Foun
 npm ci
 
 # Validate the executable policy structure.
-npx callscout policy validate examples/wallet-policy.json
+npx keybound policy validate examples/wallet-policy.json
 
 # Audit a threshold-protected live-state policy.
-npx callscout policy audit examples/wallet-policy-live.json
+npx keybound policy audit examples/wallet-policy-live.json
 
 # Run the complete allow/deny scenario demo without a real wallet or RPC.
 npm run demo
 
-# Run real contracts and full traces against two independent Anvil nodes.
-npm run demo:anvil
+# Start the judge-facing Next.js app, Gateway API, contracts, and both Anvil nodes.
+npm run dev
+# open http://127.0.0.1:3000
+
+# In another terminal, exercise the external-agent API without a signer.
+npm run agent:smoke -- --origin http://127.0.0.1:3000
+
+# Or run all four real-chain scenarios non-interactively and exit.
+npm run anvil:smoke
 
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
 ```
 
-An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; CallScout never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by CallScout is the request forwarded to the wallet.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; Keybound never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by Keybound is the request forwarded to the wallet.
 
-## Web demo
+## Product surfaces
 
-The deployed demo includes the responsive product site, a generated monitoring report, and two purpose-separated authoring tools:
+The Next.js app serves the complete responsive demo from one origin:
 
-- [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
-- [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
-- [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
-- [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
+- `/` — product story and architecture;
+- `/runs` — live agent control room and persistent run history;
+- `/runs/:id` — complete evidence for one decision;
+- `/report` — interactive call-surface report;
+- `/policy` — zoomable wallet-policy block builder; and
+- `/api/v1/agent/*` — the restricted interface used by an external AI agent.
 
-Build and serve the same pages locally:
+`npm run dev` owns the full local lifecycle: it compiles the demo contracts, starts two independent Anvil execution sources, deploys identical fixtures, starts the wallet-policy Gateway, and serves Next.js at `http://127.0.0.1:3000`. Press `Ctrl+C` once to stop the app and both child nodes. Run `npm run demo:reset` only when you intentionally want to delete generated local run history before recording a clean demo.
 
-```sh
-npm run site:check
-npm run site:serve
-# open http://127.0.0.1:4173
-```
+The policy canvas compiles an executable draft; it does not activate or enforce it. Run `npx keybound policy validate <exported-policy.json>` before controlled activation. See the [live demo runbook](docs/anvil-demo.md), [Gateway API](docs/api.md), and [Vercel deployment](docs/deployment.md).
 
-`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/pr-review-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil run API. See the [live demo runbook](docs/anvil-demo.md).
+The current Vercel configuration builds the Next.js interface. The local Anvil Gateway is deliberately loopback-only and is not a production serverless backend. The later testnet beta requires authenticated agents, durable storage, independent remote RPC providers, and an isolated signer adapter before `/runs` can execute hosted transactions; the deployment guide states this boundary explicitly.
 
 ## Architecture
 
@@ -195,10 +200,10 @@ const agentProvider = createGuardedProvider({
   provider: walletProvider,
   policy,
   stateSource: createLiveStateSource({
-    url: 'https://state.example/callscout.json',
-    cachePath: '.cache/callscout/live-state.json',
+    url: 'https://state.example/keybound.json',
+    cachePath: '.cache/keybound/live-state.json',
   }),
-  stateSequenceStore: createFileSequenceStore('/trusted/callscout/state-sequence.json'),
+  stateSequenceStore: createFileSequenceStore('/trusted/keybound/state-sequence.json'),
   onDecision: (receipt) => appendToAuditLog(receipt),
 });
 
@@ -209,7 +214,7 @@ Never expose the underlying wallet provider, signer, seed phrase, private key, s
 
 ## Full transaction simulation
 
-Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout requires the proposed outer nonce to match each source's pending account nonce, then evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff using the same access list and envelope fields. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, nonce disagreement, trace disagreement, missing quorum, or malformed output deny.
+Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. Keybound requires the proposed outer nonce to match each source's pending account nonce, then evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff using the same access list and envelope fields. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, nonce disagreement, trace disagreement, missing quorum, or malformed output deny.
 
 EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. For both existing and newly installed delegates, every wallet-originated `CALL` and `STATICCALL` in the trace must pass exact contract, selector, calldata, value, and signed live-state rules; wallet-originated `DELEGATECALL` and `CALLCODE` deny. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
 
@@ -223,13 +228,13 @@ Fetching and caching never create trust; bundles remain untrusted until they pas
 
 ## Deterministic on-chain monitors
 
-CallScout collects protocol observations from at least two independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. The secure monitor profile requires a quorum of at least two: matching sources produce `operational`, deterministic mismatches produce `compromised`, and disagreement or outages produce `degraded`.
+Keybound collects protocol observations from at least two independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. The secure monitor profile requires a quorum of at least two: matching sources produce `operational`, deterministic mismatches produce `compromised`, and disagreement or outages produce `degraded`.
 
 ```sh
 export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
 export CALLSCOUT_RPC_SECONDARY='https://second-rpc.example'
 
-callscout state collect protocol-monitor.json \
+keybound state collect protocol-monitor.json \
   --sequence 42 \
   --out state-payload.json
 ```
@@ -238,14 +243,14 @@ Collection remains separate from signing so RPC-facing monitor processes never n
 
 ## Tamper-evident decisions
 
-Authorization receipts can be written to a single-writer, hash-chained JSONL log and verified with `callscout audit verify`. Protect or externally anchor the chain head; hash chaining detects tampering but is not immutable storage by itself. See [Authorization audit log](docs/audit-log.md).
+Authorization receipts can be written to a single-writer, hash-chained JSONL log and verified with `keybound audit verify`. Protect or externally anchor the chain head; hash chaining detects tampering but is not immutable storage by itself. See [Authorization audit log](docs/audit-log.md).
 
 ## Monitoring: static call discovery
 
-CallScout can inventory Ethereum interactions in JavaScript and TypeScript. It uses the TypeScript parser and never executes scanned source code.
+Keybound can inventory Ethereum interactions in JavaScript and TypeScript. It uses the TypeScript parser and never executes scanned source code.
 
 ```sh
-npx callscout scan src examples \
+npx keybound scan src examples \
   --out reports/eth-calls.html \
   --json reports/eth-calls.json
 ```
@@ -259,8 +264,8 @@ Static discovery is evidence for policy authoring and review. It cannot prove ru
 The registry enriches monitoring reports with known tokens, protocols, and contract roles. It is separate from the executable wallet policy: a registry match is an identity hint, not permission and not proof of safety.
 
 ```sh
-npx callscout registry sync all
-npx callscout registry search uniswap
+npx keybound registry sync all
+npx keybound registry search uniswap
 npm run ruleset:build
 ```
 
@@ -268,7 +273,7 @@ npm run ruleset:build
 
 ## Security posture
 
-CallScout reduces the authority given to an AI agent; it does not make arbitrary contracts safe. In particular:
+Keybound reduces the authority given to an AI agent; it does not make arbitrary contracts safe. In particular:
 
 - an allowlisted contract can still contain economic or logic risk;
 - a policy author can deliberately grant dangerous permissions;
@@ -289,8 +294,11 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Full transaction simulation and EIP-7702](docs/transaction-simulation.md)
 - [Authorization audit log](docs/audit-log.md)
 - [Wallet integration](docs/integration.md)
+- [Gateway API](docs/api.md)
 - [Monitoring and scanner](docs/monitoring.md)
-- [Demo runbook](docs/demo.md)
+- [Live dual-Anvil runbook](docs/anvil-demo.md)
+- [Demo and verification guide](docs/demo.md)
+- [Vercel deployment](docs/deployment.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Project status

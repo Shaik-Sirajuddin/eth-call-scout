@@ -25,15 +25,15 @@ test('visual policy builder exposes the complete local authoring workflow', () =
     'Live state quorum',
     'Simulation quorum',
     'Authorization receipt',
-    'callscout policy validate',
+    'keybound policy validate',
     'window.__callScoutPolicyBuilder',
-    'pr-review-ruleset.html',
   ]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
+  assert.doesNotMatch(html, /pr-review-ruleset\.html/);
   assert.match(html, /@media\(max-width:820px\)/);
   assert.match(html, /prefers-reduced-motion/);
   assert.match(html, /localStorage\.setItem\(STORAGE_KEY/);
-  assert.match(html, /application\/callscout-block/);
+  assert.match(html, /application\/keybound-block/);
 });
 
 test('policy seed and registry data cannot break out of the builder script', () => {

@@ -15,7 +15,7 @@ Checks are performed against every configured RPC source. A protocol is:
 - `compromised` when at least `rpcQuorum` sources return deterministic invariant mismatches; or
 - `degraded` when neither result reaches quorum because sources disagree or fail.
 
-The secure monitor profile requires at least two distinct RPC endpoint URLs and `rpcQuorum >= 2`. A single provider cannot produce an activation-valid CallScout observation by itself.
+The secure monitor profile requires at least two distinct RPC endpoint URLs and `rpcQuorum >= 2`. A single provider cannot produce an activation-valid Keybound observation by itself.
 
 Only `operational` can pass wallet authorization after the payload is signed and verified.
 
@@ -60,16 +60,16 @@ The checked-in demo values are synthetic and must not be reused for production. 
 export CALLSCOUT_RPC_PRIMARY='https://first-independent-rpc.example'
 export CALLSCOUT_RPC_SECONDARY='https://second-independent-rpc.example'
 
-callscout state collect protocol-monitor.json \
+keybound state collect protocol-monitor.json \
   --sequence 42 \
   --out state-payload.json
 
 # Sign in separate operational and security environments.
-callscout state sign state-payload.json \
+keybound state sign state-payload.json \
   --key operations.pem --key-id operations \
   --out state-one-signature.json
 
-callscout state sign state-payload.json \
+keybound state sign state-payload.json \
   --key security.pem --key-id security \
   --append state-one-signature.json \
   --out state-quorum.json

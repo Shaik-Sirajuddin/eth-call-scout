@@ -170,7 +170,7 @@ export function createLiveStateSource({ url, cachePath, fetchImpl = fetch, timeo
   if (endpoint.username || endpoint.password) throw new Error('Live protocol-state URLs must not contain credentials.');
   return async function liveStateSource() {
     try {
-      const response = await fetchImpl(endpoint, { headers: { accept: 'application/json', 'user-agent': 'callscout/0.1' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
+      const response = await fetchImpl(endpoint, { headers: { accept: 'application/json', 'user-agent': 'keybound/0.1' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok) throw new Error(`Protocol-state endpoint returned HTTP ${response.status}.`);
       const length = Number(response.headers.get('content-length'));
       if (Number.isFinite(length) && length > maxBytes) throw new Error('Protocol-state response is too large.');

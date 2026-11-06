@@ -1,6 +1,6 @@
 # Contributing
 
-CallScout sits on a wallet security boundary. Changes should be small, reviewable, default-deny, and covered by tests that prove both allowed and denied behavior.
+Keybound sits on a wallet security boundary. Changes should be small, reviewable, default-deny, and covered by tests that prove both allowed and denied behavior.
 
 ## Development
 

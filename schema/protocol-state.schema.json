@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://callscout.dev/schema/protocol-state.schema.json",
-  "title": "CallScout signed protocol-state bundle",
+  "$id": "https://keybound.dev/schema/protocol-state.schema.json",
+  "title": "Keybound signed protocol-state bundle",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "payload", "signatures"],
