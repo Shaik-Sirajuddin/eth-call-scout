@@ -65,3 +65,53 @@ curl -sS https://YOUR_VERCEL_DOMAIN/api/v1/agent/capabilities \
 ```
 
 The public browser UI does not receive this key. Operator mutations will use a separate server-side path and separate rate limits.
+
+## Build the persistent Gateway
+
+The Gateway is a separate container with a persistent volume. It refuses to start when `VERCEL` is present. Its authenticated `/health` route must prove Sepolia, two named RPC sources, a valid active policy, live-state quorum, and an EIP-7702 deny posture before the Vercel proxy accepts it.
+
+Prepare a fresh disposable wallet and two Ed25519 state-signing keys:
+
+```sh
+npm run contracts:build
+npm run sepolia:prepare
+```
+
+The command writes `.env.sepolia.local` with mode `0600` and prints only the public wallet address. Fund that address with faucet Sepolia ETH—never mainnet ETH—then fill in two independent trace-capable RPC URLs. Each provider must support all of these methods on Sepolia:
+
+- `eth_call` and `eth_estimateGas` for the exact type-2 request;
+- `debug_traceCall` with `callTracer`, `tracerConfig.withLog: true`;
+- `debug_traceCall` with `prestateTracer`, `diffMode: true`;
+- pending nonce, code, block, receipt and transaction reads; and
+- `debug_traceTransaction` for the post-mine verification path.
+
+WalletCordon probes both debug tracers before deploying contracts. A public endpoint that exposes ordinary JSON-RPC but disables the debug namespace is not a simulation source and must not be used.
+
+Deploy the safe router, the trace-denied router, tokens, and monitored fixtures:
+
+```sh
+npm run sepolia:deploy
+```
+
+The deployer writes `deployments/sepolia.json`. Review and commit that public manifest. It pins the wallet, both router addresses, runtime code hashes, monitor calls, signer public keys, policy expiry, value/gas/fee limits, two-source quorum, and the EIP-7702 denial. Private keys remain only in `.env.sepolia.local` and the Gateway host's secret store.
+
+Run the service locally against Sepolia:
+
+```sh
+npm run sepolia:gateway
+curl -sS http://127.0.0.1:8787/health \
+  -H "Authorization: Bearer $WALLETCORDON_GATEWAY_TOKEN"
+```
+
+For hosting, build `Dockerfile.gateway`, mount a durable volume at `/data`, expose the platform-assigned `PORT`, and configure every variable from `.env.sepolia.local` as a secret. Run exactly one replica: the beta history, sequence floor, spend tracker, and hash-chain appenders are single-writer. The container runs as a non-root user and exposes only unauthenticated `/live`; every capability, run, history, and health endpoint requires the Gateway service token.
+
+Do not deploy the Gateway without persistent storage. Run JSON, hash-chained audit receipts, alerts and the authenticated live-state sequence floor must survive restarts.
+
+## Real two-transaction proof
+
+The deployment creates two reviewed routers with identical runtime code:
+
+1. The safe router performs the bounded swap. Policy, current two-signature state, both full traces and the exact signer envelope must pass before it is broadcast.
+2. The trace-denied router is also an exact policy target, so a target allowlist alone would accept it. Its runtime state enables a call to `UnsafeTarget`. Both call trees expose that unapproved internal target, so WalletCordon denies before the signer sees the request.
+
+This makes the failed example a real simulation finding, not a hard-coded address denial or UI fixture.

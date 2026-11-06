@@ -53,6 +53,8 @@ This separation is intentional: the agent never receives the signer or private k
 
 The complete sequence and operational checks are in [Sepolia beta rollout](testnet-beta.md).
 
+The signer Gateway is shipped as `Dockerfile.gateway`. Deploy it to a container host that provides HTTPS termination, encrypted secrets, and a persistent volume mounted at `/data`. Vercel remains the frontend and authenticated proxy. The Gateway deliberately exits if it detects the Vercel runtime, which prevents an accidental private-key deployment in a serverless function.
+
 ## Make the judge URL public
 
 The production URL must not require a Vercel account.
