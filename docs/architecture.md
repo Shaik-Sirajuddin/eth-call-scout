@@ -1,6 +1,6 @@
 # Architecture and trust boundaries
 
-CallScout is a least-authority bridge between an untrusted AI agent and a wallet. The model may propose actions and inspect public chain state, but it is not allowed to decide which transaction is safe or invoke arbitrary wallet capabilities.
+Keybound is a least-authority bridge between an untrusted AI agent and a wallet. The model may propose actions and inspect public chain state, but it is not allowed to decide which transaction is safe or invoke arbitrary wallet capabilities.
 
 ## Decision path
 

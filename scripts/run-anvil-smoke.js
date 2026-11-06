@@ -1,6 +1,6 @@
-import { DemoRuntime } from '../src/demo-runtime.js';
+import { WalletPolicyGateway } from '../src/wallet-policy-gateway.js';
 
-const runtime = new DemoRuntime();
+const runtime = new WalletPolicyGateway();
 
 async function run(prompt, scenario) {
   const created = runtime.createRun(prompt, { scenario });

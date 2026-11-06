@@ -135,7 +135,7 @@ test('guard remembers an authenticated unsafe sequence and blocks rollback', asy
 });
 
 test('persistent sequence store refuses rollback', async () => {
-  const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'callscout-sequence-'));
+  const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'keybound-sequence-'));
   try {
     const store = createFileSequenceStore(path.join(directory, 'state.json'));
     assert.equal(await store.read(), 0);
@@ -148,12 +148,12 @@ test('persistent sequence store refuses rollback', async () => {
 });
 
 test('HTTPS live source caches untrusted bundles and falls back only to that cache', async () => {
-  const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'callscout-cache-'));
+  const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'keybound-cache-'));
   try {
     const state = bundle();
     let online = true;
     const source = createLiveStateSource({
-      url: 'https://state.example/callscout.json',
+      url: 'https://state.example/keybound.json',
       cachePath: path.join(directory, 'state.json'),
       fetchImpl: async () => {
         if (!online) throw new Error('offline');

@@ -106,7 +106,7 @@ const states = [
 const results = [];
 let forwarded = 0;
 let sequence = 0;
-const auditDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), 'callscout-demo-'));
+const auditDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), 'keybound-demo-'));
 const audit = createAuditLog(path.join(auditDirectory, 'receipts.jsonl'));
 const wallet = {
   async request(request) {
@@ -151,4 +151,4 @@ await scenario('Opaque message signing request', { method: 'personal_sign', para
 
 const auditStatus = await audit.verify();
 await fsp.rm(auditDirectory, { recursive: true });
-process.stdout.write(`${JSON.stringify({ product: 'CallScout', forwardedTransactions: forwarded, scenarios: results, audit: auditStatus }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ product: 'Keybound', forwardedTransactions: forwarded, scenarios: results, audit: auditStatus }, null, 2)}\n`);

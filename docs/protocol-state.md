@@ -1,6 +1,6 @@
 # Authenticated live protocol state
 
-A contract being allowlisted does not mean it is safe now. CallScout treats protocol state as an independent, fail-closed veto evaluated immediately before wallet forwarding.
+A contract being allowlisted does not mean it is safe now. Keybound treats protocol state as an independent, fail-closed veto evaluated immediately before wallet forwarding.
 
 ## Signed bundle
 
@@ -74,18 +74,18 @@ Production integrations should also pass `createFileSequenceStore()` or another 
 ## Offline signing commands
 
 ```sh
-callscout state sign payload.json \
+keybound state sign payload.json \
   --key operations-private.pem \
   --key-id operations \
   --out state-one-signature.json
 
-callscout state sign payload.json \
+keybound state sign payload.json \
   --key security-private.pem \
   --key-id security \
   --append state-one-signature.json \
   --out state-quorum.json
 
-callscout state verify state-quorum.json \
+keybound state verify state-quorum.json \
   --policy wallet-policy.json \
   --intent transaction-intent.json
 ```
@@ -94,4 +94,4 @@ Never place signing private keys in the repository, agent environment, browser b
 
 ## What produces status
 
-Signature verification proves who published a status, not whether the status is correct. Publishers should combine protocol-specific evidence such as implementation-slot and bytecode checks, pause state, oracle freshness, official incident signals, and independent RPC observations. CallScout's [deterministic protocol monitor](protocol-monitoring.md) collects bytecode, storage, and view-call invariants through an RPC quorum before signing.
+Signature verification proves who published a status, not whether the status is correct. Publishers should combine protocol-specific evidence such as implementation-slot and bytecode checks, pause state, oracle freshness, official incident signals, and independent RPC observations. Keybound's [deterministic protocol monitor](protocol-monitoring.md) collects bytecode, storage, and view-call invariants through an RPC quorum before signing.

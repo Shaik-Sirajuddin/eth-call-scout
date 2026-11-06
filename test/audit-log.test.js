@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createAuditLog, verifyAuditLog } from '../src/audit-log.js';
 
 test('writes and verifies a hash-chained receipt log', async () => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'callscout-audit-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'keybound-audit-'));
   const file = path.join(directory, 'receipts.jsonl');
   try {
     const log = createAuditLog(file);
@@ -21,7 +21,7 @@ test('writes and verifies a hash-chained receipt log', async () => {
 });
 
 test('detects receipt modification and refuses to append', async () => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'callscout-audit-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'keybound-audit-'));
   const file = path.join(directory, 'receipts.jsonl');
   try {
     const log = createAuditLog(file);

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanProject } from '../src/rust-scanner.js';
+import { scanFiles } from '../src/scanner.js';
 import { applyRuleset, enrichFindings } from '../src/registry.js';
 import { renderReport } from '../src/report.js';
 import { renderRulesetBuilder } from '../src/ruleset-page.js';
@@ -20,7 +20,12 @@ const baseRegistry = await readJson(path.join(ROOT, 'data', 'registry.static.jso
 const ruleset = await readJson(path.join(ROOT, '.secu'));
 const walletPolicy = await readJson(path.join(ROOT, 'examples', 'wallet-policy.json'));
 const registry = applyRuleset(baseRegistry, ruleset);
-const scan = scanProject([path.join(ROOT, 'examples')]);
+const exampleDirectory = path.join(ROOT, 'examples');
+const exampleFiles = (await fs.readdir(exampleDirectory, { withFileTypes: true }))
+  .filter((entry) => entry.isFile() && /\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts)$/i.test(entry.name) && !/\.d\.(?:ts|mts|cts)$/i.test(entry.name))
+  .map((entry) => path.join(exampleDirectory, entry.name))
+  .sort();
+const scan = { scanned_files: exampleFiles.length, findings: scanFiles(exampleFiles) };
 const findings = enrichFindings(scan.findings, registry).map((finding) => ({
   ...finding,
   file: publicPath(finding.file),
@@ -28,7 +33,7 @@ const findings = enrichFindings(scan.findings, registry).map((finding) => ({
 
 await fs.rm(DIST, { recursive: true, force: true });
 await fs.mkdir(DIST, { recursive: true });
-for (const asset of ['index.html', 'styles.css', 'app.js', 'demo.html', 'demo.css', 'demo.js']) {
+for (const asset of ['index.html', 'styles.css', 'app.js']) {
   await fs.copyFile(path.join(SITE, asset), path.join(DIST, asset));
 }
 
@@ -42,4 +47,4 @@ await fs.writeFile(path.join(DIST, 'report.json'), `${JSON.stringify(report, nul
 await fs.writeFile(path.join(DIST, 'ruleset.html'), renderRulesetBuilder(baseRegistry, walletPolicy), 'utf8');
 await fs.writeFile(path.join(DIST, '.nojekyll'), '', 'utf8');
 
-process.stdout.write(`Demo site: ${DIST}\nAgent control room: ${path.join(DIST, 'demo.html')}\nCall-surface report: ${path.join(DIST, 'report.html')}\nPolicy builder: ${path.join(DIST, 'ruleset.html')}\n`);
+process.stdout.write(`Generated web artifacts: ${DIST}\nCall-surface report: ${path.join(DIST, 'report.html')}\nPolicy builder: ${path.join(DIST, 'ruleset.html')}\n`);

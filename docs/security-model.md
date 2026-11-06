@@ -38,7 +38,7 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 
 The current trusted computing base includes:
 
-- the CallScout policy evaluator and guarded-provider code;
+- the Keybound policy evaluator and guarded-provider code;
 - the Node.js runtime and host operating system;
 - the activated policy and its distribution path;
 - the wallet implementation and its provider transport;
@@ -56,7 +56,7 @@ Simulation proves behavior only for the sampled chain state and exact transactio
 
 An allowlisted upgradeable proxy can change behavior without changing its address. Live-state monitors should track implementation slots, code hashes, pause state, oracle health, and protocol-specific incident signals where applicable.
 
-No automated system can guarantee a protocol is uncompromised. CallScout reduces blast radius and adds independent vetoes; it does not replace protocol audits, wallet security, incident response, or cautious limits.
+No automated system can guarantee a protocol is uncompromised. Keybound reduces blast radius and adds independent vetoes; it does not replace protocol audits, wallet security, incident response, or cautious limits.
 
 ## Fail-closed behavior
 

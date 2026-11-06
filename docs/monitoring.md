@@ -5,7 +5,7 @@ The scanner inventories likely Ethereum interactions in JavaScript and TypeScrip
 ## Run a scan
 
 ```sh
-npx callscout scan src examples \
+npx keybound scan src examples \
   --out reports/eth-calls.html \
   --json reports/eth-calls.json
 ```
@@ -34,9 +34,9 @@ Selector matches can be ambiguous. Only verified ABI decoding should be treated 
 The registry merges curated mappings with optional token, protocol, volume, and Aave address-book data. Registry matches add names, roles, and logos to reports. They are not security endorsements.
 
 ```sh
-npx callscout registry sync all
-npx callscout registry list contracts
-npx callscout registry search aave
+npx keybound registry sync all
+npx keybound registry list contracts
+npx keybound registry search aave
 ```
 
 ## Report interpretation
