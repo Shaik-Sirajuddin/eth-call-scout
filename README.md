@@ -1,70 +1,292 @@
-## Ethereum call scanner
+# CallScout
 
-This repository also contains `eth-call-scout`, a static-analysis CLI for finding Ethereum contract interactions and JSON-RPC calls in JavaScript and TypeScript. Its source parser and dependency traversal are implemented in Rust with Tree-sitter JavaScript and TypeScript grammars; the CLI keeps registry enrichment, ABI decoding, and HTML report generation in JavaScript.
+Deterministic wallet authorization and live protocol defense for AI agents.
 
-It recognizes common ethers `Contract` calls, viem actions (`readContract`, `writeContract`, `simulateContract`), EIP-1193 `request({ method, params })`, provider `send('eth_call', ...)`, direct `fetch` JSON-RPC payloads, and `{ to, data }` provider calls. The review report includes source locations, snippets, resolved literal addresses, function names when visible, arguments/calldata, RPC methods, and confidence notes.
+AI agents are useful planners, but they should not be wallet security boundaries. CallScout lets an agent propose transactions through a restricted provider while ordinary code—not a prompt—decides whether the exact transaction may reach the wallet.
 
-Passing a source file follows its transitive JavaScript/TypeScript imports, including installed package source resolved through TypeScript and the nearest `tsconfig.json`. Passing a directory scans its source files recursively (excluding common generated and dependency directories), then follows imports from those files. `.d.ts` declaration files are excluded.
+> **AI proposes. Policy decides. Wallet signs.**
+
+CallScout combines four layers:
+
+1. **Executable wallet policy** — exact chains, wallets, contracts, selectors, value and fee ceilings, expiries, and ABI-word constraints.
+2. **Authenticated protocol state** — fresh, signed protocol health can veto a whitelisted target when it is degraded, paused, compromised, stale, or unknown.
+3. **Full transaction simulation** — independent trace-capable RPCs must agree on call effects, logs, gas, state writes, code changes, and asset movement before forwarding.
+4. **Monitoring and evidence** — static call discovery, registry mapping, calldata decoding, interactive reports, and policy-bound authorization receipts.
+
+The call scanner in this repository is one monitoring feature. It does not authorize wallet access and is not the root of trust.
+
+## Why this is different from an agent instruction file
+
+Markdown instructions and system prompts are advisory. They can be ignored, misread, injected, or lost between model calls. CallScout policies are executable JSON evaluated outside the model at the EIP-1193 provider boundary.
+
+The guarded provider:
+
+- forwards a fixed set of read-only RPC methods;
+- evaluates the exact `eth_sendTransaction` fields immediately before forwarding;
+- requires full call, trace, log, and state-diff simulation after policy and live-state checks;
+- denies raw signing, typed-data signing, opaque raw transactions, wallet permission changes, chain switching, and unsupported batch methods;
+- forwards a transaction only when every deterministic check passes; and
+- emits a receipt containing policy and transaction hashes for audit.
+
+Missing data, invalid policies, unknown targets, unknown selectors, malformed calldata, and failed checks deny by default.
+
+## Quick start
+
+Requirements: Node.js 22 or newer.
 
 ```sh
-npm install
-# Rust/Cargo is needed the first time; npm run scan builds the parser automatically.
-npm run scan -- src examples --out reports/eth-calls.html --json reports/eth-calls.json
+npm ci
+
+# Validate the executable policy structure.
+npx callscout policy validate examples/wallet-policy.json
+
+# Audit a threshold-protected live-state policy.
+npx callscout policy audit examples/wallet-policy-live.json
+
+# Run the complete allow/deny scenario demo without a real wallet or RPC.
+npm run demo
+
+# Run every syntax check, security test, and the safe demo authorization.
+npm run verify
 ```
 
-Run `npm run scan -- --help` for CLI options. `examples/variations.ts` demonstrates the supported call styles.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
 
-Build the standalone Rust scanner explicitly with `npm run build:parser`. It walks supplied directories and follows relative imports and installed package entrypoints from file inputs, then returns findings as JSON to the JavaScript CLI.
+## Landing page
 
-### Token and protocol registry
-
-The scanner includes a curated Ethereum token/protocol directory, ETHGlobal Cannes 2026 sponsor integrations, and volume tracker platforms. It can refresh token names and logo URIs from Uniswap and Sushi token lists, protocol names/logos and DEX volume from DefiLlama, and Aave V3 Ethereum contract addresses from Aave's published address book. Live data is merged into a local cache under `.cache/eth-call-scout/registry.json`; the curated list remains available offline. Curated Uniswap router deployments and the synced Aave address book map contract addresses to their protocol entries.
+The responsive product site is buildless and lives in `site/`:
 
 ```sh
-npm run scan -- registry sync all
-npm run scan -- registry list tokens
-npm run scan -- registry list protocols
-npm run scan -- registry search uniswap
+npm run site:check
+npm run site:serve
+# open http://127.0.0.1:4173
 ```
 
-### Decode native calldata
+Its interactive decision lab is an illustrative presentation of the real receipt pipeline. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
 
-Pass `--decode` to query a verified ABI for each raw calldata target, decode the selector and arguments locally, and cache the ABI. When `ETHERSCAN_API_KEY` is set in the environment or a local `.env`, it checks Etherscan first, follows a verified proxy implementation when the proxy ABI does not contain the selector, then checks Sourcify. If neither source has a usable ABI, it looks up candidate signatures in Sourcify's 4byte database. Use `--chain-id` when scanning another EVM network.
+## Architecture
 
-```sh
-npm run scan -- src --decode --chain-id 1 --out reports/decoded.html
+```text
+Untrusted zone                         Deterministic security boundary
+
+User goal -> AI agent -> tx proposal -> guarded EIP-1193 provider
+                                            |
+                         +------------------+------------------+
+                         |                                     |
+                  executable policy                    signed live state
+                  + invariant checks                  + freshness checks
+                         |                                     |
+                         +---------------+---------------------+
+                                         |
+                           multi-RPC full transaction simulation
+                           + call trace + logs + state diff
+                                         |
+                                  allow / deny receipt
+                                         |
+                                  wallet only on allow
+
+Supporting evidence: source scanner -> registry -> ABI decoder -> review report
 ```
 
-Do not commit `.env`. Raw selectors may have collisions; the report marks ambiguous signature matches. Unverified contracts, dynamic addresses, and unsupported or unknown chain IDs can still remain undecoded. The scanner never executes scanned source code.
+The complete trust model is in [Architecture](docs/architecture.md) and [Security model](docs/security-model.md).
 
-The HTML report loads registry logos from their published HTTPS/IPFS URIs and displays a separate function-role badge inferred from the function name (for example, `swap`, `flash loan`, `lending`, `bridge`, or `token`). These role badges describe the call name and are not proof of the contract's verified purpose.
+## Executable policies
 
-### Pull request risk diffs
+Policies use exact values rather than natural-language intent. The version 1 schema is at [schema/wallet-policy.schema.json](schema/wallet-policy.schema.json).
 
-The repository uses `.secu` as a JSON ruleset file. Its `scanPaths` list selects which project areas run in CI; the checked-in config targets `examples/`. The `Secu contract call review` workflow scans those paths at the PR base and head revisions with the same Rust analyzer and emits a Markdown diff containing risk scores, parsed call-site changes, protocols, and function names/signatures.
+```json
+{
+  "version": 1,
+  "name": "Conservative mainnet agent",
+  "defaultAction": "deny",
+  "chains": [1],
+  "wallets": ["0x1111111111111111111111111111111111111111"],
+  "validUntil": "2030-01-01T00:00:00.000Z",
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "threshold": 2,
+    "trustedKeys": [
+      { "id": "operations", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" },
+      { "id": "security", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" }
+    ]
+  },
+  "simulation": {
+    "required": true,
+    "blockTag": "pending",
+    "quorum": 2,
+    "maxBlockSkew": 5,
+    "maxGasEstimate": "350000",
+    "maxCallDepth": 8,
+    "maxInternalCalls": 64,
+    "maxStateAccounts": 128,
+    "maxStorageWrites": 256,
+    "denyCodeChanges": true,
+    "eip7702": {
+      "allowAuthorizationList": false,
+      "allowDelegatedWallet": false,
+      "maxAuthorizations": 1,
+      "delegates": []
+    },
+    "allowedCallTypes": ["CALL", "STATICCALL", "DELEGATECALL"],
+    "internalTargets": [],
+    "assetLimits": [],
+    "sources": [
+      { "id": "sim-a", "env": "CALLSCOUT_SIM_PRIMARY" },
+      { "id": "sim-b", "env": "CALLSCOUT_SIM_SECONDARY" }
+    ]
+  },
+  "invariants": {
+    "maxNativeValueWei": "10000000000000000",
+    "maxGas": "350000",
+    "maxGasPriceWei": "100000000000",
+    "maxFeePerGasWei": "100000000000",
+    "maxPriorityFeePerGasWei": "5000000000",
+    "requireCalldata": true,
+    "denyUnlimitedApproval": true
+  },
+  "contracts": [
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": ["0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"]
+            },
+            { "type": "uint-max", "argument": 1, "value": "1000000000" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
 
-The scan job has read-only permissions. A separate `workflow_run` workflow, defined on the default branch, posts the generated Markdown as a PR review comment with `GITHUB_TOKEN`; it reads the artifact as text and does not check out or run PR code. Actions are pinned to full commit SHAs. The current example PRs add native JSON-RPC Aave and Uniswap call sites.
+The gate reads the selector and static ABI words directly from calldata. A label such as `approve(address,uint256)` is documentation only; it is never trusted as authorization input. See [Policy reference](docs/policies.md).
 
-### Interactive review and custom terms
+## Guard a wallet provider
 
-The generated HTML is a self-contained dashboard with three independently toggleable areas: a risk summary, switchable tables, and a zoomable graph. The graph lays calls out left to right inside outlined groups and uses stable colors per protocol or token. The tables cover inferred transaction groups, protocols, tokens, and addresses; each table keeps its own search and sort settings, and the table area can expand over the graph.
+```js
+import { createGuardedProvider } from './src/wallet-guard.js';
+import { createFileSequenceStore, createLiveStateSource } from './src/protocol-state.js';
+import policy from './agent-policy.json' with { type: 'json' };
 
-The CLI detects source code, so it cannot establish that calls execute in the same on-chain transaction or recover runtime timestamps. It groups calls by source function unless a transaction hash is supplied in the finding data; those groups are explicitly labeled as inferred. Call source is marked `static` for source-code detections and `runtime` only when runtime evidence is present.
+const agentProvider = createGuardedProvider({
+  provider: walletProvider,
+  policy,
+  stateSource: createLiveStateSource({
+    url: 'https://state.example/callscout.json',
+    cachePath: '.cache/callscout/live-state.json',
+  }),
+  stateSequenceStore: createFileSequenceStore('/trusted/callscout/state-sequence.json'),
+  onDecision: (receipt) => appendToAuditLog(receipt),
+});
 
-Address ratings follow the active terms registry: blacklisted addresses are high risk, known addresses are low risk, and unknown addresses are low-mid risk. The overall score summarizes the highest observed weighted address and parameter exposure. A registry match is an identity hint, not a safety guarantee; this is not a security audit. Static slippage checks only flag recognizable values exposed in call parameters.
+// Give agentProvider—not walletProvider—to the agent runtime.
+```
 
-Build or open the standalone ruleset editor:
+Never expose the underlying wallet provider, signer, seed phrase, private key, session key, or raw-signing API to the agent. Integration requirements are in [Wallet integration](docs/integration.md).
+
+## Full transaction simulation
+
+Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, trace disagreement, missing quorum, or malformed output deny.
+
+EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
+
+## Live protocol veto
+
+Policies can require a fresh protocol-state bundle signed by a threshold of pinned Ed25519 keys. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
+
+Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
+
+## Deterministic on-chain monitors
+
+CallScout can collect protocol observations from multiple independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. A quorum of matching sources produces `operational`; a quorum of deterministic mismatches produces `compromised`; disagreement or outages produce `degraded`.
 
 ```sh
+export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
+export CALLSCOUT_RPC_SECONDARY='https://second-rpc.example'
+
+callscout state collect protocol-monitor.json \
+  --sequence 42 \
+  --out state-payload.json
+```
+
+Collection remains separate from signing so RPC-facing monitor processes never need state-signing private keys. See [Protocol monitoring](docs/protocol-monitoring.md).
+
+## Tamper-evident decisions
+
+Authorization receipts can be written to a single-writer, hash-chained JSONL log and verified with `callscout audit verify`. Protect or externally anchor the chain head; hash chaining detects tampering but is not immutable storage by itself. See [Authorization audit log](docs/audit-log.md).
+
+## Monitoring: static call discovery
+
+CallScout can inventory Ethereum interactions in JavaScript and TypeScript. It uses the TypeScript parser and never executes scanned source code.
+
+```sh
+npx callscout scan src examples \
+  --out reports/eth-calls.html \
+  --json reports/eth-calls.json
+```
+
+It recognizes ethers `Contract` calls, viem actions, EIP-1193 `request`, provider `send`/`call`, and direct `fetch` JSON-RPC payloads. `--decode` can resolve raw calldata using a verified ABI or selector candidates.
+
+Static discovery is evidence for policy authoring and review. It cannot prove runtime control flow, transaction ordering, protocol safety, or authorization. See [Monitoring](docs/monitoring.md).
+
+## Registry and analyzer rulesets
+
+The registry enriches monitoring reports with known tokens, protocols, and contract roles. It is separate from the executable wallet policy: a registry match is an identity hint, not permission and not proof of safety.
+
+```sh
+npx callscout registry sync all
+npx callscout registry search uniswap
 npm run ruleset:build
-# Open ruleset.html directly in a browser
 ```
 
-The editor starts from `data/registry.static.json`, searches and filters the premapped tokens, protocols, and contracts, supports including/excluding defaults, and lets you add custom mappings, blacklist addresses, and set a high-slippage threshold in basis points. Download its JSON ruleset and apply it during analysis:
+The standalone `ruleset.html` editor controls report mappings. It does not grant wallet access.
 
-```sh
-npm run scan -- src/index.ts --ruleset eth-call-scout.ruleset.json \\
-  --out reports/calls.html --json reports/calls.json
-```
+## Security posture
 
-Rulesets use version 1 JSON. Set `includeDefaults` to false to use only custom mappings, or use `excludeAddresses` / `excludeProtocolIds` for selected exclusions. `blacklistAddresses` identifies high-risk addresses; `knownAddresses` can add trusted address identities; `trustedFunctions` marks exact function names in the report; and `highSlippageBps` controls the static slippage warning threshold (default 500). `tokens`, `protocols`, and `contracts` hold custom mappings; entries can have `enabled: false` to keep them in the file without applying them.
+CallScout reduces the authority given to an AI agent; it does not make arbitrary contracts safe. In particular:
+
+- an allowlisted contract can still contain economic or logic risk;
+- a policy author can deliberately grant dangerous permissions;
+- selectors can collide, so target address and chain are always part of the decision;
+- static ABI-word constraints do not decode dynamic tuples or arrays;
+- a compromised wallet implementation, host process, policy distribution path, or trusted live-state signer remains in the trusted computing base; and
+- simulation cannot predict behavior under every future state, caller, block, or transaction ordering; persistent delegates and protocol contracts still require reviewed identity and conservative limits.
+
+Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include private keys, seed phrases, production RPC credentials, or exploitable wallet details in public issues.
+
+## Documentation
+
+- [Architecture and trust boundaries](docs/architecture.md)
+- [Security and threat model](docs/security-model.md)
+- [Policy reference](docs/policies.md)
+- [Authenticated live protocol state](docs/protocol-state.md)
+- [Deterministic protocol monitoring](docs/protocol-monitoring.md)
+- [Full transaction simulation and EIP-7702](docs/transaction-simulation.md)
+- [Authorization audit log](docs/audit-log.md)
+- [Wallet integration](docs/integration.md)
+- [Monitoring and scanner](docs/monitoring.md)
+- [Demo runbook](docs/demo.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Project status
+
+This is an ETHGlobal prototype under active security hardening. Use test wallets and test networks while evaluating it. A production deployment requires an independent security review of the policy engine, state-signing operations, wallet adapter, and release pipeline.
+
+## Secu pull request review
+
+The repository root `.secu` file is the version 1 JSON ruleset for source review. Its `scanPaths` field selects the files to compare; the current configuration targets `examples/`. On each pull request, the **Secu contract call review** workflow runs the Rust parser against the base and proposed commits on GitHub-hosted runners, then publishes a Markdown artifact with the risk score, summary, parsed call changes, protocols added or removed, and function signatures added or removed. The report compares static source findings and does not claim that separate calls execute in the same on-chain transaction.
+
+The scanner job has read-only repository permissions. A separate workflow, triggered only after the scan workflow completes, reads the text artifact and posts it as a pull request comment review using the repository token. It does not check out or execute pull request code. Actions are pinned to full commit SHAs.
+
+To change the review scope, edit `scanPaths` in `.secu`; add blacklist/known addresses or registry mappings there to tune risk labels. The scanner compiles from `parser-rs/` via `npm run build:parser`; the JavaScript CLI and report renderer remain in `src/`.

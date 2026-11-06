@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "name": "Conservative mainnet agent",
+  "defaultAction": "deny",
+  "chains": [1],
+  "wallets": ["0x1111111111111111111111111111111111111111"],
+  "validUntil": "2030-01-01T00:00:00.000Z",
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "maxClockSkewSeconds": 15,
+    "minimumSequence": 1,
+    "threshold": 2,
+    "trustedKeys": [
+      {
+        "id": "demo-operations",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAggr+2Q9zdj11F+msBRF2HXBnaSj5jBwadKnGkCEp450="
+      },
+      {
+        "id": "demo-security",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAGYPQAi+KlxPvtvHMuS7FFpeqK5nXIjDeuVjalSMFbyY="
+      }
+    ]
+  },
+  "simulation": {
+    "required": true,
+    "blockTag": "pending",
+    "timeoutMs": 12000,
+    "quorum": 2,
+    "maxBlockSkew": 5,
+    "maxGasEstimate": "350000",
+    "maxCallDepth": 8,
+    "maxInternalCalls": 64,
+    "maxStateAccounts": 128,
+    "maxStorageWrites": 256,
+    "denyCodeChanges": true,
+    "eip7702": {
+      "allowAuthorizationList": false,
+      "allowDelegatedWallet": false,
+      "maxAuthorizations": 1,
+      "delegates": []
+    },
+    "allowedCallTypes": ["CALL", "STATICCALL", "DELEGATECALL"],
+    "internalTargets": [],
+    "assetLimits": [
+      {
+        "chainId": 1,
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "maxOutflow": "0",
+        "maxApproval": "1000000000",
+        "allowedRecipients": [],
+        "allowedSpenders": ["0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"]
+      }
+    ],
+    "sources": [
+      { "id": "sim-primary", "env": "CALLSCOUT_SIM_PRIMARY" },
+      { "id": "sim-secondary", "env": "CALLSCOUT_SIM_SECONDARY" }
+    ]
+  },
+  "invariants": {
+    "maxNativeValueWei": "10000000000000000",
+    "maxGas": "350000",
+    "maxGasPriceWei": "100000000000",
+    "maxFeePerGasWei": "100000000000",
+    "maxPriorityFeePerGasWei": "5000000000",
+    "requireCalldata": true,
+    "denyUnlimitedApproval": true
+  },
+  "contracts": [
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": ["0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "1000000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
