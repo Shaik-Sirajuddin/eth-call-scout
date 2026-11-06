@@ -26,6 +26,7 @@
     </button>
     <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav>
       <a href="#how-it-works">How it works</a>
+      <a href="#product-tour">Product tour</a>
       <a href="#decision-lab">Decision lab</a>
       <a href="#tools">Live tools</a>
       <a href="#security">Security</a>
@@ -41,7 +42,7 @@
         <h1>Let agents act.<br><em>Keep wallets sovereign.</em></h1>
         <p class="hero-lede">CallScout lets AI propose transactions without giving it unrestricted wallet authority. Executable policy, signed live protocol state, and full EVM simulation must all agree before the wallet ever sees a request.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#decision-lab">Inspect a decision <span aria-hidden="true">↓</span></a>
+          <a class="button button-primary" href="#product-tour">Watch the full path <span aria-hidden="true">↓</span></a>
           <a class="button button-ghost" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">View source <span aria-hidden="true">↗</span></a>
         </div>
         <div class="hero-proof" aria-label="Product properties">
@@ -130,6 +131,40 @@
       </div>
     </section>
 
+    <section class="section tour-section" id="product-tour">
+      <div class="section-heading reveal">
+        <div class="eyebrow">End-to-end product tour</div>
+        <h2>Follow one agent request all the way to the wallet.</h2>
+        <p>Move through the exact trust path: the agent proposes a concrete transaction, deterministic policy narrows it, live state and full simulation independently veto it, and the wallet receives only an all-pass request.</p>
+      </div>
+      <div class="tour-shell reveal" data-tour tabindex="0" aria-label="CallScout end-to-end product slideshow">
+        <div class="tour-visuals">
+          <article class="tour-slide active" data-tour-slide="0" aria-hidden="false">
+            <div class="tour-copy"><span>01 · UNTRUSTED PLANNER</span><h3>Prompt becomes an exact transaction proposal.</h3><p>The agent may interpret intent and construct calldata, but it receives no signer and cannot authorize itself.</p></div>
+            <div class="prompt-shot"><div class="shot-bar"><i></i><i></i><i></i><span>agent / proposal</span></div><blockquote>“Swap 100 USDC for ETH with at least 0.04 ETH out.”</blockquote><div class="proposal-grid"><span>TO</span><code>0x68b3…5fc45</code><span>SELECTOR</span><code>0x414bf389</code><span>VALUE</span><code>0 wei</code><span>NONCE</span><code>0x18</code></div><b>UNTRUSTED INPUT</b></div>
+          </article>
+          <article class="tour-slide" data-tour-slide="1" aria-hidden="true">
+            <div class="tour-copy"><span>02 · EXECUTABLE POLICY</span><h3>Code checks authority—not an LLM prompt.</h3><p>Wallet, chain, contract, selector, ABI arguments, value, gas, fee ceilings, expiry, and approval limits must all match.</p></div>
+            <div class="policy-shot"><div class="policy-line"><span>Wallet + chain</span><b>PASS</b></div><div class="policy-line"><span>Router + selector</span><b>PASS</b></div><div class="policy-line"><span>Amount ≤ 1,000 USDC</span><b>PASS</b></div><div class="policy-line"><span>Minimum output bounded</span><b>PASS</b></div><div class="policy-hash"><span>POLICY HASH</span><code>8e4f01c4…c291</code></div></div>
+          </article>
+          <article class="tour-slide" data-tour-slide="2" aria-hidden="true">
+            <div class="tour-copy"><span>03 · LIVE STATE + SIMULATION</span><h3>Whitelist status is re-proved at runtime.</h3><p>Signed monitors check current protocol identity while trace-capable nodes agree on calls, logs, storage writes, gas, and asset movement.</p></div>
+            <div class="quorum-shot"><div class="quorum-column"><small>LIVE PROTOCOL STATE</small><strong>OPERATIONAL</strong><span>runtime code hash</span><span>pause state</span><span>2 / 2 signatures</span></div><div class="quorum-arrow">→</div><div class="quorum-column"><small>FULL EVM SIMULATION</small><strong>2 / 2 MATCH</strong><span>3 calls · depth 2</span><span>100 USDC out</span><span>0 code changes</span></div></div>
+          </article>
+          <article class="tour-slide" data-tour-slide="3" aria-hidden="true">
+            <div class="tour-copy"><span>04 · WALLET + EVIDENCE</span><h3>Forward once. Preserve every reason.</h3><p>An allow receipt binds the exact transaction, policy, live-state bundle, and simulation fingerprint. Every denial stops before the wallet.</p></div>
+            <div class="receipt-shot"><div class="receipt-verdict"><i>✓</i><div><small>FINAL DECISION</small><strong>ALLOW</strong></div></div><ol><li><span>Agent proposal</span><b>RECORDED</b></li><li><span>Policy checks</span><b>PASS</b></li><li><span>State + simulation</span><b>PASS</b></li><li><span>Wallet forwarding</span><b>1 REQUEST</b></li></ol><code>receipt_0187 · hash chained</code></div>
+          </article>
+        </div>
+        <div class="tour-controls">
+          <button type="button" data-tour-prev aria-label="Previous product-tour slide">←</button>
+          <div class="tour-dots" role="tablist" aria-label="Product-tour slides"><button class="active" type="button" data-tour-dot="0" aria-label="Show agent proposal slide" aria-selected="true"></button><button type="button" data-tour-dot="1" aria-label="Show executable policy slide" aria-selected="false"></button><button type="button" data-tour-dot="2" aria-label="Show live state and simulation slide" aria-selected="false"></button><button type="button" data-tour-dot="3" aria-label="Show wallet receipt slide" aria-selected="false"></button></div>
+          <span data-tour-count>01 / 04</span>
+          <button type="button" data-tour-next aria-label="Next product-tour slide">→</button>
+        </div>
+      </div>
+    </section>
+
     <section class="section lab-section" id="decision-lab">
       <div class="section-heading reveal">
         <div class="eyebrow">Interactive decision lab</div>
@@ -205,19 +240,45 @@
           <p>Drag and connect wallet, invariant, contract, live-state, simulation, asset, and 7702 blocks on a pannable, zoomable canvas.</p>
           <span class="tool-link">Compose wallet authority <b aria-hidden="true">→</b></span>
         </a>
-        <a class="tool-card scanner-tool reveal" href="./scanner-ruleset.html">
-          <div class="tool-card-top"><span>03 · MONITORING TERMS</span><b>OPEN ↗</b></div>
+        <a class="tool-card scanner-tool reveal" href="./pr-review-ruleset.html">
+          <div class="tool-card-top"><span>03 · REVIEW AGENT TERMS</span><b>OPEN ↗</b></div>
           <div class="tool-visual rules-visual" aria-hidden="true">
             <div class="rule-toggle"><i></i><span>DEFAULT REGISTRY</span><b>ON</b></div>
             <div class="rule-row"><i></i><span>Uniswap</span><b>KNOWN</b></div>
             <div class="rule-row"><i></i><span>Project vault</span><b>CUSTOM</b></div>
           </div>
-          <h3>Scanner terms</h3>
-          <p>Manage source-review mappings, blacklists, trusted function names, and slippage thresholds independently from wallet policy.</p>
-          <span class="tool-link">Tune monitoring evidence <b aria-hidden="true">→</b></span>
+          <h3>PR Review Agent ruleset</h3>
+          <p>Manage source-review mappings, blacklists, trusted functions, and risk thresholds independently from wallet policy.</p>
+          <span class="tool-link">Configure review evidence <b aria-hidden="true">→</b></span>
         </a>
       </div>
       <p class="tool-boundary reveal"><strong>Trust boundary:</strong> the canvas authors policy but cannot grant access. Only the deterministic validator, guarded provider, authenticated live state, and simulation quorum can authorize a transaction.</p>
+    </section>
+
+    <section class="section reviews-section" id="review-agent">
+      <div class="section-heading reveal">
+        <div class="eyebrow">PR Review Agent · real workflow evidence</div>
+        <h2>See what the agent reports before code lands.</h2>
+        <p>These snapshots reproduce automated CallScout review results from the project’s own pull requests. Open the source review to verify the complete agent output.</p>
+      </div>
+      <div class="review-gallery">
+        <article class="review-snapshot review-high reveal">
+          <div class="snapshot-chrome"><span><i></i><i></i><i></i></span><b>PR REVIEW AGENT</b><em>BLOCK</em></div>
+          <div class="snapshot-body"><small>SECU SCAN DIFF</small><h3>Risk score: 100/100 · HIGH</h3><div class="review-verdict">⛔ BLACKLISTED / MAINTAINER REQUIRED</div><div class="review-stats"><span><b>1</b> blacklisted</span><span><b>10</b> unknown</span><span><b>12</b> calls added</span></div><pre><code>+ eth_call  0xBADD…0001<br>+ eth_call  0x1111…1111<br>+ 10 more newly parsed targets</code></pre></div>
+          <a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/pull/20">View source review <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="review-snapshot review-clear reveal">
+          <div class="snapshot-chrome"><span><i></i><i></i><i></i></span><b>PR REVIEW AGENT</b><em>PASS</em></div>
+          <div class="snapshot-body"><small>SECU SCAN DIFF</small><h3>Risk score: 0/100 · LOW</h3><div class="review-verdict">✓ LOW RISK · NO NEW CALLS</div><div class="review-stats"><span><b>0</b> blacklisted</span><span><b>0</b> unknown</span><span><b>100</b> safety</span></div><pre><code>Diff: no parsed call,<br>protocol, or function changes.</code></pre></div>
+          <a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/pull/24">View source review <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="review-snapshot review-neutral reveal">
+          <div class="snapshot-chrome"><span><i></i><i></i><i></i></span><b>PR REVIEW AGENT</b><em>UNCHANGED</em></div>
+          <div class="snapshot-body"><small>DELEGATED WALLET PATCH</small><h3>Call surface remained stable.</h3><div class="review-verdict">✓ NO PARSED TRANSACTIONS ADDED</div><div class="review-stats"><span><b>3</b> known</span><span><b>3</b> unresolved</span><span><b>20</b> base risk</span></div><pre><code>Added calls: none<br>Removed calls: none<br>Function changes: none</code></pre></div>
+          <a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/pull/11">View source review <span aria-hidden="true">↗</span></a>
+        </article>
+      </div>
+      <div class="review-actions reveal"><a class="button button-primary" href="./report.html">Open full agent report <span aria-hidden="true">→</span></a><a class="button button-ghost" href="./pr-review-ruleset.html">Configure review rules <span aria-hidden="true">→</span></a></div>
     </section>
 
     <section class="section layers-section" id="security">
@@ -293,7 +354,7 @@
 <span class="muted"># deterministic policy</span>         <span class="ok">PASS</span>
 <span class="muted"># signed live protocol state</span>  <span class="ok">PASS</span>
 <span class="muted"># full transaction simulation</span> <span class="ok">PASS</span>
-<span class="muted"># 73 security tests</span>           <span class="ok">PASS</span>
+<span class="muted"># 76 security tests</span>           <span class="ok">PASS</span>
 <span class="muted"># forwarded transactions</span>       <span class="number">1 / 6</span></code></pre>
         <button class="copy-command" type="button" data-copy="npm ci && npm run verify"><span>Copy command</span><b aria-hidden="true">⌘C</b></button>
       </div>
@@ -316,7 +377,7 @@
       <span>CallScout</span>
     </a>
     <p>Deterministic wallet authorization and live protocol defense for AI agents.</p>
-    <div class="footer-links"><a href="./report.html">Report</a><a href="./ruleset.html">Policy builder</a><a href="./scanner-ruleset.html">Scanner terms</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/tree/main/docs">Docs</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout">GitHub</a></div>
+    <div class="footer-links"><a href="./report.html">Agent report</a><a href="./ruleset.html">Policy builder</a><a href="./pr-review-ruleset.html">Review ruleset</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/tree/main/docs">Docs</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout">GitHub</a></div>
     <span class="footer-note">ETHGlobal prototype · test networks recommended</span>
   </footer>
 </body>

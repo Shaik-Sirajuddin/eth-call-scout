@@ -60,7 +60,7 @@ Public judge-ready pages:
 
 - [Example interactive report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
 - [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
-- [Scanner registry and risk terms](https://shaik-sirajuddin.github.io/eth-call-scout/scanner-ruleset.html)
+- [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
 
 To generate and serve the same pages locally:
 

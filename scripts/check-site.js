@@ -16,11 +16,21 @@ requireMatch(/<meta\s+name="description"\s+content="[^"]+"/, 'Landing page requi
 requireMatch(/<meta\s+name="viewport"/, 'Landing page requires a responsive viewport.');
 requireMatch(/<h1>[\s\S]*?<\/h1>/, 'Landing page requires one primary heading.');
 requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.');
+requireMatch(/data-tour/, 'Landing page requires the end-to-end product tour.');
+requireMatch(/data-tour-slide="3"/, 'Product tour must cover the complete four-stage trust path.');
+requireMatch(/id="review-agent"/, 'Landing page requires the PR Review Agent evidence gallery.');
+for (const pr of ['20', '24', '11']) requireMatch(new RegExp(`pull/${pr}`), `Review gallery must link to source PR #${pr}.`);
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
-for (const required of ['report.html', 'ruleset.html', 'scanner-ruleset.html']) {
+for (const required of ['report.html', 'ruleset.html', 'pr-review-ruleset.html']) {
   if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
+}
+const reviewRulesetPath = path.join(root, 'pr-review-ruleset.html');
+if (fs.existsSync(reviewRulesetPath)) {
+  const reviewRuleset = fs.readFileSync(reviewRulesetPath, 'utf8');
+  if (!/PR Review Agent Ruleset/.test(reviewRuleset)) errors.push('Review ruleset must use the user-facing PR Review Agent name.');
+  if (!/Wallet authorization remains a separate executable policy/.test(reviewRuleset)) errors.push('Review ruleset must disclose its non-authorizing scope.');
 }
 const policyBuilderPath = path.join(root, 'ruleset.html');
 if (fs.existsSync(policyBuilderPath)) {

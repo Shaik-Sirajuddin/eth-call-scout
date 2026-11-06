@@ -69,6 +69,7 @@ const stateHash = document.querySelector('[data-state-hash]');
 const traceHash = document.querySelector('[data-trace-hash]');
 const receiptTime = document.querySelector('[data-receipt-time]');
 const scenarioButtons = [...document.querySelectorAll('[data-scenario]')];
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function renderScenario(name) {
   const scenario = scenarios[name];
@@ -111,6 +112,61 @@ function renderScenario(name) {
 scenarioButtons.forEach((button) => button.addEventListener('click', () => renderScenario(button.dataset.scenario)));
 renderScenario('safe');
 
+const tour = document.querySelector('[data-tour]');
+const tourSlides = [...document.querySelectorAll('[data-tour-slide]')];
+const tourDots = [...document.querySelectorAll('[data-tour-dot]')];
+const tourCount = document.querySelector('[data-tour-count]');
+const tourPrev = document.querySelector('[data-tour-prev]');
+const tourNext = document.querySelector('[data-tour-next]');
+let activeTourSlide = 0;
+let tourTimer;
+
+function showTourSlide(index) {
+  if (!tourSlides.length) return;
+  activeTourSlide = (index + tourSlides.length) % tourSlides.length;
+  tourSlides.forEach((slide, slideIndex) => {
+    const active = slideIndex === activeTourSlide;
+    slide.classList.toggle('active', active);
+    slide.setAttribute('aria-hidden', String(!active));
+  });
+  tourDots.forEach((dot, dotIndex) => {
+    const active = dotIndex === activeTourSlide;
+    dot.classList.toggle('active', active);
+    dot.setAttribute('aria-selected', String(active));
+    dot.tabIndex = active ? 0 : -1;
+  });
+  if (tourCount) {
+    tourCount.textContent = `${String(activeTourSlide + 1).padStart(2, '0')} / ${String(tourSlides.length).padStart(2, '0')}`;
+  }
+}
+
+function stopTourAutoplay() {
+  window.clearInterval(tourTimer);
+  tourTimer = undefined;
+}
+
+function startTourAutoplay() {
+  if (reducedMotion || !tourSlides.length || tourTimer) return;
+  tourTimer = window.setInterval(() => showTourSlide(activeTourSlide + 1), 7000);
+}
+
+tourPrev?.addEventListener('click', () => showTourSlide(activeTourSlide - 1));
+tourNext?.addEventListener('click', () => showTourSlide(activeTourSlide + 1));
+tourDots.forEach((dot) => dot.addEventListener('click', () => showTourSlide(Number(dot.dataset.tourDot))));
+tour?.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  showTourSlide(activeTourSlide + (event.key === 'ArrowRight' ? 1 : -1));
+});
+tour?.addEventListener('mouseenter', stopTourAutoplay);
+tour?.addEventListener('mouseleave', startTourAutoplay);
+tour?.addEventListener('focusin', stopTourAutoplay);
+tour?.addEventListener('focusout', (event) => {
+  if (!tour.contains(event.relatedTarget)) startTourAutoplay();
+});
+showTourSlide(0);
+startTourAutoplay();
+
 const header = document.querySelector('[data-header]');
 const nav = document.querySelector('[data-nav]');
 const navToggle = document.querySelector('[data-nav-toggle]');
@@ -132,7 +188,6 @@ function updateHeader() { header?.classList.toggle('scrolled', window.scrollY > 
 updateHeader();
 window.addEventListener('scroll', updateHeader, { passive: true });
 
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const revealItems = [...document.querySelectorAll('.reveal')];
 if (reducedMotion || !('IntersectionObserver' in window)) {
   revealItems.forEach((item) => item.classList.add('visible'));

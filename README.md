@@ -61,7 +61,7 @@ The deployed demo includes the responsive product site, a generated monitoring r
 - [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
 - [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
 - [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
-- [Scanner registry and risk terms](https://shaik-sirajuddin.github.io/eth-call-scout/scanner-ruleset.html)
+- [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
 
 Build and serve the same pages locally:
 
@@ -71,7 +71,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/scanner-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate scanner editor changes only monitoring mappings and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
+`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/pr-review-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
 
 ## Architecture
 
@@ -259,7 +259,7 @@ npx callscout registry search uniswap
 npm run ruleset:build
 ```
 
-`npm run ruleset:build` generates two standalone tools. `ruleset.html` is the visual wallet-policy canvas; `scanner-ruleset.html` controls report mappings and cannot grant wallet access. A policy exported from the canvas is still untrusted input until the deterministic CLI validator and guarded provider accept it.
+`npm run ruleset:build` generates two standalone tools. `ruleset.html` is the visual wallet-policy canvas; `pr-review-ruleset.html` controls PR Review Agent evidence and cannot grant wallet access. The legacy `scanner-ruleset.html` URL is emitted only as a compatibility copy. A policy exported from the canvas is still untrusted input until the deterministic CLI validator and guarded provider accept it.
 
 ## Security posture
 
