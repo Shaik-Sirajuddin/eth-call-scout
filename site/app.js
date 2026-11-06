@@ -5,7 +5,7 @@ const carousel = document.querySelector('[data-carousel]');
 const carouselStage = carousel?.querySelector('.carousel-stage');
 const carouselTrack = carousel?.querySelector('[data-track]');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let activeSlide = 1;
+let activeSlide = 0;
 let autoDirection = -1;
 let autoplayTimer;
 
