@@ -1,0 +1,19 @@
+{
+  "name": "eth-call-scout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Find Ethereum contract interactions and JSON-RPC calls in JavaScript and TypeScript source.",
+  "type": "module",
+  "bin": {
+    "eth-call-scout": "./bin/eth-call-scout.js"
+  },
+  "scripts": {
+    "scan": "node ./bin/eth-call-scout.js",
+    "ruleset:build": "node ./scripts/build-ruleset-page.js",
+    "check": "node --check src/scanner.js && node --check bin/eth-call-scout.js"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0",
+    "typescript": "^5.9.3"
+  }
+}

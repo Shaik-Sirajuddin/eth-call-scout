@@ -1,0 +1,6 @@
+node_modules/
+reports/
+.cache/
+.env
+.env.*
+!.env.example
