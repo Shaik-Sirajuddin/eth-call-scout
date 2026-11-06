@@ -1,6 +1,6 @@
 # Demo runbook
 
-The demo exercises deterministic policy, threshold-signed fresh protocol state, rollback-aware wallet guarding, and monitoring without connecting a real wallet or sending a transaction.
+The demo exercises deterministic policy, threshold-signed fresh protocol state, rollback-aware wallet guarding, full transaction simulation, and monitoring without connecting a real wallet or sending a transaction.
 
 ## Setup
 
@@ -16,17 +16,18 @@ npm ci
 npm run demo
 ```
 
-The demo uses two independent simulated RPC endpoints, deterministic bytecode/storage/view-call monitoring, two ephemeral Ed25519 signers, a mandatory signature threshold, executable wallet policy, a guarded mock wallet, rollback tracking, and a hash-chained audit log.
+The demo uses two independent monitor RPC endpoints and two independent trace-simulation endpoints, deterministic bytecode/storage/view-call monitoring, two ephemeral Ed25519 signers, a mandatory signature threshold, executable wallet policy, a guarded mock wallet, rollback tracking, and a hash-chained audit log.
 
-It runs five scenarios:
+It runs six scenarios:
 
 1. healthy protocol plus bounded approval — allowed and forwarded;
 2. whitelisted contract with changed runtime bytecode — denied by live state;
 3. healthy protocol with an unapproved spender — denied by calldata policy;
-4. stale signed state — denied by freshness and expiry; and
-5. opaque `personal_sign` — denied at the RPC boundary.
+4. simulation reveals an unauthorized internal call — denied by trace policy and consensus;
+5. stale signed state — denied by freshness and expiry; and
+6. opaque `personal_sign` — denied at the RPC boundary.
 
-The final summary must report `forwardedTransactions: 1`. Every denied scenario must report `walletForwarded: false`, and the audit chain must be valid with five records.
+The final summary must report `forwardedTransactions: 1`. Every denied scenario must report `walletForwarded: false`, and the audit chain must be valid with six records.
 
 No signing key is written to disk and no network transaction is sent.
 
@@ -36,7 +37,7 @@ No signing key is written to disk and no network transaction is sent.
 npm run verify
 ```
 
-The tests cover policy validation, exact calldata constraints, signature quorum, state tampering, stale/expired/compromised state, contract binding, rollback, persistent-store failure, RPC quorum, bytecode mismatches, lagging nodes, cache fallback, audit-log tampering, and denied-request non-forwarding.
+The tests cover policy validation, exact calldata constraints, signature quorum, state tampering, stale/expired/compromised state, contract binding, rollback, persistent-store failure, monitor and simulation RPC quorums, full call traces, state diffs, trace disagreement, unauthorized internal calls, EIP-7702 default denial and safe opt-in, delegate code identity, bytecode mismatches, lagging nodes, cache fallback, audit-log tampering, and denied-request non-forwarding.
 
 ## Real monitor pipeline
 

@@ -24,9 +24,45 @@
       }
     ]
   },
+  "simulation": {
+    "required": true,
+    "blockTag": "pending",
+    "timeoutMs": 12000,
+    "quorum": 2,
+    "maxBlockSkew": 5,
+    "maxGasEstimate": "350000",
+    "maxCallDepth": 8,
+    "maxInternalCalls": 64,
+    "maxStateAccounts": 128,
+    "maxStorageWrites": 256,
+    "denyCodeChanges": true,
+    "eip7702": {
+      "allowAuthorizationList": false,
+      "allowDelegatedWallet": false,
+      "maxAuthorizations": 1,
+      "delegates": []
+    },
+    "allowedCallTypes": ["CALL", "STATICCALL", "DELEGATECALL"],
+    "internalTargets": [],
+    "assetLimits": [
+      {
+        "chainId": 1,
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "maxOutflow": "0",
+        "maxApproval": "1000000000",
+        "allowedRecipients": [],
+        "allowedSpenders": ["0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"]
+      }
+    ],
+    "sources": [
+      { "id": "sim-primary", "env": "CALLSCOUT_SIM_PRIMARY" },
+      { "id": "sim-secondary", "env": "CALLSCOUT_SIM_SECONDARY" }
+    ]
+  },
   "invariants": {
     "maxNativeValueWei": "10000000000000000",
     "maxGas": "350000",
+    "maxGasPriceWei": "100000000000",
     "maxFeePerGasWei": "100000000000",
     "maxPriorityFeePerGasWei": "5000000000",
     "requireCalldata": true,

@@ -59,6 +59,8 @@ The verifier requires:
 
 State can only veto. It cannot turn a transaction denied by wallet policy into an allow.
 
+An `operational` state is also not the final allow: the exact transaction must subsequently pass simulation quorum. Live state answers “is this reviewed target healthy now?” while simulation answers “what does this exact transaction do against the sampled state?”
+
 ## Rollback protection
 
 The guarded provider remembers the highest authenticated sequence, including a signed `compromised` observation. This prevents an attacker from replacing it with an older operational bundle during the process lifetime.
@@ -88,7 +90,7 @@ callscout state verify state-quorum.json \
   --intent transaction-intent.json
 ```
 
-Never place signing private keys in the repository, agent environment, browser bundle, or wallet-policy file.
+Never place signing private keys in the repository, agent environment, browser bundle, wallet-policy file, or simulation process.
 
 ## What produces status
 

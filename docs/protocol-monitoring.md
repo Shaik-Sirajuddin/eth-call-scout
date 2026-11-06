@@ -17,6 +17,8 @@ Checks are performed against every configured RPC source. A protocol is:
 
 Only `operational` can pass wallet authorization after the payload is signed and verified.
 
+Protocol monitoring is a pre-transaction veto, not a substitute for simulation. A fresh `operational` observation says the configured live invariants matched; the exact proposed transaction must still pass [full transaction simulation](transaction-simulation.md). Conversely, a passing simulation cannot override `degraded`, `compromised`, stale, or unavailable protocol state.
+
 ## Configuration
 
 See `schema/protocol-monitor.schema.json` and `examples/protocol-monitor.demo.json`.
@@ -83,3 +85,4 @@ RPC endpoints must use HTTPS, except loopback HTTP for local development. Creden
 - Add protocol-specific pause, oracle, reserve, or invariant view calls where stable and meaningful.
 - Treat a mismatch as a fail-closed incident requiring investigation; a legitimate upgrade still changes the trusted invariant.
 - A passing monitor cannot prove absence of all exploits. It proves only that configured deterministic invariants matched through the configured quorum.
+- Add reviewed EIP-7702 delegate implementations to deterministic monitoring when they are approved for production use; simulation still checks the runtime code hash on every transaction.

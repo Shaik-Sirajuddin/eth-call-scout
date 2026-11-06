@@ -9,6 +9,7 @@ import { auditPolicy, authorizeIntent, loadPolicy, sha256, validatePolicy } from
 import { addProtocolStateSignature, evaluateProtocolState, signProtocolState } from './protocol-state.js';
 import { collectProtocolState } from './protocol-monitor.js';
 import { verifyAuditLog } from './audit-log.js';
+import { failedSimulation, finalizeSimulation, simulateTransaction } from './transaction-simulator.js';
 
 const HELP = `CallScout — deterministic wallet authorization for AI agents\n\nUsage:\n  callscout authorize <intent.json|-> --policy <policy.json> [--state <bundle.json>] [--out <receipt.json>]\n  callscout policy <validate|audit> <policy.json>\n  callscout state <collect|sign|verify> ...\n  callscout audit verify <receipts.jsonl>\n  callscout scan <file-or-directory...> [scan options]\n  callscout registry <sync|list|search> ...\n\nThe agent may propose transactions, but executable policy and signed live protocol state decide\nwhether the exact request reaches the wallet. All unsupported mutation methods deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply monitoring ruleset exported from ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner is a monitoring feature, not the wallet authorization boundary.\n`;
 
@@ -97,7 +98,11 @@ async function runAuthorize(args) {
   const policy = loadPolicy(path.resolve(policyPath));
   const intent = await readJsonInput(intentPath);
   const protocolState = statePath ? await readJsonInput(statePath) : null;
-  const receipt = authorizeIntent(policy, intent, { protocolState });
+  let receipt = authorizeIntent(policy, intent, { protocolState });
+  if (receipt.decision !== 'deny') {
+    try { receipt = finalizeSimulation(receipt, await simulateTransaction(policy, intent)); }
+    catch (error) { receipt = failedSimulation(receipt, error); }
+  }
   writeJson(receipt, output);
   if (receipt.decision !== 'allow') process.exitCode = 2;
 }

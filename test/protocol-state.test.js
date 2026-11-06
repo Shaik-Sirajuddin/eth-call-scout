@@ -76,7 +76,7 @@ test('accepts a valid threshold-signed, fresh, operational state bound to the ta
 test('live state is an independent veto in the authorization receipt', () => {
   const policy = policyWithState();
   const receipt = authorizeIntent(policy, intent, { protocolState: bundle(), now: NOW });
-  assert.equal(receipt.decision, 'allow');
+  assert.equal(receipt.decision, 'simulate');
   assert.equal(receipt.protocolState.status, 'operational');
   assert.ok(receipt.checks.some((check) => check.id === 'state:signature-threshold' && check.status === 'pass'));
   assert.equal(auditPolicy(policy).findings.length, 0);
