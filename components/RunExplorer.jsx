@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-const scenarios = [
+const localScenarios = [
   { value: 'safe', title: 'Expected swap', detail: 'Every gate passes and the wallet signs', verdict: 'ALLOW' },
   { value: 'exploiter', title: 'Known attacker', detail: 'The recipient appears on the denylist', verdict: 'DENY' },
   { value: 'block-limit', title: 'Spend limit reached', detail: 'A second swap exceeds this block’s cap', verdict: 'DENY' },
@@ -10,6 +10,8 @@ const scenarios = [
   { value: 'hidden-call', title: 'Hidden contract call', detail: 'The EVM trace reaches a new target', verdict: 'DENY' },
   { value: 'slippage', title: 'Slippage failure', detail: 'The exact transaction reverts on both nodes', verdict: 'DENY' },
 ];
+
+const testnetScenarios = localScenarios.filter((scenario) => ['safe', 'hidden-call'].includes(scenario.value));
 
 const guidedSteps = [
   {
@@ -76,6 +78,10 @@ export default function RunExplorer({ initialRunId = null }) {
   const [activeDemoId, setActiveDemoId] = useState(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const isTestnet = health?.mode === 'sepolia-beta';
+  const scenarios = isTestnet ? testnetScenarios : localScenarios;
+  const networkName = isTestnet ? 'SEPOLIA' : 'ANVIL';
+  const readiness = health?.ready ? (isTestnet ? 'SEPOLIA GATEWAY READY' : 'LOCAL ENGINE READY') : 'STARTING ENGINE';
 
   const refresh = useCallback(async () => {
     const [{ runs: latest }, current] = await Promise.all([
@@ -180,8 +186,8 @@ export default function RunExplorer({ initialRunId = null }) {
         <header className="topbar">
           <div><span className="topbar-kicker">WALLETCORDON / GUARDED EXECUTION</span><h1>Agent runs</h1></div>
           <div className="environment" aria-live="polite">
-            <div className={`mode-badge ${health?.ready ? 'live' : 'checking'}`}><i></i><span>{health?.ready ? 'LOCAL ENGINE READY' : 'STARTING ENGINE'}</span></div>
-            <div className="chain-badge"><span>ANVIL</span><strong>{health?.chainId ?? '—'}</strong></div>
+            <div className={`mode-badge ${health?.ready ? 'live' : 'checking'}`}><i></i><span>{readiness}</span></div>
+            <div className="chain-badge"><span>{networkName}</span><strong>{health?.chainId ?? '—'}</strong></div>
           </div>
         </header>
 
@@ -191,7 +197,7 @@ export default function RunExplorer({ initialRunId = null }) {
           <div className="guided-copy">
             <span className="section-label">TWO-TRANSACTION PROOF</span>
             <h2 id="guided-demo-title">Same agent. Same wallet. Different answer.</h2>
-            <p>The first swap stays inside the owner’s rules and reaches the signer. The second looks normal until simulation reveals a call to an unauthorized contract. It stops at the boundary.</p>
+            <p>The first swap stays inside the owner’s rules and reaches the signer. The second looks normal until simulation reveals a call to an unauthorized contract. {isTestnet ? 'Both are evaluated against live Sepolia; only the safe transaction is broadcast.' : 'It stops at the local signing boundary.'}</p>
             <button className="demo-run-button" type="button" onClick={runGuidedDemo} disabled={demoBusy || !health?.ready}>
               <span>{demoBusy ? 'Running both transactions…' : 'Run both transactions'}</span><b aria-hidden="true">→</b>
             </button>
@@ -214,7 +220,7 @@ export default function RunExplorer({ initialRunId = null }) {
           <div className="command-copy">
             <span className="section-label">CUSTOM SINGLE RUN</span>
             <h2 id="command-title">Send a request through the boundary.</h2>
-            <p>Change the trading goal or choose a chain condition. The agent constructs the transaction; WalletCordon decides whether the exact request may reach the signer.</p>
+            <p>Change the trading goal or choose a security scenario. The agent constructs the transaction; WalletCordon decides whether the exact request may reach the {isTestnet ? 'isolated Sepolia signer' : 'local signer'}.</p>
           </div>
           <form className="prompt-form" onSubmit={submit}>
             <label htmlFor="trade-prompt">Trading request</label>
@@ -223,7 +229,7 @@ export default function RunExplorer({ initialRunId = null }) {
               <button className="run-button" type="submit" disabled={busy || demoBusy || !health?.ready}><span>{busy ? 'Checking request…' : 'Run transaction'}</span><b aria-hidden="true">→</b></button>
             </div>
             <fieldset className="scenario-picker">
-              <legend>Choose the chain condition</legend>
+              <legend>Choose the security scenario</legend>
               {scenarios.map((entry) => <label key={entry.value} className={`scenario ${scenario === entry.value ? 'active' : ''}`}><input type="radio" name="scenario" value={entry.value} checked={scenario === entry.value} onChange={() => setScenario(entry.value)} /><span><b>{entry.title}</b><small>{entry.detail}</small></span><i>{entry.verdict}</i></label>)}
             </fieldset>
             <p className={`form-status ${error ? 'error' : ''}`}>{busy ? 'Policy, live state, and simulation are checking the exact transaction…' : ''}</p>
@@ -233,8 +239,8 @@ export default function RunExplorer({ initialRunId = null }) {
         <section className="engine-strip" aria-label="Active security gates">
           <div><i className="green"></i><span>POLICY</span><strong>Executable rules loaded</strong></div>
           <div><i className="aqua"></i><span>LIVE STATE</span><strong>2 of 2 monitors signed</strong></div>
-          <div><i className="amber"></i><span>SIMULATION</span><strong>Two traces required</strong></div>
-          <div><i className="green"></i><span>HISTORY</span><strong>Receipts preserved</strong></div>
+          <div><i className="amber"></i><span>SIMULATION</span><strong>Two {isTestnet ? 'Sepolia ' : ''}traces required</strong></div>
+          <div><i className="green"></i><span>HISTORY</span><strong>{isTestnet ? 'Durable remote receipts' : 'Local receipts preserved'}</strong></div>
         </section>
 
         <section className="runs-layout" aria-label="Run explorer">
@@ -266,13 +272,13 @@ function RunDetail({ run, onCopy }) {
   const verdict = run.decision ?? run.status;
   return (
     <article className="run-detail" aria-live="polite">
-      <header className="detail-head"><div><span className="section-label">{run.demo ? `TWO-TRANSACTION DEMO · STEP ${run.demo.step}/${run.demo.total}` : run.source === 'agent-api' ? 'EXTERNAL AGENT API' : 'BUNDLED INTENT PLANNER'}</span><h2>{run.prompt}</h2><p>{run.id} · {new Date(run.createdAt).toLocaleString()}</p></div><div className={`verdict ${statusClass(verdict)}`}><span>FINAL DECISION</span><strong>{String(verdict).toUpperCase()}</strong></div></header>
+      <header className="detail-head"><div><span className="section-label">{run.demo ? `TWO-TRANSACTION DEMO · STEP ${run.demo.step}/${run.demo.total}` : run.source === 'agent-api' ? 'EXTERNAL AGENT API' : run.source === 'operator' ? 'CONTROL ROOM REQUEST' : 'BUNDLED INTENT PLANNER'}</span><h2>{run.prompt}</h2><p>{run.id} · {new Date(run.createdAt).toLocaleString()}</p></div><div className={`verdict ${statusClass(verdict)}`}><span>FINAL DECISION</span><strong>{String(verdict).toUpperCase()}</strong></div></header>
       {run.demo && <div className={`demo-result ${statusClass(verdict)}`}><span>STEP {run.demo.step}: {run.demo.title}</span><strong>{run.demo.expected === 'allow' ? 'Expected to execute safely' : 'Expected security veto'}</strong><p>{run.decision === 'deny' ? eventFor(run, 'simulation')?.detail ?? run.demo.reason : run.demo.reason}</p></div>}
       <div className="metric-grid">
         <div className="metric"><span>POLICY CHECKS</span><strong>{passed} pass / {checks.filter((check) => check.status === 'deny').length} deny</strong></div>
         <div className="metric"><span>LIVE STATE</span><strong>{liveState?.status === 'deny' ? 'vetoed' : liveState ? '2 / 2 signed' : 'pending'}</strong></div>
         <div className="metric"><span>SIMULATION</span><strong>{simulation?.agreeingSources?.length != null ? `${simulation.agreeingSources.length} agreeing` : eventFor(run, 'simulation')?.status ?? 'pending'}</strong></div>
-        <div className="metric"><span>WALLET OUTCOME</span><strong>{run.transactionHash ? `mined ${short(run.transactionHash)}` : wallet?.status === 'deny' ? 'never called' : 'pending'}</strong></div>
+        <div className="metric"><span>WALLET OUTCOME</span><strong>{run.chainReceipt ? `mined ${short(run.transactionHash)}` : run.transactionHash ? `broadcast ${short(run.transactionHash)}` : wallet?.status === 'deny' ? 'never called' : 'pending'}</strong></div>
       </div>
 
       <section className="detail-section"><div className="section-row"><div><span className="section-label">END-TO-END FLOW</span><h3>Decision timeline</h3></div><span>{run.events?.length ?? 0} events</span></div><div className="timeline">{(run.events ?? []).map((event) => <div key={`${event.index}-${event.at}`} className={`event ${statusClass(event.status)}`}><span className="event-index">{String(event.index).padStart(2, '0')}</span><span className="event-phase">{event.phase}</span><div className="event-copy"><strong>{event.title}</strong><p>{event.detail}</p></div></div>)}</div></section>
@@ -282,7 +288,7 @@ function RunDetail({ run, onCopy }) {
         <Evidence title="LIVE PROTOCOL STATE" state={liveState?.status === 'deny' ? 'VETO' : liveState ? 'SIGNED' : 'PENDING'} deny={liveState?.status === 'deny'}><KeyValue rows={[['sequence', liveState?.data?.sequence ?? '—'], ['signers', liveState?.data?.signatures?.join(', ') ?? '—'], ['block', liveState?.data?.blockNumber ?? '—'], ['evidence', liveState?.data?.evidence?.length != null ? `${liveState.data.evidence.length} monitor results` : '—']]} /></Evidence>
         <Evidence title="POLICY + INVARIANTS" state={checks.some((check) => check.status === 'deny') ? 'DENY' : checks.length ? 'PASS' : 'PENDING'} deny={checks.some((check) => check.status === 'deny')} wide><div className="check-list">{checks.map((check) => <div key={check.id} className={`check ${statusClass(check.status)}`}><i></i><b>{check.id}</b><span>{check.detail}</span></div>)}</div></Evidence>
         <Evidence title="FULL EVM SIMULATION" state={eventFor(run, 'simulation')?.status?.toUpperCase() ?? 'PENDING'} deny={eventFor(run, 'simulation')?.status === 'deny'}><KeyValue rows={[['fingerprint', short(simulation?.fingerprint, 14, 8)], ['sources', simulation?.agreeingSources?.join(', ') || '—'], ['call frames', simulation?.metrics?.calls ?? '—'], ['storage writes', simulation?.metrics?.storageWrites ?? '—'], ['gas estimate', simulation?.metrics?.gasEstimate ?? '—']]} />{simulationFailures.length > 0 && <div className="simulation-failures"><span>TRACE VIOLATION</span>{simulationFailures.map((failure) => <p key={failure}>{failure}</p>)}</div>}</Evidence>
-        <Evidence title="WALLET + AUDIT" state={(run.attempts?.length ?? 0) > 1 ? `${run.attempts.filter((attempt) => attempt.transactionHash).length} MINED · ${run.attempts.filter((attempt) => !attempt.transactionHash).length} DENIED` : run.transactionHash ? 'MINED' : wallet?.status === 'deny' ? 'NOT CALLED' : 'PENDING'} deny={wallet?.status === 'deny'}><KeyValue rows={[...((run.attempts?.length ?? 0) > 1 ? run.attempts.map((attempt) => [attempt.label, attempt.transactionHash ? `mined ${short(attempt.transactionHash, 10, 6)}` : 'denied, wallet not called']) : []), ['transaction', short(run.transactionHash, 14, 8)], ['block', run.chainReceipt?.blockNumber ?? '—'], ['audit valid', audit?.data?.valid == null ? '—' : String(audit.data.valid)], ['receipt count', audit?.data?.count ?? '—']]} /></Evidence>
+        <Evidence title="WALLET + AUDIT" state={(run.attempts?.length ?? 0) > 1 ? `${run.attempts.filter((attempt) => attempt.transactionHash).length} MINED · ${run.attempts.filter((attempt) => !attempt.transactionHash).length} DENIED` : run.chainReceipt ? 'MINED' : run.transactionHash ? 'BROADCAST' : wallet?.status === 'deny' ? 'NOT CALLED' : 'PENDING'} deny={wallet?.status === 'deny'}><KeyValue rows={[...((run.attempts?.length ?? 0) > 1 ? run.attempts.map((attempt) => [attempt.label, attempt.transactionHash ? `mined ${short(attempt.transactionHash, 10, 6)}` : 'denied, wallet not called']) : []), ['transaction', short(run.transactionHash, 14, 8)], ['block', run.chainReceipt?.blockNumber ?? '—'], ['audit valid', audit?.data?.valid == null ? '—' : String(audit.data.valid)], ['receipt count', audit?.data?.count ?? '—']]} /></Evidence>
         <Evidence title="ON-CHAIN VERIFICATION" state={run.verification?.status?.toUpperCase() ?? 'NOT SENT'} deny={Boolean(run.verification) && run.verification.status !== 'verified'}><KeyValue rows={[['block', run.verification?.blockNumber ?? '—'], ['gas used', run.verification?.gasUsed ?? '—'], ...(run.verification?.checks ?? []).map((check) => [check.id.replace('onchain:', ''), check.status])]} /></Evidence>
         <Evidence title="ALERTS" state={run.alerts?.length ? `${run.alerts.length} RAISED` : 'NONE'} deny={Boolean(run.alerts?.length)}><KeyValue rows={(run.alerts ?? []).length ? run.alerts.map((alert) => [alert.code, alert.message]) : [['log', 'No alerts for this run']]} /></Evidence>
         <Evidence title="EXACT TRANSACTION ENVELOPE" state="JSON" wide><pre className="code-box">{json(run.transaction)}</pre></Evidence>
