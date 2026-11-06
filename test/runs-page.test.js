@@ -44,4 +44,7 @@ test('Agent Runs labels the active local or Sepolia runtime without exposing uns
   assert.match(explorer, /\['safe', 'hidden-call'\]/);
   assert.match(explorer, /run\.chainReceipt \? `mined/);
   assert.match(explorer, /run\.transactionHash \? `broadcast/);
+  assert.match(explorer, /SEPOLIA GATEWAY OFFLINE/);
+  assert.match(explorer, /if \(cause\.payload\) setHealth\(cause\.payload\)/);
+  assert.match(explorer, /response\.text\(\)/);
 });
