@@ -126,6 +126,7 @@ const wallet = {
   },
 };
 const guard = createGuardedProvider({
+  verification: false,
   provider: wallet,
   policy,
   stateSource: async () => states.shift(),

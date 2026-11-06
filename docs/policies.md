@@ -155,3 +155,45 @@ Executable policies must pin at least two Ed25519 public keys, configure a signa
 ## Policy operations
 
 Treat policy activation as a privileged operation. Keep authoring separate from activation, review policy hashes, use version control or signed releases, and do not let the agent write its own active policy. A policy change should generate an operational audit event independent of transaction receipts.
+
+## Default rule sets
+
+Most users should not have to write selectors. `keybound policy init` builds a complete policy from rules measured on real mainnet contracts, with low limits:
+
+```sh
+npx keybound policy init --wallet 0xYourWallet \
+  --state-key ops:BASE64_KEY --state-key security:BASE64_KEY \
+  --profile general --max-per-block USDC=100 --max-per-block ETH=0.05 --out policy.json
+```
+
+| Profile | Allows | Stays denied |
+|---|---|---|
+| `general` | Wrap ETH, single swaps paid back to the wallet, Aave supply, withdraw and repay | Borrowing, flash loans, transfers to other people, everything else |
+| `swapper` | Wrap ETH, single swaps paid back to the wallet | Lending, transfers to other people |
+| `lender` | Wrap ETH, Aave supply, withdraw and repay | Swaps, borrowing, flash loans |
+| `payments` | Transfers to the addresses given with `--payee` | Everything else |
+
+The rules are in `data/rule-sets/general.json`. `npm run rules:general` rebuilds them by running each call on a local mainnet fork and recording what it really touches. The policy builder opens with the `general` rules loaded, so users can edit them instead of starting from nothing.
+
+The limits are examples of a low starting point, not advice on what is safe for you.
+
+## Per-block spend limits
+
+Set the most a wallet may send in one block, across all of its transactions:
+
+- `simulation.assetLimits[].maxOutflowPerBlock` for a token, in base units.
+- `invariants.maxNativeOutflowPerBlockWei` for ETH, in wei.
+
+A transaction that would go over is denied with `spend:block-limit` and writes a `block-limit-reached` alert. The wallet is not called.
+
+Spend is counted against the block the simulation ran on, because the guard cannot know which block a transaction will land in. Two transactions simulated on different blocks could still land together, so the on-chain check recounts by the real block and raises `onchain-limit-exceeded` if a limit was passed.
+
+Totals are held in memory, so they restart with the guard. That is enough for a window of one block. Limits over longer periods are not built yet.
+
+## Blocked addresses
+
+The [attacker list](attacker-list.md) always applies. Add your own with `blockedAddresses`:
+
+```json
+{ "blockedAddresses": ["0x0000000000000000000000000000000000000bad"] }
+```

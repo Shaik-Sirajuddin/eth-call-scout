@@ -1,5 +1,6 @@
 import { id, keccak256 } from 'ethers';
 import { sha256 } from './canonical.js';
+import { assertAttackerList, ATTACKER_LIST, attackerListIdentity, attackerLookup, describeAttacker, findAttackersInEffects } from './attacker-list.js';
 import { assertGasRules, checkGasRuleVersions, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
 import { evaluateWalletCalls, normalizeIntent, resolveGasLimit, validatePolicy } from './policy.js';
 
@@ -39,7 +40,7 @@ function rpcTransaction(intent) {
   };
 }
 
-function validateUrl(value) {
+export function validateUrl(value) {
   const url = new URL(value);
   const local = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !local) throw new Error('Simulation endpoints must use HTTPS; HTTP is allowed only for loopback development.');
@@ -47,7 +48,7 @@ function validateUrl(value) {
   return url;
 }
 
-async function rpc(url, method, params, { fetchImpl, timeoutMs }) {
+export async function rpc(url, method, params, { fetchImpl = fetch, timeoutMs = 12_000 } = {}) {
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'keybound-simulator/0.1' },
@@ -160,7 +161,7 @@ function normalizedStateEffects(diff, volatileBalanceAddresses = new Set()) {
   });
 }
 
-function analyzeAssets(logs, wallet, limits, chainId) {
+export function analyzeAssets(logs, wallet, limits, chainId) {
   const byToken = new Map(limits.filter((limit) => limit.chainId === chainId).map((limit) => [limit.token.toLowerCase(), limit]));
   const outflows = new Map();
   const approvals = [];
@@ -252,6 +253,10 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   if (BigInt(state.walletBalanceDecrease) > maximumWalletBalanceDecrease) failures.push(`Wallet balance decrease ${state.walletBalanceDecrease} exceeds bounded native value plus maximum gas cost ${maximumWalletBalanceDecrease}.`);
   const assets = analyzeAssets(aggregate.logs, intent.from, config.assetLimits, intent.chainId);
   failures.push(...assets.violations);
+  // Look at every transfer and call, not just the wallet's own. A swap can pay out to anyone.
+  const lookup = attackerLookup(stateContext.attackerList, policy);
+  const attackerHits = findAttackersInEffects({ calls: aggregate.nodes, logs: aggregate.logs, accounts: [...Object.keys(diffTrace.pre), ...Object.keys(diffTrace.post)] }, lookup);
+  for (const hit of attackerHits) failures.push(`Listed attacker ${describeAttacker(hit)} is involved: ${hit.reasons.join('; ')}.`);
   // The sender pays execution fees. Independent nodes can legitimately simulate
   // a slightly different base fee while agreeing on every contract effect. Each
   // source still enforces the sender's total balance decrease above; the quorum
@@ -276,6 +281,7 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
       maximumWalletBalanceDecrease: maximumWalletBalanceDecrease.toString(),
       outflows: assets.outflows,
       approvals: assets.approvals,
+      attackerHits,
       walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })),
       consensusEvidence: { traceFingerprint, stateFingerprint },
     },
@@ -385,15 +391,16 @@ async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
   const diffTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'prestateTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { diffMode: true, disableCode: false, disableStorage: false } }], { fetchImpl, timeoutMs });
   const gasRuleStatuses = await checkGasRuleVersions(stateContext.gasRules, gasRulesInTrace(stateContext.gasRules, intent, callTrace), (method, params) => rpc(source.url, method, params, { fetchImpl, timeoutMs }), { blockTag: config.blockTag, now: stateContext.now });
   const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate, { ...stateContext, gasRuleStatuses });
-  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702, gasRulesHash: stateContext.gasRules.hash, gasLimit: analysis.metrics.gasLimit, gasRuleOutdated: analysis.metrics.gasRule?.outdated ?? null });
+  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702, attackerListHash: stateContext.attackerList.hash, gasRulesHash: stateContext.gasRules.hash, gasLimit: analysis.metrics.gasLimit, gasRuleOutdated: analysis.metrics.gasRule?.outdated ?? null });
   analysis.metrics = { ...analysis.metrics, senderCode, eip7702 };
   return { sourceId: source.id, blockNumber, kind: analysis.failures.length ? 'violation' : 'pass', ...analysis, eip7702Violation: false };
 }
 
 /** Run exact-transaction call, gas, full call-trace, log, and state-diff simulation through a quorum. */
-export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date(), gasRules = GAS_RULES } = {}) {
+export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date(), gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
   assertGasRules(gasRules);
-  const policyValidation = validatePolicy(policy, { gasRules });
+  assertAttackerList(attackerList);
+  const policyValidation = validatePolicy(policy, { gasRules, attackerList });
   if (!policyValidation.valid) throw new Error(`Invalid simulation policy: ${policyValidation.errors.map((entry) => entry.message).join(' ')}`);
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) throw new Error(`Invalid simulation intent: ${normalized.errors.map((entry) => entry.message).join(' ')}`);
@@ -407,7 +414,7 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
   });
   if (new Set(sources.map((source) => source.url.href)).size !== sources.length) throw new Error('Simulation sources must use distinct endpoint URLs.');
   const results = await Promise.all(sources.map(async (source) => {
-    try { return await simulateSource(policy, intent, source, fetchImpl, { protocolState, minimumStateSequence, now, gasRules }); }
+    try { return await simulateSource(policy, intent, source, fetchImpl, { protocolState, minimumStateSequence, now, gasRules, attackerList }); }
     catch (cause) { return { sourceId: source.id, kind: 'error', failures: [cause.message], fingerprint: null, metrics: null, blockNumber: null, eip7702Violation: false }; }
   }));
   const blocks = results.map((result) => result.blockNumber).filter((value) => value != null);
@@ -426,8 +433,11 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
   const conflictingPassQuorums = [...fingerprints.values()].filter((group) => group.length >= config.quorum).length > 1;
   const passQuorum = consensus[1].length >= config.quorum && !conflictingPassQuorums;
   const violationQuorum = violations.length >= config.quorum;
-  const valid = passQuorum && !violationQuorum;
+  // One source seeing an attacker is enough to stop. There is no quorum on sending funds to a thief.
+  const attackerHits = [...new Map(results.flatMap((result) => result.metrics?.attackerHits ?? []).map((hit) => [hit.address, hit])).values()];
+  const valid = passQuorum && !violationQuorum && attackerHits.length === 0;
   const checks = [
+    { id: 'attacker:effects', status: attackerHits.length ? 'deny' : 'pass', detail: attackerHits.length ? `Simulation shows a listed attacker involved: ${attackerHits.map((hit) => `${describeAttacker(hit)}, ${hit.reasons.join('; ')}`).join(' | ')}.` : 'No listed attacker receives funds or approvals in simulation.' },
     { id: 'eip7702:security', status: results.filter((result) => result.eip7702Violation).length >= config.quorum ? 'deny' : 'pass', detail: `${results.filter((result) => result.eip7702Violation).length}/${sources.length} sources observed an unsafe or unauthorized EIP-7702 state; deny quorum is ${config.quorum}.` },
     { id: 'simulation:available', status: results.some((result) => result.kind !== 'error') ? 'pass' : 'deny', detail: `${results.filter((result) => result.kind !== 'error').length}/${sources.length} simulation sources responded.` },
     { id: 'simulation:policy', status: violationQuorum ? 'deny' : 'pass', detail: `${violations.length}/${sources.length} sources observed policy violations; deny quorum is ${config.quorum}.` },
@@ -439,6 +449,8 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
     checks,
     summary: {
       gasRules: gasRulesIdentity(gasRules),
+      attackerList: attackerListIdentity(attackerList),
+      attackerHits,
       blockTag: config.blockTag,
       blockNumber: selected?.blockNumber?.toString() ?? null,
       fingerprint: passQuorum ? consensus[0] : null,
@@ -461,11 +473,12 @@ export function finalizeSimulation(receipt, result) {
   if (receipt.decision === 'deny') return receipt;
   // The receipt must name the rule set that really decided, so a mismatch can never become an allow.
   const rulesMatch = receipt.gasRules?.hash != null && result.summary?.gasRules?.hash === receipt.gasRules.hash;
+  const attackerListMatch = receipt.attackerList?.hash != null && result.summary?.attackerList?.hash === receipt.attackerList.hash;
   return {
     ...receipt,
-    decision: result.valid && rulesMatch ? 'allow' : 'deny',
+    decision: result.valid && rulesMatch && attackerListMatch ? 'allow' : 'deny',
     simulation: result.summary,
-    checks: [...receipt.checks, ...result.checks, { id: 'gas:rules-match', status: rulesMatch ? 'pass' : 'deny', detail: `Authorization used gas rules ${receipt.gasRules?.hash ?? '(none)'}; simulation used ${result.summary?.gasRules?.hash ?? '(none)'}.` }],
+    checks: [...receipt.checks, ...result.checks, { id: 'attacker:list-match', status: attackerListMatch ? 'pass' : 'deny', detail: `Authorization used attacker list ${receipt.attackerList?.hash ?? '(none)'}; simulation used ${result.summary?.attackerList?.hash ?? '(none)'}.` }, { id: 'gas:rules-match', status: rulesMatch ? 'pass' : 'deny', detail: `Authorization used gas rules ${receipt.gasRules?.hash ?? '(none)'}; simulation used ${result.summary?.gasRules?.hash ?? '(none)'}.` }],
   };
 }
 

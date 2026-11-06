@@ -18,7 +18,7 @@ const publicPath = (file) => {
 
 const baseRegistry = await readJson(path.join(ROOT, 'data', 'registry.static.json'));
 const ruleset = await readJson(path.join(ROOT, '.secu'));
-const walletPolicy = await readJson(path.join(ROOT, 'examples', 'wallet-policy.json'));
+const walletPolicy = await readJson(path.join(ROOT, 'examples', 'general-policy.json'));
 const registry = applyRuleset(baseRegistry, ruleset);
 const exampleDirectory = path.join(ROOT, 'examples');
 const exampleFiles = (await fs.readdir(exampleDirectory, { withFileTypes: true }))

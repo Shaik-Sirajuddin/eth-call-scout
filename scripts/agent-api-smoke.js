@@ -37,9 +37,9 @@ const proposal = {
   to: action.target,
   data: router.encodeFunctionData('swapExactTokensForTokens', [parseUnits('100', 18), parseUnits('190', 18), capabilities.wallet]),
   value: '0',
-  gas: '350000',
-  maxFeePerGas: '10000000000',
-  maxPriorityFeePerGas: '1000000000',
+  gas: '0x55730',
+  maxFeePerGas: '0x2540be400',
+  maxPriorityFeePerGas: '0x3b9aca00',
   nonce: capabilities.nextNonce,
   type: '2',
 };

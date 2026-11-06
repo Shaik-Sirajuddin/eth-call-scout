@@ -11,6 +11,8 @@ try {
   const environment = await runtime.start();
   const runs = [];
   runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'safe'));
+  runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'exploiter'));
+  runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'block-limit'));
   runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'compromised'));
   runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'hidden-call'));
   runs.push(await run('Swap 100 dUSD for dETH with at least 190 dETH out.', 'slippage'));

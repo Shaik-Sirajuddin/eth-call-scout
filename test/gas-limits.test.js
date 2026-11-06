@@ -262,7 +262,7 @@ test('the guard never forwards the wasteful call, and still forwards the normal 
 
   const sent = [];
   const provider = { async request(request) { if (request.method === 'eth_chainId') return '0x1'; sent.push(request.method); return '0xhash'; } };
-  const guard = (chain) => createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: measuredRules(), simulationOptions: { rpcUrls, fetchImpl: fakeChain(chain) } });
+  const guard = (chain) => createGuardedProvider({ verification: false, provider, policy, protocolState, now: NOW, gasRules: measuredRules(), simulationOptions: { rpcUrls, fetchImpl: fakeChain(chain) } });
 
   await assert.rejects(
     guard({ estimate: 300000, gasUsed: 300000 }).request({ method: 'eth_sendTransaction', params: [WASTEFUL_TX] }),
@@ -327,7 +327,7 @@ test('the receipt names the rule set that really made the decision', async () =>
   assert.notEqual(rules.hash, GAS_RULES.hash);
 
   const receipts = [];
-  const guard = createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: rules, onDecision: (receipt) => receipts.push(receipt), simulationOptions: { rpcUrls, fetchImpl: fakeChain() } });
+  const guard = createGuardedProvider({ verification: false, provider, policy, protocolState, now: NOW, gasRules: rules, onDecision: (receipt) => receipts.push(receipt), simulationOptions: { rpcUrls, fetchImpl: fakeChain() } });
   await guard.request({ method: 'eth_sendTransaction', params: [NORMAL_TX] });
   assert.equal(receipts[0].decision, 'allow');
   assert.equal(receipts[0].gasRules.hash, rules.hash);
@@ -336,15 +336,15 @@ test('the receipt names the rule set that really made the decision', async () =>
 
   // A simulator that used any other set cannot produce an allow.
   const otherRules = async () => ({ valid: true, checks: [], summary: { gasRules: { version: 'other', hash: 'not-the-same' } } });
-  const mismatched = createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: rules, simulator: otherRules });
+  const mismatched = createGuardedProvider({ verification: false, provider, policy, protocolState, now: NOW, gasRules: rules, simulator: otherRules });
   await assert.rejects(mismatched.request({ method: 'eth_sendTransaction', params: [NORMAL_TX] }), (error) => error instanceof WalletGuardError && error.receipt.checks.find((check) => check.id === 'gas:rules-match').status === 'deny');
 });
 
 test('one rule set is chosen at construction and cannot be swapped or forged', () => {
   const provider = { async request() { return '0x1'; } };
-  assert.throws(() => createGuardedProvider({ provider, policy: example, simulationOptions: { gasRules: measuredRules() } }), /Pass gasRules to createGuardedProvider/);
+  assert.throws(() => createGuardedProvider({ verification: false, provider, policy: example, simulationOptions: { gasRules: measuredRules() } }), /Pass gasRules to createGuardedProvider/);
   const forged = { version: 'x', validUntil: '2030-01-01T00:00:00.000Z', hash: GAS_RULES.hash, find: () => null };
-  assert.throws(() => createGuardedProvider({ provider, policy: example, gasRules: forged }), /created by createGasRules/);
+  assert.throws(() => createGuardedProvider({ verification: false, provider, policy: example, gasRules: forged }), /created by createGasRules/);
   assert.throws(() => authorizeIntent(example, NORMAL_TX, { now: NOW, gasRules: forged }), /created by createGasRules/);
 });
 

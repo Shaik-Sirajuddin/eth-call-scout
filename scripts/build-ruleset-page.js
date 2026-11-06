@@ -5,7 +5,7 @@ import { renderReviewRulesetBuilder, renderRulesetBuilder } from '../src/ruleset
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const registry = JSON.parse(fs.readFileSync(path.join(root, 'data', 'registry.static.json'), 'utf8'));
-const walletPolicy = JSON.parse(fs.readFileSync(path.join(root, 'examples', 'wallet-policy.json'), 'utf8'));
+const walletPolicy = JSON.parse(fs.readFileSync(path.join(root, 'examples', 'general-policy.json'), 'utf8'));
 const target = path.join(root, 'ruleset.html');
 const html = renderRulesetBuilder(registry, walletPolicy);
 fs.writeFileSync(target, html, 'utf8');

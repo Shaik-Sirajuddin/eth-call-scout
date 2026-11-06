@@ -45,7 +45,8 @@ test('persists completed run history and reloads it in a new gateway instance', 
   assert.equal(second.getRun('run_persisted_001').requestId, 'request-persisted-001');
   assert.equal(second.getRun('run_persisted_001').status, 'complete');
   const mode = (await fs.stat(path.join(runtimeDirectory, 'runs', 'run_persisted_001.json'))).mode & 0o777;
-  assert.equal(mode, 0o600);
+  // Windows does not have Unix file modes.
+  if (process.platform !== 'win32') assert.equal(mode, 0o600);
 });
 
 test('recovers an interrupted queued or running record as a terminal error', async (t) => {

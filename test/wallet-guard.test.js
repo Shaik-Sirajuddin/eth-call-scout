@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { ATTACKER_LIST, attackerListIdentity } from '../src/attacker-list.js';
 import { GAS_RULES, gasRulesIdentity } from '../src/gas-limits.js';
 import { addProtocolStateSignature, signProtocolState } from '../src/protocol-state.js';
 import { createGuardedProvider, WalletGuardError } from '../src/wallet-guard.js';
@@ -27,7 +28,7 @@ stateKeys.forEach((keys, index) => { protocolState = addProtocolStateSignature(p
 const simulator = async () => ({
   valid: true,
   checks: [{ id: 'simulation:consensus', status: 'pass', detail: 'Test simulation quorum passed.' }],
-  summary: { gasRules: gasRulesIdentity(GAS_RULES), fingerprint: 'test-simulation', agreeingSources: ['test-a', 'test-b'] },
+  summary: { gasRules: gasRulesIdentity(GAS_RULES), attackerList: attackerListIdentity(ATTACKER_LIST), fingerprint: 'test-simulation', agreeingSources: ['test-a', 'test-b'] },
 });
 
 function mockProvider() {

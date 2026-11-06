@@ -13,3 +13,4 @@ scanner-ruleset.html
 .env
 .env.*
 !.env.example
+.keybound/

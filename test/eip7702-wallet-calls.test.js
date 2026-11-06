@@ -180,6 +180,7 @@ test('the wallet guard forwards only a delegated batch whose live-state-bound ca
   const state = protocolState(FIXED_WALLET);
   const policy = batchPolicy(FIXED_WALLET);
   const guard = createGuardedProvider({
+    verification: false,
     provider,
     policy,
     protocolState: state,
@@ -190,6 +191,7 @@ test('the wallet guard forwards only a delegated batch whose live-state-bound ca
   assert.ok(!requests.includes('eth_sendTransaction'));
 
   const safeGuard = createGuardedProvider({
+    verification: false,
     provider,
     policy,
     protocolState: state,

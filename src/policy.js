@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { verifyAuthorization } from 'ethers';
 import { canonicalJson, sha256 } from './canonical.js';
+import { assertAttackerList, ATTACKER_LIST, attackerListIdentity, attackerLookup, describeAttacker, findAttackersInHex } from './attacker-list.js';
 import { assertGasRules, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
 import { evaluateProtocolState } from './protocol-state.js';
 
@@ -92,13 +93,14 @@ function validateSimulationConfig(config, errors) {
     config.assetLimits.forEach((limit, index) => {
       const at = `${path}.assetLimits[${index}]`;
       if (!isPlainObject(limit)) { errors.push(issue('invalid-asset-limit', at, 'Asset limit must be an object.')); return; }
-      rejectUnknown(limit, new Set(['chainId', 'token', 'maxOutflow', 'maxApproval', 'allowedRecipients', 'allowedSpenders']), at, errors);
+      rejectUnknown(limit, new Set(['chainId', 'token', 'maxOutflow', 'maxOutflowPerBlock', 'maxApproval', 'allowedRecipients', 'allowedSpenders']), at, errors);
       if (!Number.isSafeInteger(limit.chainId) || limit.chainId < 1) errors.push(issue('invalid-chain', `${at}.chainId`, 'chainId must be a positive safe integer.'));
       if (!ADDRESS.test(String(limit.token ?? ''))) errors.push(issue('invalid-address', `${at}.token`, 'Asset limit requires an exact token address.'));
       const token = `${limit.chainId}:${String(limit.token).toLowerCase()}`;
       if (tokens.has(token)) errors.push(issue('duplicate-asset-limit', at, 'Each token may have only one asset limit.'));
       tokens.add(token);
       parseUint(limit.maxOutflow, `${at}.maxOutflow`, errors, { optional: false });
+      parseUint(limit.maxOutflowPerBlock, `${at}.maxOutflowPerBlock`, errors);
       parseUint(limit.maxApproval, `${at}.maxApproval`, errors, { optional: false });
       for (const field of ['allowedRecipients', 'allowedSpenders']) {
         if (!Array.isArray(limit[field])) errors.push(issue('invalid-address-list', `${at}.${field}`, `${field} must be an array.`));
@@ -197,10 +199,36 @@ function uncappedGasFindings(policy, gasRules) {
   return findings;
 }
 
-export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES } = {}) {
+/** Find attacker addresses a policy tries to allow. Listing one must fail loudly, not quietly deny later. */
+function attackersInPolicy(policy, attackerList) {
+  if (!attackerList) return [];
+  const found = [];
+  const check = (address, path) => {
+    const match = attackerList.find(address);
+    if (match) found.push({ address: match.address, label: match.label, path });
+  };
+  const contracts = Array.isArray(policy.contracts) ? policy.contracts : [];
+  contracts.forEach((contract, index) => {
+    check(contract?.address, `$.contracts[${index}].address`);
+    (Array.isArray(contract?.methods) ? contract.methods : []).forEach((method, methodIndex) => {
+      (Array.isArray(method?.constraints) ? method.constraints : []).forEach((constraint, constraintIndex) => {
+        if (constraint?.type === 'address-in' && Array.isArray(constraint.addresses)) constraint.addresses.forEach((address, addressIndex) => check(address, `$.contracts[${index}].methods[${methodIndex}].constraints[${constraintIndex}].addresses[${addressIndex}]`));
+      });
+    });
+  });
+  const simulation = policy.simulation;
+  (Array.isArray(simulation?.internalTargets) ? simulation.internalTargets : []).forEach((target, index) => check(target?.address, `$.simulation.internalTargets[${index}].address`));
+  (Array.isArray(simulation?.assetLimits) ? simulation.assetLimits : []).forEach((limit, index) => {
+    check(limit?.token, `$.simulation.assetLimits[${index}].token`);
+    for (const field of ['allowedRecipients', 'allowedSpenders']) (Array.isArray(limit?.[field]) ? limit[field] : []).forEach((address, addressIndex) => check(address, `$.simulation.assetLimits[${index}].${field}[${addressIndex}]`));
+  });
+  return found;
+}
+
+export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
-  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation']), '$', errors);
+  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation', 'blockedAddresses']), '$', errors);
   if (policy.version !== 1) errors.push(issue('unsupported-version', '$.version', 'Wallet policy version must be 1.'));
   if (typeof policy.name !== 'string' || !policy.name.trim()) errors.push(issue('missing-name', '$.name', 'Policy requires a non-empty name.'));
   if (policy.defaultAction !== 'deny') errors.push(issue('unsafe-default', '$.defaultAction', 'defaultAction must be "deny". Allow-by-default policies are not supported.'));
@@ -210,6 +238,10 @@ export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES
     if (!Array.isArray(policy.wallets)) errors.push(issue('invalid-wallets', '$.wallets', 'wallets must be an array of exact addresses.'));
     else policy.wallets.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.wallets[${index}]`, 'Expected a 20-byte 0x address.')); });
   }
+  if (policy.blockedAddresses != null) {
+    if (!Array.isArray(policy.blockedAddresses)) errors.push(issue('invalid-blocked-addresses', '$.blockedAddresses', 'blockedAddresses must be an array of exact addresses.'));
+    else policy.blockedAddresses.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.blockedAddresses[${index}]`, 'Expected a 20-byte 0x address.')); });
+  }
   if (policy.validUntil != null && (typeof policy.validUntil !== 'string' || !Number.isFinite(Date.parse(policy.validUntil)))) errors.push(issue('invalid-expiry', '$.validUntil', 'validUntil must be an ISO-8601 timestamp.'));
   if (policy.protocolState == null) errors.push(issue('missing-state-policy', '$.protocolState', 'Executable wallet policies must require authenticated live protocol state.'));
   else validateProtocolStateConfig(policy.protocolState, errors);
@@ -218,8 +250,9 @@ export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES
 
   if (!isPlainObject(policy.invariants)) errors.push(issue('missing-invariants', '$.invariants', 'Policy requires an invariants object.'));
   else {
-    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
+    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxNativeOutflowPerBlockWei', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
     parseUint(policy.invariants.maxNativeValueWei, '$.invariants.maxNativeValueWei', errors, { optional: false });
+    parseUint(policy.invariants.maxNativeOutflowPerBlockWei, '$.invariants.maxNativeOutflowPerBlockWei', errors);
     parseUint(policy.invariants.maxGas, '$.invariants.maxGas', errors);
     parseUint(policy.invariants.maxGasPriceWei, '$.invariants.maxGasPriceWei', errors);
     parseUint(policy.invariants.maxFeePerGasWei, '$.invariants.maxFeePerGasWei', errors);
@@ -227,6 +260,8 @@ export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES
     if (policy.invariants.requireCalldata != null && typeof policy.invariants.requireCalldata !== 'boolean') errors.push(issue('invalid-invariant', '$.invariants.requireCalldata', 'requireCalldata must be boolean.'));
     if (policy.invariants.denyUnlimitedApproval === false) errors.push(issue('unsafe-approval-setting', '$.invariants.denyUnlimitedApproval', 'Unlimited ERC-20 approvals cannot be enabled in the secure policy profile.'));
   }
+
+  for (const finding of attackersInPolicy(policy, attackerList)) errors.push(issue('attacker-in-policy', finding.path, `${finding.address} is on the attacker list (${finding.label}), so a policy cannot allow it.`));
 
   if (!Array.isArray(policy.contracts) || !policy.contracts.length) errors.push(issue('missing-contracts', '$.contracts', 'Policy requires at least one exact contract allowlist entry.'));
   else {
@@ -555,22 +590,24 @@ export function evaluateWalletCalls(policy, chainId, calls, { protocolState = nu
 }
 
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
-export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0, gasRules = GAS_RULES } = {}) {
+export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0, gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
   assertGasRules(gasRules);
+  assertAttackerList(attackerList);
+  const attackerRecord = attackerListIdentity(attackerList);
   const evaluatedAt = new Date(now).toISOString();
-  const policyValidation = validatePolicy(policy, { gasRules });
+  const policyValidation = validatePolicy(policy, { gasRules, attackerList });
   const gasRulesRecord = gasRulesIdentity(gasRules);
   const policyHash = policyValidation.valid ? sha256(policy) : null;
   const checks = [];
   const add = (id, ok, detail) => { checks.push({ id, status: ok ? 'pass' : 'deny', detail }); return ok; };
   if (!policyValidation.valid) {
     policyValidation.errors.forEach((error) => add(`policy:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, gasRules: gasRulesRecord, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: null, checks };
   }
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) {
     normalized.errors.forEach((error) => add(`intent:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, gasRules: gasRulesRecord, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: null, checks };
   }
   const intent = normalized.intent;
   const summary = { ...serializableIntent(intent), selector: intent.data.length >= 10 ? intent.data.slice(0, 10) : null };
@@ -616,6 +653,15 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     add('fee:priority', invariants.maxPriorityFeePerGasWei != null && intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `EIP-1559 requires maxPriorityFeePerGasWei and the transaction field must not exceed ${invariants.maxPriorityFeePerGasWei ?? '(missing)'}.`);
   }
 
+  // These apply before anything else about the call is trusted, whatever the policy allows.
+  const lookup = attackerLookup(attackerList, policy);
+  const targetAttacker = lookup(intent.to);
+  add('attacker:target', !targetAttacker, targetAttacker ? `Target is a listed attacker: ${describeAttacker(targetAttacker)}.` : `Target is not on the attacker list (${attackerList.count} addresses, version ${attackerList.version}).`);
+  const calldataAttackers = findAttackersInHex(intent.data, lookup);
+  add('attacker:calldata', calldataAttackers.length === 0, calldataAttackers.length ? `Calldata names a listed attacker: ${calldataAttackers.map(describeAttacker).join(', ')}.` : 'Calldata names no listed attacker.');
+  const delegateAttackers = (intent.authorizationList ?? []).map((authorization) => lookup(authorization.address)).filter(Boolean);
+  if (intent.authorizationList != null) add('attacker:delegate', delegateAttackers.length === 0, delegateAttackers.length ? `EIP-7702 delegate is a listed attacker: ${delegateAttackers.map(describeAttacker).join(', ')}.` : 'EIP-7702 delegates are not on the attacker list.');
+
   const contract = evaluateTargetCall(policy, intent, add);
   const gasLimit = contract ? resolveGasLimit(policy, intent, { rules: gasRules }) : null;
   if (contract) add('gas:function-limit', gasLimit != null && intent.gas != null && intent.gas <= gasLimit.limit, gasLimit ? `Gas must be present and at most ${gasLimit.limit} for this function (${gasLimit.source}).` : 'This function has no gas limit. Set maxGas in the policy.');
@@ -632,7 +678,7 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     stateSummary = stateResult.summary;
   }
   const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'simulate';
-  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, gasRules: gasRulesRecord, protocolState: stateSummary, simulation: null, checks };
+  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: stateSummary, simulation: null, checks };
 }
 
 /** Find structurally valid but broad rules that deserve human review before activation. */

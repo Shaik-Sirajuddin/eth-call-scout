@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 
 const scenarios = [
   { value: 'safe', title: 'Safe path', detail: 'All gates pass; one tx is mined', verdict: 'ALLOW' },
+  { value: 'exploiter', title: 'Exploiter recipient', detail: 'Bot pays the Binance bridge exploiter', verdict: 'DENY' },
+  { value: 'block-limit', title: 'Block spend limit', detail: 'Second swap in one block goes over', verdict: 'DENY' },
   { value: 'compromised', title: 'Protocol paused', detail: 'Signed live state vetoes first', verdict: 'DENY' },
   { value: 'hidden-call', title: 'Hidden call', detail: 'Full trace finds unsafe target', verdict: 'DENY' },
   { value: 'slippage', title: 'Slippage revert', detail: 'Exact call fails on both nodes', verdict: 'DENY' },
@@ -206,6 +208,8 @@ function RunDetail({ run, onCopy }) {
         <Evidence title="POLICY + INVARIANTS" state={checks.some((check) => check.status === 'deny') ? 'DENY' : checks.length ? 'PASS' : 'PENDING'} deny={checks.some((check) => check.status === 'deny')} wide><div className="check-list">{checks.map((check) => <div key={check.id} className={`check ${statusClass(check.status)}`}><i></i><b>{check.id}</b><span>{check.detail}</span></div>)}</div></Evidence>
         <Evidence title="FULL EVM SIMULATION" state={eventFor(run, 'simulation')?.status?.toUpperCase() ?? 'PENDING'} deny={eventFor(run, 'simulation')?.status === 'deny'}><KeyValue rows={[['fingerprint', short(simulation?.fingerprint, 14, 8)], ['sources', simulation?.agreeingSources?.join(', ') || '—'], ['call frames', simulation?.metrics?.calls ?? '—'], ['storage writes', simulation?.metrics?.storageWrites ?? '—'], ['gas estimate', simulation?.metrics?.gasEstimate ?? '—']]} /></Evidence>
         <Evidence title="WALLET + AUDIT" state={run.transactionHash ? 'MINED' : wallet?.status === 'deny' ? 'NOT CALLED' : 'PENDING'} deny={wallet?.status === 'deny'}><KeyValue rows={[['transaction', short(run.transactionHash, 14, 8)], ['block', run.chainReceipt?.blockNumber ?? '—'], ['audit valid', audit?.data?.valid == null ? '—' : String(audit.data.valid)], ['receipt count', audit?.data?.count ?? '—']]} /></Evidence>
+        <Evidence title="ON-CHAIN VERIFICATION" state={run.verification?.status?.toUpperCase() ?? 'NOT SENT'} deny={Boolean(run.verification) && run.verification.status !== 'verified'}><KeyValue rows={[['block', run.verification?.blockNumber ?? '—'], ['gas used', run.verification?.gasUsed ?? '—'], ...(run.verification?.checks ?? []).map((check) => [check.id.replace('onchain:', ''), check.status])]} /></Evidence>
+        <Evidence title="ALERTS" state={run.alerts?.length ? `${run.alerts.length} RAISED` : 'NONE'} deny={Boolean(run.alerts?.length)}><KeyValue rows={(run.alerts ?? []).length ? run.alerts.map((alert) => [alert.code, alert.message]) : [['log', 'No alerts for this run']]} /></Evidence>
         <Evidence title="EXACT TRANSACTION ENVELOPE" state="JSON" wide><pre className="code-box">{json(run.transaction)}</pre></Evidence>
         <Evidence title="AUTHORIZATION RECEIPT" state={run.receipt?.decision?.toUpperCase() ?? 'PENDING'} deny={run.receipt?.decision === 'deny'} wide><pre className="code-box">{json(run.receipt)}</pre></Evidence>
       </div></section>

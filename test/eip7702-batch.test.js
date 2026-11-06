@@ -172,7 +172,7 @@ test('leaves calls made by other contracts to the existing internal-call rules',
 test('the guard never forwards a batch that hides a disallowed call', async () => {
   const requests = [];
   const provider = { async request(request) { requests.push(request.method); return request.method === 'eth_chainId' ? '0x1' : '0xhash'; } };
-  const guardFor = (frames, state = signedState()) => createGuardedProvider({ provider, policy: batchPolicy(), protocolState: state, now: NOW, simulationOptions: { rpcUrls, fetchImpl: fakeChain(frames) } });
+  const guardFor = (frames, state = signedState()) => createGuardedProvider({ verification: false, provider, policy: batchPolicy(), protocolState: state, now: NOW, simulationOptions: { rpcUrls, fetchImpl: fakeChain(frames) } });
   const request = { method: 'eth_sendTransaction', params: [batchTx] };
 
   await assert.rejects(guardFor([frame(token.encodeFunctionData('setOperator', [ATTACKER]))]).request(request), WalletGuardError);
@@ -191,7 +191,7 @@ test('the guard gives the simulator the live state it just evaluated', async () 
     received = options;
     return { valid: false, checks: [{ id: 'simulation:policy', status: 'deny', detail: 'test' }], summary: {} };
   };
-  const guard = createGuardedProvider({ provider, policy: batchPolicy(), protocolState: state, now: NOW, simulator, simulationOptions: { rpcUrls } });
+  const guard = createGuardedProvider({ verification: false, provider, policy: batchPolicy(), protocolState: state, now: NOW, simulator, simulationOptions: { rpcUrls } });
   await assert.rejects(guard.request({ method: 'eth_sendTransaction', params: [batchTx] }), WalletGuardError);
   assert.equal(received.protocolState, state);
   assert.equal(received.minimumStateSequence, 1);

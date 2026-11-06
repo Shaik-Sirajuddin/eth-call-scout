@@ -99,3 +99,28 @@ npx keybound scan examples/variations.ts \
 ```
 
 Open `reports/eth-calls.html`. Explain that this report is supporting evidence, while the executable policy and provider guard are the authorization boundary.
+
+## Recording the two-transaction demo
+
+This shows real Ethereum contracts: an honest swap that is allowed, then the same swap with the Binance bridge exploiter as the recipient, which is denied.
+
+```sh
+# 1. Rehearse on two real mainnet nodes. Nothing is signed or sent, and no key is needed.
+npm run demo:swap
+
+# 2. Record with a mined transaction on local mainnet forks. No real money. Needs a recent Foundry (run foundryup).
+npm run demo:swap -- --fork --block-limit
+
+# 3. Optional: send a real swap. Uses real ETH, so use a throwaway wallet with a small balance.
+KEYBOUND_DEMO_PRIVATE_KEY=0x... npm run demo:swap -- --mainnet --confirm --amount-eth 0.001
+```
+
+The exploiter is `0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc`, from the October 2022 BNB bridge attack. Transaction 2 is denied in every mode, so it never costs gas.
+
+The same two cases are in the control room at `/runs` as **Safe path** and **Exploiter recipient**, on local demo tokens. **Block spend limit** shows a second swap in the same block being denied. Each run shows its on-chain check and alerts.
+
+Alerts from the control room are in `demo/runtime/alerts.jsonl`:
+
+```sh
+npx keybound alerts show demo/runtime/alerts.jsonl
+```

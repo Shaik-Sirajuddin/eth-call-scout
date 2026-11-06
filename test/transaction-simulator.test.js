@@ -100,7 +100,7 @@ test('allows wallet balance reduction for bounded gas but denies unexplained nat
   const bounded = simulationFetch({ walletBalanceDecrease: 1_000_000_000_000_000n });
   const passing = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: bounded.fetchImpl });
   assert.equal(passing.valid, true);
-  assert.equal(passing.summary.metrics.maximumGasCost, '4000000000000000');
+  assert.equal(passing.summary.metrics.maximumGasCost, (BigInt(intent.gas) * BigInt(intent.maxFeePerGas)).toString());
 
   const excessive = simulationFetch({ walletBalanceDecrease: 15_000_000_000_000_000n });
   const denied = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: excessive.fetchImpl });

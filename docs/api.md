@@ -89,9 +89,9 @@ Submits one exact EIP-1559 transaction proposal. A successful HTTP response mean
     "to": "0x...",
     "data": "0x...",
     "value": "0",
-    "gas": "350000",
-    "maxFeePerGas": "10000000000",
-    "maxPriorityFeePerGas": "1000000000",
+    "gas": "0x55730",
+    "maxFeePerGas": "0x2540be400",
+    "maxPriorityFeePerGas": "0x3b9aca00",
     "nonce": "1",
     "type": "2"
   }
@@ -215,3 +215,14 @@ Common status codes:
 ## Security boundary
 
 The API intentionally has no endpoint for raw signing, message signing, typed-data signing, raw transaction submission, wallet permissions, chain changes, policy weakening, live-state signing, or direct RPC forwarding. Adding a new mutation requires a purpose-built parser, executable policy rules, live-state binding, full simulation support, audit evidence, and tests. A generic pass-through endpoint would defeat the architecture.
+
+## Attacker list endpoints
+
+Free, public and read-only. See [Attacker list](attacker-list.md). Unlike the endpoints above, these are safe to expose and are cached.
+
+- `GET /api/v1/attackers`: the whole list.
+- `GET /api/v1/attackers?view=meta`: version, hash, count and sources.
+- `GET /api/v1/attackers?view=addresses`: a plain array of addresses.
+- `GET /api/v1/attackers/{address}`: whether one address is listed, and why.
+
+Gas and fee fields in a proposal must be `0x` hex strings.

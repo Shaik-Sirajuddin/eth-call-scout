@@ -58,3 +58,45 @@ The built-in hash-chained JSONL sink is single-writer and tamper-evident. It is 
 ## Error handling
 
 Denied calls throw `WalletGuardError` with EIP-1193-style code `4100` and a `receipt` property. Present the failed check to the user without silently broadening policy, weakening quorum, changing an approved delegate, or retrying through an unguarded provider.
+
+## Alerts and on-chain checks
+
+Once a transaction lands, the guard checks it against the chain in the background, without holding up the agent. It reads through a simulation source, not the wallet it is checking.
+
+| Check | Fails when |
+|---|---|
+| `onchain:status` | The transaction reverted |
+| `onchain:transaction-match` | The wallet sent a different sender, target, calldata, value or nonce than was approved |
+| `onchain:attacker` | A listed attacker received value or approval |
+| `onchain:asset-limits` | Tokens left beyond the policy's limits or to an unapproved address |
+| `onchain:block-limit` | The real block went over a per-block limit |
+| `onchain:gas` | More gas was used than the function allows |
+| `onchain:matches-simulation` | More left the wallet than simulation showed |
+| `onchain:all-transactions-approved` | The wallet sent a transaction that did not go through the guard |
+
+Failures do not undo anything, because the transaction has already happened. They are written as alerts for you to read:
+
+```js
+import { createAlertLog } from './src/alerts.js';
+import { createAuditLog } from './src/audit-log.js';
+
+const audit = createAuditLog('/trusted/keybound/receipts.jsonl');
+const agentProvider = createGuardedProvider({
+  provider: walletProvider,
+  policy,
+  stateSource,
+  alerts: createAlertLog('/trusted/keybound/alerts.jsonl'),
+  onDecision: (receipt) => audit.append(receipt),
+  onVerification: (result) => audit.append(result),
+});
+```
+
+```sh
+npx keybound alerts show /trusted/keybound/alerts.jsonl
+npx keybound alerts show /trusted/keybound/alerts.jsonl --severity critical
+npx keybound alerts verify /trusted/keybound/alerts.jsonl
+```
+
+Without `alerts`, they go to stderr. The log is hash-chained, so edits can be detected. Keep it where the agent cannot write. Set `verification: false` to turn the on-chain check off, or pass `verification: { request, timeoutMs, pollMs }` to choose how it reads the chain. It also turns off by itself when no simulation source URL is set.
+
+The check for transactions sent around the guard only sees nonces after the guard started, so it does not cover earlier history.

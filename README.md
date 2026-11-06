@@ -107,6 +107,13 @@ Supporting evidence: source scanner -> registry -> ABI decoder -> review report
 
 The complete trust model is in [Architecture](docs/architecture.md) and [Security model](docs/security-model.md).
 
+## Protection on by default
+
+- **Attacker list:** `data/attacker-addresses.json` holds known attacker and exploiter addresses, always on. A transaction that would pay, approve or name one is denied. A [free API](docs/attacker-list.md) serves the latest list, and `npx keybound attackers update` downloads it.
+- **Per-block spend limits:** set the most a wallet may send in one block. Going over denies the transaction and writes an alert. See [Per-block spend limits](docs/policies.md#per-block-spend-limits).
+- **On-chain checks:** after a transaction lands, the guard confirms it matches what was approved. Failures go to an alert log you can read with `npx keybound alerts show`. See [Alerts and on-chain checks](docs/integration.md#alerts-and-on-chain-checks).
+- **Default rule sets:** `npx keybound policy init` builds a policy for a general user, swapper, lender or payments wallet, with low limits you can change. See [Default rule sets](docs/policies.md#default-rule-sets).
+
 ## Executable policies
 
 Policies use exact values rather than natural-language intent. The version 1 schema is at [schema/wallet-policy.schema.json](schema/wallet-policy.schema.json).
@@ -295,6 +302,7 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Authorization audit log](docs/audit-log.md)
 - [Wallet integration](docs/integration.md)
 - [Gateway API](docs/api.md)
+- [Attacker list and free API](docs/attacker-list.md)
 - [Monitoring and scanner](docs/monitoring.md)
 - [Live dual-Anvil runbook](docs/anvil-demo.md)
 - [Demo and verification guide](docs/demo.md)
