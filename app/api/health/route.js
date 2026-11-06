@@ -13,6 +13,14 @@ export async function GET() {
       history: descriptor.history ?? 'persistent-local',
     }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
-    return Response.json({ ready: false, error: error.message }, { status: 503, headers: { 'cache-control': 'no-store' } });
+    const hosted = Boolean(process.env.VERCEL || process.env.WALLETCORDON_GATEWAY_URL);
+    return Response.json({
+      ready: false,
+      mode: hosted ? 'sepolia-beta' : 'local-anvil',
+      chainId: hosted ? 11_155_111 : null,
+      history: hosted ? 'durable-remote' : 'persistent-local',
+      eip7702: hosted ? 'denied-by-policy' : undefined,
+      error: error.message,
+    }, { status: 503, headers: { 'cache-control': 'no-store' } });
   }
 }

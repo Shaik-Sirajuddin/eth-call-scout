@@ -32,8 +32,16 @@ const guidedSteps = [
 
 async function requestJson(url, options) {
   const response = await fetch(url, { cache: 'no-store', ...options });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? `Request failed with ${response.status}`);
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; }
+  catch { throw new Error(`WalletCordon returned an invalid response (HTTP ${response.status}).`); }
+  if (!response.ok) {
+    const error = new Error(data.error ?? `Request failed with ${response.status}`);
+    error.payload = data;
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -81,7 +89,9 @@ export default function RunExplorer({ initialRunId = null }) {
   const isTestnet = health?.mode === 'sepolia-beta';
   const scenarios = isTestnet ? testnetScenarios : localScenarios;
   const networkName = isTestnet ? 'SEPOLIA' : 'ANVIL';
-  const readiness = health?.ready ? (isTestnet ? 'SEPOLIA GATEWAY READY' : 'LOCAL ENGINE READY') : 'STARTING ENGINE';
+  const readiness = health?.ready
+    ? (isTestnet ? 'SEPOLIA GATEWAY READY' : 'LOCAL ENGINE READY')
+    : (isTestnet ? 'SEPOLIA GATEWAY OFFLINE' : 'STARTING ENGINE');
 
   const refresh = useCallback(async () => {
     const [{ runs: latest }, current] = await Promise.all([
@@ -97,7 +107,12 @@ export default function RunExplorer({ initialRunId = null }) {
     let cancelled = false;
     requestJson('/api/health')
       .then((value) => { if (!cancelled) setHealth(value); })
-      .catch((cause) => { if (!cancelled) setError(cause.message); });
+      .catch((cause) => {
+        if (!cancelled) {
+          if (cause.payload) setHealth(cause.payload);
+          setError(cause.message);
+        }
+      });
     return () => { cancelled = true; };
   }, []);
 

@@ -4,8 +4,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const gateway = await getWalletGateway();
-  return Response.json({ runs: await gateway.listRuns() }, { headers: { 'cache-control': 'no-store' } });
+  try {
+    const gateway = await getWalletGateway();
+    return Response.json({ runs: await gateway.listRuns() }, { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 503, headers: { 'cache-control': 'no-store' } });
+  }
 }
 
 export async function POST(request) {
