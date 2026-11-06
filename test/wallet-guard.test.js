@@ -7,12 +7,12 @@ import { createGuardedProvider, WalletGuardError } from '../src/wallet-guard.js'
 
 const policy = JSON.parse(fs.readFileSync(new URL('../examples/wallet-policy.json', import.meta.url), 'utf8'));
 const intent = JSON.parse(fs.readFileSync(new URL('../examples/transaction-intent.json', import.meta.url), 'utf8'));
-const stateKeys = crypto.generateKeyPairSync('ed25519');
+const stateKeys = [crypto.generateKeyPairSync('ed25519'), crypto.generateKeyPairSync('ed25519')];
 policy.protocolState = {
   required: true,
   maxAgeSeconds: 300,
-  threshold: 1,
-  trustedKeys: [{ id: 'test', algorithm: 'ed25519', publicKey: stateKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }],
+  threshold: 2,
+  trustedKeys: stateKeys.map((keys, index) => ({ id: `test-${index}`, algorithm: 'ed25519', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') })),
 };
 const statePayload = {
   version: 1,
@@ -21,7 +21,8 @@ const statePayload = {
   expiresAt: '2026-12-01T00:05:00.000Z',
   protocols: [{ id: 'usdc', chainId: 1, status: 'operational', observedAt: '2026-12-01T00:00:00.000Z', contracts: [intent.to] }],
 };
-const protocolState = addProtocolStateSignature({ version: 1, payload: statePayload, signatures: [] }, signProtocolState(statePayload, { keyId: 'test', privateKey: stateKeys.privateKey }));
+let protocolState = { version: 1, payload: statePayload, signatures: [] };
+stateKeys.forEach((keys, index) => { protocolState = addProtocolStateSignature(protocolState, signProtocolState(statePayload, { keyId: `test-${index}`, privateKey: keys.privateKey })); });
 const simulator = async () => ({
   valid: true,
   checks: [{ id: 'simulation:consensus', status: 'pass', detail: 'Test simulation quorum passed.' }],

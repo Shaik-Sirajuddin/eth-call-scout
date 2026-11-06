@@ -18,7 +18,7 @@ For the exact normalized transaction, each configured source must provide:
 
 The analyzer first proves that the trace root exactly matches sender, target, calldata, and value. It then enforces call type, chain-bound internal target allowlists, maximum depth and count, native outflow, gas, touched accounts, storage writes, code changes, ERC-20 transfers, ERC-20 approvals, recipients, and spenders. ERC-721-style event shapes, ERC-1155 wallet outflows, and operator-wide approvals deny until purpose-built asset policies exist. It canonicalizes the observed effects into a fingerprint. At least `quorum` sources must agree on one passing fingerprint, and a violation quorum always vetoes.
 
-RPC URLs must be HTTPS except for loopback development, may not contain credentials, must be distinct, and are subject to response size and timeout limits. Sources beyond `maxBlockSkew` are excluded. Trace errors and unsupported tracer behavior fail closed.
+The secure activation profile requires at least two sources and a passing quorum of at least two. RPC URLs must be HTTPS except for loopback development, may not contain credentials, must be distinct, and are subject to response size and timeout limits. Sources beyond `maxBlockSkew` are excluded. Trace errors and unsupported tracer behavior fail closed.
 
 ## Supported transaction envelopes
 

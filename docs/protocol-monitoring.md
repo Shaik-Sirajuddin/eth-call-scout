@@ -15,6 +15,8 @@ Checks are performed against every configured RPC source. A protocol is:
 - `compromised` when at least `rpcQuorum` sources return deterministic invariant mismatches; or
 - `degraded` when neither result reaches quorum because sources disagree or fail.
 
+The secure monitor profile requires at least two distinct RPC endpoint URLs and `rpcQuorum >= 2`. A single provider cannot produce an activation-valid CallScout observation by itself.
+
 Only `operational` can pass wallet authorization after the payload is signed and verified.
 
 Protocol monitoring is a pre-transaction veto, not a substitute for simulation. A fresh `operational` observation says the configured live invariants matched; the exact proposed transaction must still pass [full transaction simulation](transaction-simulation.md). Conversely, a passing simulation cannot override `degraded`, `compromised`, stale, or unavailable protocol state.

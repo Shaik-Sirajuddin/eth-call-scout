@@ -33,6 +33,14 @@ test('validates strict multi-source monitor configuration', () => {
   const unknown = structuredClone(config);
   unknown.protocols[0].contracts[0].aiOpinion = 'safe';
   assert.equal(validateMonitorConfig(unknown).valid, false);
+
+  const singleSource = structuredClone(config);
+  singleSource.sources = [singleSource.sources[0]];
+  singleSource.rpcQuorum = 1;
+  const insecure = validateMonitorConfig(singleSource);
+  assert.equal(insecure.valid, false);
+  assert.ok(insecure.errors.some((error) => error.code === 'missing-sources'));
+  assert.ok(insecure.errors.some((error) => error.code === 'invalid-quorum'));
 });
 
 test('collects an operational payload only when RPC quorum satisfies all invariants', async () => {

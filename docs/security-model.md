@@ -10,7 +10,7 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 - malicious content returned by a website, protocol, tool, or RPC response;
 - a transaction proposal with deceptive labels but hostile calldata;
 - stale protocol metadata after an incident or emergency pause;
-- a compromised single live-state publisher when a signature threshold is configured;
+- a compromised single live-state publisher, which cannot meet the mandatory two-signature threshold;
 - replay of an old authorization receipt or old protocol-state snapshot; and
 - configuration mistakes such as wildcard-like permissions, unbounded approvals, missing expiries, or policies not bound to a wallet.
 
@@ -59,7 +59,7 @@ No automated system can guarantee a protocol is uncompromised. CallScout reduces
 
 ## Fail-closed behavior
 
-Every executable policy requires authenticated live state and full transaction simulation. Production policies should also require bounded expiry, wallet binding, and method constraints. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, simulation disagreement, unsupported tracer output, or unsupported transaction forms deny.
+Every executable policy requires wallet binding, an expiry, an explicit gas cap, authenticated live state with at least two keys and signatures, and full transaction simulation with at least two sources and a quorum of two. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, simulation disagreement, unsupported tracer output, or unsupported transaction forms deny.
 
 ## Reporting vulnerabilities
 

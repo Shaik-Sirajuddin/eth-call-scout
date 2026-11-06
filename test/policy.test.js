@@ -9,14 +9,14 @@ import { addProtocolStateSignature, signProtocolState } from '../src/protocol-st
 const fixture = JSON.parse(fs.readFileSync(new URL('../examples/wallet-policy.json', import.meta.url), 'utf8'));
 const intent = JSON.parse(fs.readFileSync(new URL('../examples/transaction-intent.json', import.meta.url), 'utf8'));
 const NOW = new Date('2026-12-01T00:00:00.000Z');
-const stateKeys = crypto.generateKeyPairSync('ed25519');
+const stateKeys = [crypto.generateKeyPairSync('ed25519'), crypto.generateKeyPairSync('ed25519')];
 fixture.protocolState = {
   required: true,
   maxAgeSeconds: 300,
   maxClockSkewSeconds: 15,
   minimumSequence: 1,
-  threshold: 1,
-  trustedKeys: [{ id: 'test', algorithm: 'ed25519', publicKey: stateKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }],
+  threshold: 2,
+  trustedKeys: stateKeys.map((keys, index) => ({ id: `test-${index}`, algorithm: 'ed25519', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') })),
 };
 const statePayload = {
   version: 1,
@@ -25,7 +25,8 @@ const statePayload = {
   expiresAt: '2026-12-01T00:05:00.000Z',
   protocols: [{ id: 'usdc', chainId: 1, status: 'operational', observedAt: '2026-12-01T00:00:00.000Z', contracts: [intent.to] }],
 };
-const STATE = addProtocolStateSignature({ version: 1, payload: statePayload, signatures: [] }, signProtocolState(statePayload, { keyId: 'test', privateKey: stateKeys.privateKey }));
+let STATE = { version: 1, payload: statePayload, signatures: [] };
+stateKeys.forEach((keys, index) => { STATE = addProtocolStateSignature(STATE, signProtocolState(statePayload, { keyId: `test-${index}`, privateKey: keys.privateKey })); });
 
 function clone(value) { return structuredClone(value); }
 
@@ -57,6 +58,30 @@ test('rejects executable policies without authenticated live state', () => {
   const result = validatePolicy(policy);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.code === 'missing-state-policy'));
+});
+
+test('secure activation rejects single-source and unbound draft policies', () => {
+  const draft = clone(fixture);
+  delete draft.wallets;
+  delete draft.validUntil;
+  delete draft.invariants.maxGas;
+  draft.protocolState.threshold = 1;
+  draft.protocolState.trustedKeys = [draft.protocolState.trustedKeys[0]];
+  draft.simulation.quorum = 1;
+  draft.simulation.sources = [draft.simulation.sources[0]];
+
+  const activation = validatePolicy(draft);
+  assert.equal(activation.valid, false);
+  for (const code of [
+    'activation-wallet-binding', 'activation-expiry', 'activation-state-keys',
+    'activation-state-threshold', 'activation-simulation-sources',
+    'activation-simulation-quorum', 'activation-gas-cap',
+  ]) assert.ok(activation.errors.some((error) => error.code === code), `missing ${code}`);
+
+  const audit = auditPolicy(draft);
+  assert.equal(audit.valid, true);
+  assert.ok(audit.findings.some((finding) => finding.code === 'single-state-signer'));
+  assert.ok(audit.findings.some((finding) => finding.code === 'single-simulation-quorum'));
 });
 
 test('canonical policy hashes do not depend on object key order', () => {
@@ -195,6 +220,12 @@ test('denies expired policies and missing mandatory fee fields', () => {
   receipt = authorizeIntent(fixture, noGas, { now: NOW, protocolState: STATE });
   assert.equal(receipt.decision, 'deny');
   assert.equal(receipt.checks.find((check) => check.id === 'gas:limit').status, 'deny');
+
+  const uncappedFees = clone(fixture);
+  delete uncappedFees.invariants.maxFeePerGasWei;
+  receipt = authorizeIntent(uncappedFees, intent, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'deny');
+  assert.equal(receipt.checks.find((check) => check.id === 'fee:max').status, 'deny');
 });
 
 test('supports a bounded legacy fee model and rejects mixed fee fields', () => {

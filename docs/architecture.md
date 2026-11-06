@@ -27,7 +27,7 @@ The guard must live in the same trusted process as the wallet adapter or in a sm
 
 ### Policy engine
 
-`src/policy.js` validates policies and evaluates transactions without model calls or network requests. Policies are default-deny and use exact chain IDs, addresses, selectors, and static ABI-word constraints.
+`src/policy.js` validates policies and evaluates transactions without model calls or network requests. Policies are default-deny and use exact chain IDs, addresses, selectors, and static ABI-word constraints. Activation additionally requires wallet binding, expiry, a gas cap, two-key live-state threshold protection, and a two-source simulation quorum; incomplete drafts can be audited but cannot authorize.
 
 Canonical SHA-256 hashes bind each receipt to its policy and normalized transaction. These hashes support audit correlation; they are not signatures.
 
