@@ -51,7 +51,7 @@ No automated system can guarantee a protocol is uncompromised. CallScout reduces
 
 ## Fail-closed behavior
 
-Production policies should require bounded expiry, wallet binding, method constraints, and authenticated live state. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, or unsupported transaction forms must deny.
+Every executable policy requires authenticated live state. Production policies should also require bounded expiry, wallet binding, and method constraints. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, or unsupported transaction forms deny.
 
 ## Reporting vulnerabilities
 

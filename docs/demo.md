@@ -1,6 +1,6 @@
 # Demo runbook
 
-This first milestone demonstrates deterministic authorization without connecting a wallet or sending a transaction.
+The demo exercises deterministic policy, threshold-signed fresh protocol state, rollback-aware wallet guarding, and monitoring without connecting a real wallet or sending a transaction.
 
 ## Setup
 
@@ -10,13 +10,15 @@ cd eth-call-scout
 npm ci
 ```
 
-## Safe authorization
+## Full authorization path
 
 ```sh
-npm run demo:authorize
+npm run demo:live
 ```
 
-The example transaction is a capped USDC approval for one exact spender. The output contains an `allow` decision, canonical policy and intent hashes, and each individual check.
+The script creates two ephemeral Ed25519 signers, issues a five-minute protocol-state bundle, requires both signatures, evaluates a capped USDC approval, and forwards it to a mock wallet. The output contains an `allow` decision, canonical policy, intent, and state hashes, verified signer IDs, and every individual check.
+
+No signing key is written to disk and no network transaction is sent.
 
 ## Demonstrate fail-closed behavior
 

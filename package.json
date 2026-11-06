@@ -11,10 +11,10 @@
   "scripts": {
     "scan": "node ./bin/eth-call-scout.js",
     "ruleset:build": "node ./scripts/build-ruleset-page.js",
-    "check": "node --check src/cli.js && node --check src/decode.js && node --check src/policy.js && node --check src/project.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/wallet-guard.js && node --check bin/eth-call-scout.js",
+    "check": "node --check src/canonical.js && node --check src/cli.js && node --check src/decode.js && node --check src/policy.js && node --check src/project.js && node --check src/protocol-state.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/wallet-guard.js && node --check scripts/demo-live-state.js && node --check bin/eth-call-scout.js",
     "test": "node --test",
-    "demo:authorize": "node ./bin/eth-call-scout.js authorize examples/transaction-intent.json --policy examples/wallet-policy.json",
-    "verify": "npm run check && npm test && npm run demo:authorize"
+    "demo:live": "node ./scripts/demo-live-state.js",
+    "verify": "npm run check && npm test && npm run demo:live"
   },
   "dependencies": {
     "ethers": "^6.17.0",

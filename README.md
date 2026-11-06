@@ -38,18 +38,17 @@ npm ci
 # Validate the executable policy structure.
 npx callscout policy validate examples/wallet-policy.json
 
-# Audit structurally valid but overly broad permissions.
-npx callscout policy audit examples/wallet-policy.json
+# Audit a threshold-protected live-state policy.
+npx callscout policy audit examples/wallet-policy-live.json
 
-# Evaluate one exact transaction without contacting a wallet.
-npx callscout authorize examples/transaction-intent.json \
-  --policy examples/wallet-policy.json
+# Run a fresh end-to-end threshold-signed authorization without a real wallet.
+npm run demo:live
 
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
 ```
 
-An `allow` receipt covers only the normalized transaction hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
 
 ## Architecture
 
@@ -86,6 +85,15 @@ Policies use exact values rather than natural-language intent. The version 1 sch
   "chains": [1],
   "wallets": ["0x1111111111111111111111111111111111111111"],
   "validUntil": "2030-01-01T00:00:00.000Z",
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "threshold": 2,
+    "trustedKeys": [
+      { "id": "operations", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" },
+      { "id": "security", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" }
+    ]
+  },
   "invariants": {
     "maxNativeValueWei": "10000000000000000",
     "maxGas": "350000",
@@ -125,11 +133,17 @@ The gate reads the selector and static ABI words directly from calldata. A label
 
 ```js
 import { createGuardedProvider } from './src/wallet-guard.js';
+import { createFileSequenceStore, createLiveStateSource } from './src/protocol-state.js';
 import policy from './agent-policy.json' with { type: 'json' };
 
 const agentProvider = createGuardedProvider({
   provider: walletProvider,
   policy,
+  stateSource: createLiveStateSource({
+    url: 'https://state.example/callscout.json',
+    cachePath: '.cache/callscout/live-state.json',
+  }),
+  stateSequenceStore: createFileSequenceStore('/trusted/callscout/state-sequence.json'),
   onDecision: (receipt) => appendToAuditLog(receipt),
 });
 
@@ -137,6 +151,12 @@ const agentProvider = createGuardedProvider({
 ```
 
 Never expose the underlying wallet provider, signer, seed phrase, private key, session key, or raw-signing API to the agent. Integration requirements are in [Wallet integration](docs/integration.md).
+
+## Live protocol veto
+
+Policies can require a fresh protocol-state bundle signed by a threshold of pinned Ed25519 keys. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
+
+Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
 
 ## Monitoring: static call discovery
 
@@ -182,6 +202,7 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Architecture and trust boundaries](docs/architecture.md)
 - [Security and threat model](docs/security-model.md)
 - [Policy reference](docs/policies.md)
+- [Authenticated live protocol state](docs/protocol-state.md)
 - [Wallet integration](docs/integration.md)
 - [Monitoring and scanner](docs/monitoring.md)
 - [Demo runbook](docs/demo.md)
