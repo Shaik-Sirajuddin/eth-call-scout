@@ -72,7 +72,6 @@ Judge-facing paths on the public Vercel production domain:
 - `/demo.html` — agent control room
 - `/report.html` — example interactive report
 - `/ruleset.html` — visual wallet policy builder
-- `/pr-review-ruleset.html` — PR Review Agent ruleset
 
 See [Vercel deployment](deployment.md) for the exact import settings and the deployment-protection check required before sharing the URL.
 

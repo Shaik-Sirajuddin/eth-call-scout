@@ -38,5 +38,4 @@ server.listen(port, '127.0.0.1', () => {
   process.stdout.write(`Agent control room (example evidence): http://127.0.0.1:${port}/demo.html\n`);
   process.stdout.write(`Example report: http://127.0.0.1:${port}/report.html\n`);
   process.stdout.write(`Policy builder: http://127.0.0.1:${port}/ruleset.html\n`);
-  process.stdout.write(`PR Review Agent ruleset: http://127.0.0.1:${port}/pr-review-ruleset.html\n`);
 });

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { scanProject } from '../src/rust-scanner.js';
 import { applyRuleset, enrichFindings } from '../src/registry.js';
 import { renderReport } from '../src/report.js';
-import { renderReviewRulesetBuilder, renderRulesetBuilder } from '../src/ruleset-page.js';
+import { renderRulesetBuilder } from '../src/ruleset-page.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SITE = path.join(ROOT, 'site');
@@ -40,9 +40,6 @@ const report = {
 await fs.writeFile(path.join(DIST, 'report.html'), renderReport(report), 'utf8');
 await fs.writeFile(path.join(DIST, 'report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 await fs.writeFile(path.join(DIST, 'ruleset.html'), renderRulesetBuilder(baseRegistry, walletPolicy), 'utf8');
-const reviewRuleset = renderReviewRulesetBuilder(baseRegistry);
-await fs.writeFile(path.join(DIST, 'pr-review-ruleset.html'), reviewRuleset, 'utf8');
-await fs.writeFile(path.join(DIST, 'scanner-ruleset.html'), reviewRuleset, 'utf8');
 await fs.writeFile(path.join(DIST, '.nojekyll'), '', 'utf8');
 
-process.stdout.write(`Demo site: ${DIST}\nAgent control room: ${path.join(DIST, 'demo.html')}\nExample report: ${path.join(DIST, 'report.html')}\nPolicy builder: ${path.join(DIST, 'ruleset.html')}\nPR Review Agent ruleset: ${path.join(DIST, 'pr-review-ruleset.html')}\n`);
+process.stdout.write(`Demo site: ${DIST}\nAgent control room: ${path.join(DIST, 'demo.html')}\nCall-surface report: ${path.join(DIST, 'report.html')}\nPolicy builder: ${path.join(DIST, 'ruleset.html')}\n`);

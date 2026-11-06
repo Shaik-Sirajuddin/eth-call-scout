@@ -18,13 +18,12 @@ requireMatch(/<h1>[\s\S]*?<\/h1>/, 'Landing page requires one primary heading.')
 requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.');
 requireMatch(/data-tour/, 'Landing page requires the end-to-end product tour.');
 requireMatch(/data-tour-slide="3"/, 'Product tour must cover the complete four-stage trust path.');
-requireMatch(/id="review-agent"/, 'Landing page requires the PR Review Agent evidence gallery.');
 requireMatch(/href="\.\/demo\.html"/, 'Landing page must link to the agent control room.');
-for (const pr of ['20', '24', '11']) requireMatch(new RegExp(`pull/${pr}`), `Review gallery must link to source PR #${pr}.`);
+if (/PR Review Agent|pr-review-ruleset|pull\/(?:20|24|11)/i.test(html)) errors.push('Landing page must not expose the unrelated PR-review agent.');
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
-for (const required of ['demo.html', 'demo.css', 'demo.js', 'report.html', 'ruleset.html', 'pr-review-ruleset.html']) {
+for (const required of ['demo.html', 'demo.css', 'demo.js', 'report.html', 'ruleset.html']) {
   if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
 }
 const demoPath = path.join(root, 'demo.html');
@@ -39,11 +38,8 @@ if (fs.existsSync(demoPath)) {
   if (!/@media \(max-width: 680px\)/.test(demoCss)) errors.push('Agent control room requires a mobile responsive layout.');
   if (!/prefers-reduced-motion/.test(demoCss)) errors.push('Agent control room styles must respect reduced motion.');
 }
-const reviewRulesetPath = path.join(root, 'pr-review-ruleset.html');
-if (fs.existsSync(reviewRulesetPath)) {
-  const reviewRuleset = fs.readFileSync(reviewRulesetPath, 'utf8');
-  if (!/PR Review Agent Ruleset/.test(reviewRuleset)) errors.push('Review ruleset must use the user-facing PR Review Agent name.');
-  if (!/Wallet authorization remains a separate executable policy/.test(reviewRuleset)) errors.push('Review ruleset must disclose its non-authorizing scope.');
+for (const removed of ['pr-review-ruleset.html', 'scanner-ruleset.html']) {
+  if (fs.existsSync(path.join(root, removed))) errors.push(`Public site must not contain unrelated PR-review artifact: ${removed}`);
 }
 const policyBuilderPath = path.join(root, 'ruleset.html');
 if (fs.existsSync(policyBuilderPath)) {
@@ -59,6 +55,7 @@ if (fs.existsSync(reportPath)) {
   if (!/const DATA=\{/.test(report)) errors.push('Generated report must embed its scan data.');
   if (!/function drawGraph\(\)/.test(report)) errors.push('Generated report must include the interactive call graph.');
   if (!/href="ruleset\.html"/.test(report)) errors.push('Generated report must link to the ruleset builder.');
+  if (/PR Review Agent|pr-review-ruleset/i.test(report)) errors.push('Generated call report must not present itself as a PR-review agent.');
 }
 for (const match of html.matchAll(/<(?:a|link|script)\b[^>]*(?:href|src)="([^"]+)"/g)) {
   const reference = match[1];

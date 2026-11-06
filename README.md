@@ -63,13 +63,12 @@ An `allow` receipt covers only the normalized transaction hash and authenticated
 
 ## Web demo
 
-The Vercel deployment contains the responsive product site, the agent control room, a generated monitoring report, and two purpose-separated authoring tools. After assigning a public production domain, these paths are the judge-facing links:
+The Vercel deployment contains the responsive product site, the agent control room, a generated call-surface report, and the visual wallet-policy builder. After assigning a public production domain, these paths are the judge-facing links:
 
 - `/` — CallScout product site
 - `/demo.html` — stored example evidence when hosted; live execution when run locally
 - `/report.html` — interactive example call report
 - `/ruleset.html` — visual wallet policy builder
-- `/pr-review-ruleset.html` — PR Review Agent ruleset
 
 The exact dashboard values and the required public-access check are in [Vercel deployment](docs/deployment.md). The checked-in `vercel.json` sets the framework to Other, build command to `npm run site:build`, and output directory to `dist`; leave Vercel's Root Directory at the repository default (`.`).
 
@@ -81,7 +80,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-`site:check` scans the example sources, applies `.secu`, and creates the control room, report, policy studio, and PR Review Agent ruleset under `dist/`. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil product at `http://127.0.0.1:4174/demo.html`. See the [live demo runbook](docs/anvil-demo.md).
+`site:check` scans the example sources, applies `.secu`, and creates the control room, call-surface report, and policy studio under `dist/`. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil product at `http://127.0.0.1:4174/demo.html`. See the [live demo runbook](docs/anvil-demo.md).
 
 ## Architecture
 

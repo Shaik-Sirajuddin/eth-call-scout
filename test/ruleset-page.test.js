@@ -27,9 +27,9 @@ test('visual policy builder exposes the complete local authoring workflow', () =
     'Authorization receipt',
     'callscout policy validate',
     'window.__callScoutPolicyBuilder',
-    'pr-review-ruleset.html',
   ]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
+  assert.doesNotMatch(html, /pr-review-ruleset\.html/);
   assert.match(html, /@media\(max-width:820px\)/);
   assert.match(html, /prefers-reduced-motion/);
   assert.match(html, /localStorage\.setItem\(STORAGE_KEY/);
