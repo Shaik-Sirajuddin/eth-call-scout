@@ -46,6 +46,7 @@ function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat
         value: '0x0',
         input: tx.data,
         output: outputByHost[new URL(url).hostname] ?? '0x',
+        gasUsed: '0xea60',
         logs: [{
           address: intent.to,
           topics: [APPROVAL_TOPIC, topicAddress(tx.from), topicAddress('0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45')],

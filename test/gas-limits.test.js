@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { FunctionFragment, id, keccak256 } from 'ethers';
+import { FunctionFragment, id, keccak256, toBeHex } from 'ethers';
+import { firstBlockOfCurrentVersion, IMPLEMENTATION_SLOTS, readCodeVersion, samplesFromBlock } from '../src/code-version.js';
 import { checkGasRuleVersions, createGasRules, GAS_RULES } from '../src/gas-limits.js';
 import { auditPolicy, authorizeIntent, evaluateWalletCalls, resolveGasLimit, validatePolicy } from '../src/policy.js';
 import { addProtocolStateSignature, signProtocolState } from '../src/protocol-state.js';
@@ -16,16 +17,16 @@ const USDC = intent.to;
 const WALLET = intent.from;
 const APPROVE = '0x095ea7b3';
 const CODE = '0x6001600055';
-const SLOT = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036a5a723fd8ee048ed3f8c3';
+const SLOT = id('org.zeppelinos.proxy.implementation');
 const IMPLEMENTATION = `0x${'77'.repeat(20)}`;
 const word = (address) => `0x${address.slice(2).padStart(64, '0')}`;
 const hex = (n) => `0x${n.toString(16)}`;
 const rpcUrls = { 'sim-primary': 'https://primary.example', 'sim-secondary': 'https://secondary.example' };
 
-function measuredRules({ maxGas = '100000', validUntil = '2027-05-01T00:00:00.000Z' } = {}) {
+function measuredRules({ maxGas = '100000', validUntil = '2027-05-01T00:00:00.000Z', rulesVersion = '2026-11-06' } = {}) {
   return createGasRules({
     version: 1,
-    rulesVersion: '2026-11-06',
+    rulesVersion,
     validUntil,
     rules: [{
       chainId: 1,
@@ -54,7 +55,7 @@ function fakeChain({ estimate = 60000, gasUsed = 60000, code = CODE, implementat
       debug_traceCall: () => {
         if (request.params[2].tracer === 'prestateTracer') return { pre: {}, post: {} };
         const tx = request.params[0];
-        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', gasUsed: hex(gasUsed), calls: frames };
+        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', ...(gasUsed == null ? {} : { gasUsed: hex(gasUsed) }), calls: frames };
       },
     };
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: results[request.method]() }));
@@ -261,7 +262,7 @@ test('the guard never forwards the wasteful call, and still forwards the normal 
 
   const sent = [];
   const provider = { async request(request) { if (request.method === 'eth_chainId') return '0x1'; sent.push(request.method); return '0xhash'; } };
-  const guard = (chain) => createGuardedProvider({ provider, policy, protocolState, now: NOW, simulationOptions: { rpcUrls, fetchImpl: fakeChain(chain), gasRules: measuredRules() } });
+  const guard = (chain) => createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: measuredRules(), simulationOptions: { rpcUrls, fetchImpl: fakeChain(chain) } });
 
   await assert.rejects(
     guard({ estimate: 300000, gasUsed: 300000 }).request({ method: 'eth_sendTransaction', params: [WASTEFUL_TX] }),
@@ -271,4 +272,121 @@ test('the guard never forwards the wasteful call, and still forwards the normal 
 
   assert.equal(await guard({ estimate: 60000, gasUsed: 60000 }).request({ method: 'eth_sendTransaction', params: [NORMAL_TX] }), '0xhash');
   assert.deepEqual(sent, ['eth_sendTransaction']);
+});
+
+test('proxy slots equal the values their standards define', () => {
+  assert.ok(IMPLEMENTATION_SLOTS.includes(id('org.zeppelinos.proxy.implementation')));
+  assert.ok(IMPLEMENTATION_SLOTS.includes(toBeHex(BigInt(id('eip1967.proxy.implementation')) - 1n, 32)));
+});
+
+test('a USDC-style proxy is recognised, so its upgrades make rules outdated', async () => {
+  const rpc = async (method, params) => {
+    if (method === 'eth_getCode') return CODE;
+    if (method === 'eth_getStorageAt') return params[1] === SLOT ? word(IMPLEMENTATION) : `0x${'00'.repeat(32)}`;
+    return '0x';
+  };
+  assert.deepEqual((await readCodeVersion(rpc, USDC)).implementation, { kind: 'slot', slot: SLOT, address: IMPLEMENTATION });
+
+  const shipped = GAS_RULES.find(1, USDC, APPROVE).codeVersion.implementation;
+  assert.equal(shipped?.slot, SLOT, 'the shipped USDC rules must pin its implementation');
+  assert.match(shipped.address, /^0x[0-9a-f]{40}$/);
+});
+
+test('a wallet call with no reported gas fails closed', async () => {
+  const rules = measuredRules();
+  const statuses = await checkGasRuleVersions(rules, [rules.find(1, USDC, APPROVE)], (method) => fakeRpc(method), { now: NOW });
+  const input = `${APPROVE}${'00'.repeat(64)}`;
+  const gasFailures = (call) => evaluateWalletCalls(example, 1, [call], { now: NOW, gasRules: rules, gasRuleStatuses: statuses }).filter((failure) => failure.includes('gas:function-limit'));
+  const base = { type: 'CALL', to: USDC.toLowerCase(), value: '0', input };
+  assert.equal(gasFailures(base).length, 1, 'a missing gasUsed must not skip the check');
+  assert.match(gasFailures(base)[0], /reports no gas/);
+  assert.equal(gasFailures({ ...base, gasUsed: hex(300000) }).length, 1);
+  assert.equal(gasFailures({ ...base, gasUsed: hex(60000) }).length, 0);
+
+  const frame = { type: 'CALL', from: WALLET, to: USDC, value: '0x0', input, output: '0x' };
+  const result = await simulate({ frames: [frame] }, { tx: NORMAL_TX });
+  assert.equal(result.valid, false);
+  assert.ok(result.summary.sources.every((source) => source.status === 'error' && source.failures.some((failure) => failure.includes('a wallet call has no gasUsed'))));
+});
+
+test('a trace whose root reports no gas is malformed', async () => {
+  const result = await simulate({ gasUsed: null }, { tx: NORMAL_TX });
+  assert.equal(result.valid, false);
+  assert.ok(result.summary.sources.every((source) => source.status === 'error' && source.failures.some((failure) => failure.includes('the root call has no gasUsed'))));
+});
+
+test('the receipt names the rule set that really made the decision', async () => {
+  const keys = [crypto.generateKeyPairSync('ed25519'), crypto.generateKeyPairSync('ed25519')];
+  const policy = structuredClone(example);
+  policy.protocolState = { required: true, maxAgeSeconds: 300, threshold: 2, trustedKeys: keys.map((pair, index) => ({ id: `r-${index}`, algorithm: 'ed25519', publicKey: pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') })) };
+  const payload = { version: 1, sequence: 1, issuedAt: NOW.toISOString(), expiresAt: '2026-12-01T00:05:00.000Z', protocols: [{ id: 'usdc', chainId: 1, status: 'operational', observedAt: NOW.toISOString(), contracts: [USDC] }] };
+  let protocolState = { version: 1, payload, signatures: [] };
+  keys.forEach((pair, index) => { protocolState = addProtocolStateSignature(protocolState, signProtocolState(payload, { keyId: `r-${index}`, privateKey: pair.privateKey })); });
+  const provider = { async request(request) { return request.method === 'eth_chainId' ? '0x1' : '0xhash'; } };
+  const rules = measuredRules();
+  assert.notEqual(rules.hash, GAS_RULES.hash);
+
+  const receipts = [];
+  const guard = createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: rules, onDecision: (receipt) => receipts.push(receipt), simulationOptions: { rpcUrls, fetchImpl: fakeChain() } });
+  await guard.request({ method: 'eth_sendTransaction', params: [NORMAL_TX] });
+  assert.equal(receipts[0].decision, 'allow');
+  assert.equal(receipts[0].gasRules.hash, rules.hash);
+  assert.equal(receipts[0].simulation.gasRules.hash, rules.hash);
+  assert.equal(receipts[0].checks.find((check) => check.id === 'gas:rules-match').status, 'pass');
+
+  // A simulator that used any other set cannot produce an allow.
+  const otherRules = async () => ({ valid: true, checks: [], summary: { gasRules: { version: 'other', hash: 'not-the-same' } } });
+  const mismatched = createGuardedProvider({ provider, policy, protocolState, now: NOW, gasRules: rules, simulator: otherRules });
+  await assert.rejects(mismatched.request({ method: 'eth_sendTransaction', params: [NORMAL_TX] }), (error) => error instanceof WalletGuardError && error.receipt.checks.find((check) => check.id === 'gas:rules-match').status === 'deny');
+});
+
+test('one rule set is chosen at construction and cannot be swapped or forged', () => {
+  const provider = { async request() { return '0x1'; } };
+  assert.throws(() => createGuardedProvider({ provider, policy: example, simulationOptions: { gasRules: measuredRules() } }), /Pass gasRules to createGuardedProvider/);
+  const forged = { version: 'x', validUntil: '2030-01-01T00:00:00.000Z', hash: GAS_RULES.hash, find: () => null };
+  assert.throws(() => createGuardedProvider({ provider, policy: example, gasRules: forged }), /created by createGasRules/);
+  assert.throws(() => authorizeIntent(example, NORMAL_TX, { now: NOW, gasRules: forged }), /created by createGasRules/);
+});
+
+test('a forged rule set is refused by the simulator too', async () => {
+  const forged = { version: 'x', validUntil: '2030-01-01T00:00:00.000Z', hash: GAS_RULES.hash, find: () => null };
+  await assert.rejects(simulate({}, { tx: NORMAL_TX, rules: forged }), /created by createGasRules/);
+});
+
+test('the decision fingerprint changes with the rule set', async () => {
+  const first = await simulate({}, { tx: NORMAL_TX, rules: measuredRules({ rulesVersion: 'a' }) });
+  const second = await simulate({}, { tx: NORMAL_TX, rules: measuredRules({ rulesVersion: 'b' }) });
+  assert.ok(first.summary.fingerprint && second.summary.fingerprint);
+  assert.notEqual(first.summary.fingerprint, second.summary.fingerprint);
+});
+
+test('samples from before an upgrade inside the window are not attributed to the current version', async () => {
+  const OLD = `0x${'99'.repeat(20)}`;
+  const pin = { codeHash: keccak256(CODE), implementation: { kind: 'slot', slot: SLOT, address: IMPLEMENTATION } };
+  const chainUpgradedAt = (upgradeBlock) => async (method, params) => (method === 'eth_getCode' ? CODE : word(Number(BigInt(params[2])) >= upgradeBlock ? IMPLEMENTATION : OLD));
+
+  const from = await firstBlockOfCurrentVersion(chainUpgradedAt(1234), USDC, pin, 1000, 2000);
+  assert.equal(from, 1234);
+  const kept = samplesFromBlock([{ gas: 900000, block: 1100 }, { gas: 60000, block: 1234 }, { gas: 61000, block: 1900 }], from);
+  assert.deepEqual(kept.map((sample) => sample.gas), [60000, 61000]);
+
+  assert.equal(await firstBlockOfCurrentVersion(chainUpgradedAt(0), USDC, pin, 1000, 2000), 1000, 'no upgrade keeps the whole window');
+  assert.equal(await firstBlockOfCurrentVersion(chainUpgradedAt(2000), USDC, pin, 1000, 2000), 2000, 'an upgrade at the last block keeps only that block');
+  await assert.rejects(firstBlockOfCurrentVersion(chainUpgradedAt(3000), USDC, pin, 1000, 2000), /newest block does not match/);
+});
+
+test('proxies read through implementation() are searched the same way, and other contracts need no search', async () => {
+  const OLD = `0x${'99'.repeat(20)}`;
+  const pin = { codeHash: keccak256(CODE), implementation: { kind: 'call', address: IMPLEMENTATION } };
+  const rpc = async (method, params) => (method === 'eth_getCode' ? CODE : word(Number(BigInt(params[1])) >= 1500 ? IMPLEMENTATION : OLD));
+  assert.equal(await firstBlockOfCurrentVersion(rpc, USDC, pin, 1000, 2000), 1500);
+
+  const noCalls = async () => { throw new Error('a plain contract needs no history'); };
+  assert.equal(await firstBlockOfCurrentVersion(noCalls, USDC, { codeHash: keccak256(CODE), implementation: null }, 1000, 2000), 1000);
+});
+
+test('a node that cannot read history leaves the rules out instead of guessing', async () => {
+  const pin = { codeHash: keccak256(CODE), implementation: { kind: 'slot', slot: SLOT, address: IMPLEMENTATION } };
+  const rpc = async (method) => { if (method === 'eth_getCode') throw new Error('Archive requests require a personal token'); return '0x'; };
+  await assert.rejects(firstBlockOfCurrentVersion(rpc, USDC, pin, 1000, 2000), /Archive requests/);
 });

@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // Rebuilds data/gas-limits.json by sampling recent Ethereum mainnet blocks. Run with: npm run gas:sync
 // Options: --blocks <count to sample> (default 3000), --window <blocks back> (default 50400, about 7 days), --out <file>.
-// Set ETHEREUM_RPC_URL to use your own node.
+// Set ETHEREUM_RPC_URL to use your own node. Set ETHEREUM_HISTORY_RPC_URL to a node that keeps historical state.
 import fs from 'node:fs';
 import { FunctionFragment, id } from 'ethers';
-import { readCodeVersion } from '../src/code-version.js';
+import { firstBlockOfCurrentVersion, readCodeVersion, samplesFromBlock } from '../src/code-version.js';
 
 const argument = (name) => { const index = process.argv.indexOf(name); return index < 0 ? null : process.argv[index + 1]; };
 const OUTPUT = argument('--out') ?? new URL('../data/gas-limits.json', import.meta.url);
 const BLOCKS = Number(argument('--blocks') ?? 3000);
 const WINDOW = Number(argument('--window') ?? 50400);
 const RPC_URL = process.env.ETHEREUM_RPC_URL ?? 'https://ethereum-rpc.publicnode.com';
+const HISTORY_RPC_URL = process.env.ETHEREUM_HISTORY_RPC_URL ?? 'https://rpc.mevblocker.io';
 const CONCURRENCY = 8;
 const MAX_SAMPLES_PER_FUNCTION = 300;
 const MIN_SAMPLES = 20;
@@ -91,10 +92,13 @@ const KNOWN_SIGNATURES = [
 const SIGNATURE_BY_SELECTOR = new Map(KNOWN_SIGNATURES.map((signature) => [id(FunctionFragment.from(`function ${signature}`).format('sighash')).slice(0, 10), signature]));
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-async function rpc(method, params) {
+const rpc = (method, params) => call(RPC_URL, method, params);
+const historyRpc = (method, params) => call(HISTORY_RPC_URL, method, params);
+
+async function call(url, method, params) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetch(RPC_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'callscout-gas-rules/0.1' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(30_000) });
+      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'callscout-gas-rules/0.1' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const body = await response.json();
       if (body.error) throw new Error(body.error.message);
@@ -108,7 +112,7 @@ async function rpc(method, params) {
 
 const percentile = (sorted, ratio) => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
 
-function ruleFor(target, selector, samples, codeVersion) {
+function ruleFor(target, selector, samples, codeVersion, fromBlock) {
   const gas = [...samples].sort((a, b) => a - b);
   const p99 = percentile(gas, 0.99);
   const raw = (BigInt(p99) * SAFETY_MARGIN_PERCENT) / 100n;
@@ -123,7 +127,7 @@ function ruleFor(target, selector, samples, codeVersion) {
     signature: SIGNATURE_BY_SELECTOR.get(selector) ?? null,
     maxGas: (rounded < MIN_GAS ? MIN_GAS : rounded).toString(),
     codeVersion,
-    observed: { samples: gas.length, p50: percentile(gas, 0.5), p95: percentile(gas, 0.95), p99, max: gas[gas.length - 1] },
+    observed: { samples: gas.length, p50: percentile(gas, 0.5), p95: percentile(gas, 0.95), p99, max: gas[gas.length - 1], fromBlock },
   };
 }
 
@@ -132,7 +136,8 @@ const samples = new Map();
 const latest = Number(BigInt(await rpc('eth_blockNumber', [])));
 const firstBlock = latest - WINDOW + 1;
 const stride = Math.max(1, Math.floor(WINDOW / BLOCKS));
-let nextBlock = firstBlock;
+// Newest first, so the per-function cap keeps samples from the current code if a proxy upgraded in the window.
+let nextBlock = latest;
 let done = 0;
 let transactions = 0;
 let failedBlocks = 0;
@@ -145,15 +150,15 @@ async function scanBlock(number) {
     if ((samples.get(key)?.length ?? 0) >= MAX_SAMPLES_PER_FUNCTION) continue;
     const receipt = await rpc('eth_getTransactionReceipt', [tx.hash]);
     if (receipt?.status !== '0x1') continue;
-    samples.set(key, [...(samples.get(key) ?? []), Number(BigInt(receipt.gasUsed))]);
+    samples.set(key, [...(samples.get(key) ?? []), { gas: Number(BigInt(receipt.gasUsed)), block: number }]);
     transactions++;
   }
 }
 
 await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
-  while (nextBlock <= latest) {
+  while (nextBlock >= firstBlock) {
     const number = nextBlock;
-    nextBlock += stride;
+    nextBlock -= stride;
     try { await scanBlock(number); }
     catch { failedBlocks++; }
     if (++done % 500 === 0) process.stdout.write(`${done}/${BLOCKS} blocks, ${transactions} transactions\n`);
@@ -161,14 +166,29 @@ await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
 }));
 
 const rules = [];
+const omitted = [];
+const head = Number(BigInt(await historyRpc('eth_blockNumber', []))) - 2;
+const headTag = `0x${head.toString(16)}`;
 for (const target of TARGETS) {
   const prefix = `${target.address.toLowerCase()}:`;
+  let codeVersion;
+  let fromBlock;
+  try {
+    codeVersion = await readCodeVersion(historyRpc, target.address, headTag);
+    fromBlock = await firstBlockOfCurrentVersion(historyRpc, target.address, codeVersion, firstBlock, head);
+  } catch (error) {
+    omitted.push({ contract: target.contract, reason: error.message });
+    process.stdout.write(`${target.contract}: left out because ${error.message}\n`);
+    continue;
+  }
   // A function whose cost varies this much bundles variable work, so one number would mean little.
   const steady = (gas) => { const sorted = [...gas].sort((a, b) => a - b); return percentile(sorted, 0.99) <= percentile(sorted, 0.5) * MAX_SPREAD; };
-  const eligible = [...samples].filter(([key, gas]) => key.startsWith(prefix) && gas.length >= MIN_SAMPLES && steady(gas));
-  const codeVersion = await readCodeVersion(rpc, target.address);
-  for (const [key, gas] of eligible) rules.push(ruleFor(target, key.slice(prefix.length), gas, codeVersion));
-  process.stdout.write(`${target.contract}: ${eligible.length} functions, implementation ${codeVersion.implementation?.address ?? 'none'}\n`);
+  const eligible = [...samples]
+    .filter(([key]) => key.startsWith(prefix))
+    .map(([key, list]) => [key, samplesFromBlock(list, fromBlock).map((sample) => sample.gas)])
+    .filter(([, gas]) => gas.length >= MIN_SAMPLES && steady(gas));
+  for (const [key, gas] of eligible) rules.push(ruleFor(target, key.slice(prefix.length), gas, codeVersion, fromBlock));
+  process.stdout.write(`${target.contract}: ${eligible.length} functions from block ${fromBlock}, implementation ${codeVersion.implementation?.address ?? 'none'}\n`);
 }
 rules.sort((a, b) => a.protocolId.localeCompare(b.protocolId) || a.contract.localeCompare(b.contract) || a.selector.localeCompare(b.selector));
 
@@ -181,7 +201,8 @@ const document = {
   source: `Successful Ethereum mainnet transactions sent directly to each contract, sampled every ${stride} blocks from ${firstBlock} to ${latest}`,
   transactionsMeasured: transactions,
   blocksFailed: failedBlocks,
-  method: `maxGas is the 99th percentile of observed gas used, plus ${SAFETY_MARGIN_PERCENT - 100n}%, rounded up to the next ${ROUND_TO}. Functions with fewer than ${MIN_SAMPLES} samples are left out, and so are functions whose 99th percentile is more than ${MAX_SPREAD} times their median, because they bundle variable work and one number would mean little. A policy must set its own limit for those. Each rule pins the code it was measured on. Once that code changes or the set passes validUntil, the rule stops denying and the policy's overall gas cap applies.`,
+  omitted,
+  method: `maxGas is the 99th percentile of observed gas used, plus ${SAFETY_MARGIN_PERCENT - 100n}%, rounded up to the next ${ROUND_TO}. Functions with fewer than ${MIN_SAMPLES} samples are left out, and so are functions whose 99th percentile is more than ${MAX_SPREAD} times their median, because they bundle variable work and one number would mean little. A policy must set its own limit for those. Samples from before a proxy's latest upgrade are dropped, because they describe other code, and a contract whose history cannot be read is left out. Each rule pins the code it was measured on. Once that code changes or the set passes validUntil, the rule stops denying and the policy's overall gas cap applies.`,
   rules,
 };
 fs.writeFileSync(OUTPUT, `${JSON.stringify(document, null, 2)}\n`);

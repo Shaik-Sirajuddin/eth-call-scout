@@ -73,7 +73,7 @@ The same trace rules apply when a type-4 transaction installs a delegate and inv
 
 Passing simulation does not prove a call is cheap. An attacker can keep the same valid function and pad it, for example with extra swap hops, so funds stay safe and the wallet still pays for the waste.
 
-After tracing, each source reads the code version of every contract with a measured gas rule, then applies the function's limit to the transaction `gas`, the estimate, and the root trace's `gasUsed`. Each call the wallet itself makes inside a batch is checked against its own function limit. A rule whose pinned code version no longer matches stops denying, and the policy's contract limit or overall cap applies instead. A failed version read fails closed. See [Function gas limits](policies.md#function-gas-limits).
+After tracing, each source reads the code version of every contract with a measured gas rule, then applies the function's limit to the transaction `gas`, the estimate, and the root trace's `gasUsed`. Each call the wallet itself makes inside a batch is checked against its own function limit. A trace that omits `gasUsed` on its root or on a call the wallet makes is malformed, so that source fails. A rule whose pinned code version no longer matches stops denying, and the policy's contract limit or overall cap applies instead. A failed version read fails closed. See [Function gas limits](policies.md#function-gas-limits).
 
 ## Security boundary and limitations
 

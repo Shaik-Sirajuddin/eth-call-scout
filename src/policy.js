@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { verifyAuthorization } from 'ethers';
 import { canonicalJson, sha256 } from './canonical.js';
-import { GAS_RULES } from './gas-limits.js';
+import { assertGasRules, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
 import { evaluateProtocolState } from './protocol-state.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -182,7 +182,7 @@ function validateConstraint(constraint, path, errors) {
 
 /** Validate a wallet policy. Activation checks may be disabled only for draft auditing. */
 /** List allowed calls that have no gas ceiling from the policy or the measured rule set. */
-function uncappedGasFindings(policy) {
+function uncappedGasFindings(policy, gasRules) {
   const findings = [];
   if (!Array.isArray(policy.contracts)) return findings;
   policy.contracts.forEach((contract, index) => {
@@ -191,13 +191,13 @@ function uncappedGasFindings(policy) {
     if (contract.allowEmptyCalldata === true && contract.maxGas == null) findings.push(issue('uncapped-empty-calldata-gas', `${path}.maxGas`, 'Native transfers to this contract need a contract maxGas.', 'high'));
     (Array.isArray(contract.methods) ? contract.methods : []).forEach((method, methodIndex) => {
       if (!isPlainObject(method) || method.maxGas != null || contract.maxGas != null) return;
-      if (!GAS_RULES.find(contract.chainId, contract.address, method.selector)) findings.push(issue('uncapped-function-gas', `${path}.methods[${methodIndex}].maxGas`, `Selector ${method.selector} has no measured gas rule, so the policy must set maxGas.`, 'high'));
+      if (!gasRules.find(contract.chainId, contract.address, method.selector)) findings.push(issue('uncapped-function-gas', `${path}.methods[${methodIndex}].maxGas`, `Selector ${method.selector} has no measured gas rule, so the policy must set maxGas.`, 'high'));
     });
   });
   return findings;
 }
 
-export function validatePolicy(policy, { activation = true } = {}) {
+export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES } = {}) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
   rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation']), '$', errors);
@@ -271,7 +271,7 @@ export function validatePolicy(policy, { activation = true } = {}) {
     if ((policy.simulation?.sources?.length ?? 0) < 2) errors.push(issue('activation-simulation-sources', '$.simulation.sources', 'The secure activation profile requires at least two simulation sources.'));
     if ((policy.simulation?.quorum ?? 0) < 2) errors.push(issue('activation-simulation-quorum', '$.simulation.quorum', 'The secure activation profile requires a simulation quorum of at least two.'));
     if (policy.invariants?.maxGas == null) errors.push(issue('activation-gas-cap', '$.invariants.maxGas', 'Executable policies must require and cap the transaction gas limit.'));
-    for (const finding of uncappedGasFindings(policy)) errors.push(issue(`activation-${finding.code}`, finding.path, finding.message));
+    for (const finding of uncappedGasFindings(policy, gasRules)) errors.push(issue(`activation-${finding.code}`, finding.path, finding.message));
   }
   return { valid: errors.length === 0, errors };
 }
@@ -535,9 +535,11 @@ export function evaluateWalletCalls(policy, chainId, calls, { protocolState = nu
     valueByTarget.set(call.to, valueToTarget);
     const add = (id, ok, detail) => { if (!ok) failures.push(`${label} failed ${id}: ${detail}`); return ok; };
     const contract = evaluateTargetCall(policy, { chainId, to: call.to, data: call.input, value }, add, valueToTarget);
-    if (contract && call.gasUsed != null) {
+    if (contract) {
       const gasLimit = resolveGasLimit(policy, { chainId, to: call.to, data: call.input }, { rules: gasRules, statuses: gasRuleStatuses });
-      add('gas:function-limit', gasLimit != null && BigInt(call.gasUsed) <= gasLimit.limit, `Used ${BigInt(call.gasUsed)} gas; ${gasLimit ? `this function allows ${gasLimit.limit} (${gasLimit.source})` : 'this function has no gas limit'}.`);
+      const used = call.gasUsed == null ? null : BigInt(call.gasUsed);
+      const limitText = gasLimit ? `this function allows ${gasLimit.limit} (${gasLimit.source})` : 'this function has no gas limit';
+      add('gas:function-limit', gasLimit != null && used != null && used <= gasLimit.limit, used == null ? `The trace reports no gas for this call; ${limitText}.` : `Used ${used} gas; ${limitText}.`);
     }
     if (!contract || policy.protocolState?.required !== true) continue;
     const state = evaluateProtocolState(protocolState, policy.protocolState, {
@@ -553,20 +555,22 @@ export function evaluateWalletCalls(policy, chainId, calls, { protocolState = nu
 }
 
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
-export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0 } = {}) {
+export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0, gasRules = GAS_RULES } = {}) {
+  assertGasRules(gasRules);
   const evaluatedAt = new Date(now).toISOString();
-  const policyValidation = validatePolicy(policy);
+  const policyValidation = validatePolicy(policy, { gasRules });
+  const gasRulesRecord = gasRulesIdentity(gasRules);
   const policyHash = policyValidation.valid ? sha256(policy) : null;
   const checks = [];
   const add = (id, ok, detail) => { checks.push({ id, status: ok ? 'pass' : 'deny', detail }); return ok; };
   if (!policyValidation.valid) {
     policyValidation.errors.forEach((error) => add(`policy:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, gasRules: gasRulesRecord, protocolState: null, checks };
   }
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) {
     normalized.errors.forEach((error) => add(`intent:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, gasRules: gasRulesRecord, protocolState: null, checks };
   }
   const intent = normalized.intent;
   const summary = { ...serializableIntent(intent), selector: intent.data.length >= 10 ? intent.data.slice(0, 10) : null };
@@ -613,7 +617,7 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
   }
 
   const contract = evaluateTargetCall(policy, intent, add);
-  const gasLimit = contract ? resolveGasLimit(policy, intent) : null;
+  const gasLimit = contract ? resolveGasLimit(policy, intent, { rules: gasRules }) : null;
   if (contract) add('gas:function-limit', gasLimit != null && intent.gas != null && intent.gas <= gasLimit.limit, gasLimit ? `Gas must be present and at most ${gasLimit.limit} for this function (${gasLimit.source}).` : 'This function has no gas limit. Set maxGas in the policy.');
   let stateSummary = null;
   if (policy.protocolState?.required === true) {
@@ -628,12 +632,12 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     stateSummary = stateResult.summary;
   }
   const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'simulate';
-  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, gasRules: { version: GAS_RULES.version, hash: GAS_RULES.hash, validUntil: GAS_RULES.validUntil }, protocolState: stateSummary, simulation: null, checks };
+  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, gasRules: gasRulesRecord, protocolState: stateSummary, simulation: null, checks };
 }
 
 /** Find structurally valid but broad rules that deserve human review before activation. */
-export function auditPolicy(policy) {
-  const validation = validatePolicy(policy, { activation: false });
+export function auditPolicy(policy, { gasRules = GAS_RULES } = {}) {
+  const validation = validatePolicy(policy, { activation: false, gasRules });
   const findings = [...validation.errors];
   if (!validation.valid) return { valid: false, policyHash: null, findings };
   if (!policy.wallets?.length) findings.push(issue('unbound-wallet', '$.wallets', 'Policy is not bound to a specific wallet.', 'high'));
@@ -645,11 +649,11 @@ export function auditPolicy(policy) {
   if (policy.invariants?.maxGas == null) findings.push(issue('uncapped-transaction-gas', '$.invariants.maxGas', 'Secure activation requires an explicit transaction gas cap.', 'high'));
   const eip7702 = policy.simulation.eip7702;
   if (eip7702.allowAuthorizationList && !eip7702.allowDelegatedWallet) findings.push(issue('eip7702-wallet-lockout', '$.simulation.eip7702.allowDelegatedWallet', 'A permitted delegation will make later transactions deny until delegated-wallet use is separately enabled.', 'medium'));
-  findings.push(...uncappedGasFindings(policy));
-  if (Date.parse(GAS_RULES.validUntil) <= Date.now()) findings.push(issue('gas-rules-expired', '$.contracts', `The gas rule set expired on ${GAS_RULES.validUntil}, so only the overall gas cap applies. Run npm run gas:sync.`, 'medium'));
+  findings.push(...uncappedGasFindings(policy, gasRules));
+  if (Date.parse(gasRules.validUntil) <= Date.now()) findings.push(issue('gas-rules-expired', '$.contracts', `The gas rule set expired on ${gasRules.validUntil}, so only the overall gas cap applies. Run npm run gas:sync.`, 'medium'));
   policy.contracts.forEach((contract, index) => {
     contract.methods?.forEach((method, methodIndex) => {
-      const rule = GAS_RULES.find(contract.chainId, contract.address, method.selector);
+      const rule = gasRules.find(contract.chainId, contract.address, method.selector);
       if (rule && method.maxGas != null && BigInt(method.maxGas) > BigInt(rule.maxGas)) findings.push(issue('function-gas-above-rule', `$.contracts[${index}].methods[${methodIndex}].maxGas`, `maxGas ${method.maxGas} is above the measured ${rule.versionTag} limit of ${rule.maxGas}.`, 'medium'));
     });
     if (!contract.protocolId) findings.push(issue('missing-protocol-binding', `$.contracts[${index}].protocolId`, 'Contract is not bound to a protocol identity for live-state enforcement.', 'high'));

@@ -67,7 +67,7 @@ function batchPolicy({ requireCalldata = true } = {}) {
   return policy;
 }
 
-const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x' });
+const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x', gasUsed: '0xc350' });
 
 /** A delegated wallet on a fake chain whose simulated call tree contains the given frames. */
 function fakeChain(frames) {
@@ -83,7 +83,7 @@ function fakeChain(frames) {
       debug_traceCall: () => {
         if (request.params[2].tracer === 'prestateTracer') return { pre: {}, post: {} };
         const tx = request.params[0];
-        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', calls: frames };
+        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', gasUsed: '0xea60', calls: frames };
       },
     };
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: results[request.method]() }));

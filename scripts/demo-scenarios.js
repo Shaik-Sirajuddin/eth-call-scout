@@ -129,7 +129,8 @@ const guard = createGuardedProvider({
   provider: wallet,
   policy,
   stateSource: async () => states.shift(),
-  simulationOptions: { rpcUrls: simulationUrls, fetchImpl: simulationRpc, gasRules: demoGasRules },
+  simulationOptions: { rpcUrls: simulationUrls, fetchImpl: simulationRpc },
+  gasRules: demoGasRules,
   stateSequenceStore: {
     async read() { return sequence; },
     async write(next) { if (next < sequence) throw new Error('rollback'); sequence = next; },

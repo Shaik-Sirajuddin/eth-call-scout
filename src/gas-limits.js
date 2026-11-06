@@ -6,6 +6,7 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SELECTOR = /^0x[a-f0-9]{8}$/;
 const POSITIVE_UINT = /^[1-9][0-9]*$/;
 const HASH = /^0x[a-f0-9]{64}$/;
+const genuineRuleSets = new WeakSet();
 
 function validPin(pin) {
   if (!pin || !HASH.test(String(pin.codeHash))) return false;
@@ -24,12 +25,25 @@ export function createGasRules(document) {
     if (!valid) throw new Error(`Invalid gas rule for ${rule.address} ${rule.selector}.`);
     rules.set(`${rule.chainId}:${rule.address.toLowerCase()}:${rule.selector}`, Object.freeze({ ...rule }));
   }
-  return Object.freeze({
+  const ruleSet = Object.freeze({
     version: document.rulesVersion,
     validUntil: document.validUntil,
     hash: sha256(document),
     find: (chainId, address, selector) => rules.get(`${chainId}:${String(address).toLowerCase()}:${String(selector).toLowerCase()}`) ?? null,
   });
+  genuineRuleSets.add(ruleSet);
+  return ruleSet;
+}
+
+/** Only a set built by createGasRules has a hash that really describes its rules. */
+export function assertGasRules(ruleSet) {
+  if (!genuineRuleSets.has(ruleSet)) throw new TypeError('gasRules must be created by createGasRules.');
+  return ruleSet;
+}
+
+/** What a receipt records, so it always names the rule set that made the decision. */
+export function gasRulesIdentity(ruleSet) {
+  return { version: ruleSet.version, hash: ruleSet.hash, validUntil: ruleSet.validUntil };
 }
 
 export const GAS_RULES = createGasRules(JSON.parse(fs.readFileSync(new URL('../data/gas-limits.json', import.meta.url), 'utf8')));

@@ -53,7 +53,7 @@ So every allowed call has its own gas ceiling. It is checked against the transac
 
 Activation requires every allowed function to have a limit from one of the first three. Native transfers need a contract `maxGas`.
 
-Each measured rule has a `versionTag`, such as `aave-v3`, and a `codeVersion` that pins the contract's code hash and any proxy implementation it was measured on. Simulation compares these with the live contract. If the protocol has upgraded, or the rule set is past its `validUntil`, the old number is no longer trusted. The rule stops denying, so outdated data does not block honest calls. The overall cap still applies, and the receipt's `simulation.metrics.gasLimitSource` and `gasRule` say what happened. Refresh the rules with `npm run gas:sync`.
+Each measured rule has a `versionTag`, such as `aave-v3`, and a `codeVersion` that pins the contract's code hash and any proxy implementation it was measured on. Simulation compares these with the live contract. If the protocol has upgraded, or the rule set is past its `validUntil`, the old number is no longer trusted. The rule stops denying, so outdated data does not block honest calls. The overall cap still applies, and the receipt's `simulation.metrics.gasLimitSource` and `gasRule` say what happened. Refresh the rules with `npm run gas:sync`. Samples from before a proxy's latest upgrade are dropped, because they describe other code. This reads old contract state, so `ETHEREUM_HISTORY_RPC_URL` must point to a node that keeps it. A contract whose history cannot be read is left out, so a policy must set its limit.
 
 Rules measured on 2026-11-06:
 
@@ -62,15 +62,16 @@ Rules measured on 2026-11-06:
 | `usdc-erc20` | USDC `approve` | 55,570 | 55,906 | 70,000 |
 | `usdc-erc20` | USDC `transfer` | 45,160 | 62,272 | 80,000 |
 | `weth9` | WETH `deposit` | 27,938 | 45,138 | 60,000 |
-| `uniswap-v2` | Uniswap V2 Router02 `swapExactTokensForTokens` | 115,359 | 190,191 | 240,000 |
-| `uniswap-v3` | Uniswap V3 SwapRouter `exactInputSingle` | 125,666 | 156,325 | 200,000 |
-| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInputSingle` | 131,743 | 241,541 | 305,000 |
-| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInput` | 202,989 | 280,955 | 355,000 |
-| `uniswap-universal-v4` | Uniswap Universal Router V4 `execute` | 125,392 | 240,304 | 305,000 |
-| `aave-v3` | Aave V3 Ethereum Pool `supply` | 155,835 | 191,922 | 240,000 |
-| `aave-v3` | Aave V3 Ethereum Pool `withdraw` | 183,578 | 425,089 | 535,000 |
-| `aave-v3` | Aave V3 Ethereum Pool `borrow` | 316,487 | 575,856 | 720,000 |
-| `aave-v3` | Aave V3 Ethereum Pool `repay` | 157,078 | 168,031 | 215,000 |
+| `uniswap-v2` | Uniswap V2 Router02 `swapExactTokensForTokens` | 117,908 | 190,191 | 240,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInputSingle` | 125,827 | 167,331 | 210,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInput` | 117,700 | 311,493 | 390,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInputSingle` | 139,685 | 149,668 | 190,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInput` | 203,168 | 297,919 | 375,000 |
+| `uniswap-universal-v4` | Uniswap Universal Router V4 `execute` | 117,833 | 223,797 | 280,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `supply` | 155,811 | 191,922 | 240,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `withdraw` | 183,700 | 435,207 | 545,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `borrow` | 314,495 | 502,790 | 630,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `repay` | 156,798 | 167,696 | 210,000 |
 
 The limit is the 99th percentile of gas used on mainnet plus 25%, rounded up. A function has no rule if it had too few samples, such as Aave flash loans and most Sushi, Curve, Balancer and Compound calls, or if its cost varies too much to give one number, such as positions `multicall`. A policy must set `maxGas` for those, and activation stops until it does. A policy can set a method's `maxGas` above the rule, and audit reports this as `function-gas-above-rule`.
 

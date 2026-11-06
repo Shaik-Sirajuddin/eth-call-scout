@@ -77,7 +77,7 @@ function batchIntent(wallet) {
 }
 
 function frame(input, { type = 'CALL', from = FIXED_WALLET, to = USDC, value = '0x0', calls } = {}) {
-  return { type, from, to, value, input, output: '0x', ...(calls ? { calls } : {}) };
+  return { type, from, to, value, input, output: '0x', gasUsed: '0xc350', ...(calls ? { calls } : {}) };
 }
 
 function response(idValue, result) {
@@ -101,7 +101,7 @@ function fakeChain(frames, { wallet = FIXED_WALLET, existingDelegation = true } 
     if (request.method === 'eth_estimateGas') return response(request.id, '0xea60');
     if (request.method === 'debug_traceCall' && request.params[2].tracer === 'callTracer') {
       const tx = request.params[0];
-      return response(request.id, { type: 'CALL', from: tx.from, to: tx.to, value: tx.value, input: tx.data, output: '0x', calls: frames });
+      return response(request.id, { type: 'CALL', from: tx.from, to: tx.to, value: tx.value, input: tx.data, output: '0x', gasUsed: '0xea60', calls: frames });
     }
     if (request.method === 'debug_traceCall' && request.params[2].tracer === 'prestateTracer') {
       const tx = request.params[0];

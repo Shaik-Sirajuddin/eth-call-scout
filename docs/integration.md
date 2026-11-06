@@ -47,6 +47,8 @@ Legacy/type-0 and EIP-1559/type-2 requests are supported. Every request must inc
 
 It denies raw signing, message signing, typed-data signing, raw transaction submission, wallet permissions, chain switching/addition, and unsupported batch APIs. Supporting a new mutation method requires a purpose-built parser and policy evaluator; adding it to an allowlist is not enough.
 
+Pass a custom gas rule set, built by `createGasRules`, as `gasRules` to `createGuardedProvider`. One set is chosen when the guard is created. Authorization and simulation both use it, it is part of the decision fingerprint, and each receipt records its version and hash under `gasRules`. A simulation that used a different set is denied.
+
 ## Audit sink
 
 `onDecision` receives allow and deny receipts. A receipt includes the evaluation timestamp, canonical policy hash, normalized transaction hash, authenticated state summary, simulation fingerprint and source summary, decision, and every check result. Receipt storage should be append-only and should record the eventual transaction hash returned by the wallet alongside the authorization receipt.

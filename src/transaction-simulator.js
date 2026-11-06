@@ -1,6 +1,6 @@
 import { id, keccak256 } from 'ethers';
 import { sha256 } from './canonical.js';
-import { checkGasRuleVersions, GAS_RULES } from './gas-limits.js';
+import { assertGasRules, checkGasRuleVersions, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
 import { evaluateWalletCalls, normalizeIntent, resolveGasLimit, validatePolicy } from './policy.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -178,6 +178,7 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   const normalizedTrace = normalizeTrace(callTrace, 0, aggregate);
   const failures = [];
   const root = aggregate.nodes[0];
+  if (root.gasUsed == null) throw new Error('Malformed call trace: the root call has no gasUsed.');
   if (root.from !== intent.from) failures.push(`Trace root sender ${root.from ?? '(missing)'} does not match ${intent.from}.`);
   if (root.to !== intent.to) failures.push(`Trace root target ${root.to ?? '(missing)'} does not match ${intent.to}.`);
   if (root.input !== intent.data) failures.push('Trace root calldata does not match the proposed transaction.');
@@ -200,18 +201,19 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
     if (node.from === intent.from) nativeOutflow += BigInt(node.value);
   }
   const walletCalls = aggregate.nodes.filter((node, index) => index > 0 && node.from === intent.from);
+  if (walletCalls.some((call) => call.gasUsed == null)) throw new Error('Malformed call trace: a wallet call has no gasUsed.');
   failures.push(...evaluateWalletCalls(policy, intent.chainId, walletCalls, stateContext));
   if (nativeOutflow > BigInt(policy.invariants.maxNativeValueWei)) failures.push(`Simulated native outflow ${nativeOutflow} exceeds policy limit ${policy.invariants.maxNativeValueWei}.`);
   if (gasEstimate > BigInt(config.maxGasEstimate)) failures.push(`Estimated gas ${gasEstimate} exceeds simulation limit ${config.maxGasEstimate}.`);
   if (intent.gas != null && gasEstimate > intent.gas) failures.push(`Estimated gas ${gasEstimate} exceeds transaction gas ${intent.gas}.`);
   const gasLimit = resolveGasLimit(policy, intent, { rules: stateContext.gasRules, statuses: stateContext.gasRuleStatuses });
-  const gasUsed = root.gasUsed == null ? null : BigInt(root.gasUsed);
+  const gasUsed = BigInt(root.gasUsed);
   if (!gasLimit) failures.push('This function has no gas limit. Set maxGas in the policy.');
   else {
     // The transaction gas limit is what the chain enforces, even if execution later differs from this simulation.
     if (intent.gas == null || intent.gas > gasLimit.limit) failures.push(`Transaction gas ${intent.gas ?? '(missing)'} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
     if (gasEstimate > gasLimit.limit) failures.push(`Estimated gas ${gasEstimate} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
-    if (gasUsed != null && gasUsed > gasLimit.limit) failures.push(`Traced gas ${gasUsed} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
+    if (gasUsed > gasLimit.limit) failures.push(`Traced gas ${gasUsed} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
   }
   const expectedCodeChanges = new Map((intent.authorizationList ?? []).map((authorization) => [intent.from, `0xef0100${authorization.address.slice(2)}`]));
   const state = stateDiffStats(diffTrace, config.denyCodeChanges, expectedCodeChanges, intent.from);
@@ -229,7 +231,7 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
       depth,
       nativeOutflow: nativeOutflow.toString(),
       gasEstimate: gasEstimate.toString(),
-      gasUsed: gasUsed?.toString() ?? null,
+      gasUsed: gasUsed.toString(),
       gasLimit: gasLimit?.limit.toString() ?? null,
       gasLimitSource: gasLimit?.source ?? null,
       gasRule: gasLimit?.rule ? { versionTag: gasLimit.rule.versionTag, measured: stateContext.gasRules.version, outdated: gasLimit.outdated } : null,
@@ -344,14 +346,15 @@ async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
   const diffTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'prestateTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { diffMode: true, disableCode: false, disableStorage: false } }], { fetchImpl, timeoutMs });
   const gasRuleStatuses = await checkGasRuleVersions(stateContext.gasRules, gasRulesInTrace(stateContext.gasRules, intent, callTrace), (method, params) => rpc(source.url, method, params, { fetchImpl, timeoutMs }), { blockTag: config.blockTag, now: stateContext.now });
   const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate, { ...stateContext, gasRuleStatuses });
-  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702 });
+  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702, gasRulesHash: stateContext.gasRules.hash, gasLimit: analysis.metrics.gasLimit, gasRuleOutdated: analysis.metrics.gasRule?.outdated ?? null });
   analysis.metrics = { ...analysis.metrics, senderCode, eip7702 };
   return { sourceId: source.id, blockNumber, kind: analysis.failures.length ? 'violation' : 'pass', ...analysis, eip7702Violation: false };
 }
 
 /** Run exact-transaction call, gas, full call-trace, log, and state-diff simulation through a quorum. */
 export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date(), gasRules = GAS_RULES } = {}) {
-  const policyValidation = validatePolicy(policy);
+  assertGasRules(gasRules);
+  const policyValidation = validatePolicy(policy, { gasRules });
   if (!policyValidation.valid) throw new Error(`Invalid simulation policy: ${policyValidation.errors.map((entry) => entry.message).join(' ')}`);
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) throw new Error(`Invalid simulation intent: ${normalized.errors.map((entry) => entry.message).join(' ')}`);
@@ -396,6 +399,7 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
     valid,
     checks,
     summary: {
+      gasRules: gasRulesIdentity(gasRules),
       blockTag: config.blockTag,
       blockNumber: selected?.blockNumber?.toString() ?? null,
       fingerprint: passQuorum ? consensus[0] : null,
@@ -409,11 +413,13 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
 
 export function finalizeSimulation(receipt, result) {
   if (receipt.decision === 'deny') return receipt;
+  // The receipt must name the rule set that really decided, so a mismatch can never become an allow.
+  const rulesMatch = receipt.gasRules?.hash != null && result.summary?.gasRules?.hash === receipt.gasRules.hash;
   return {
     ...receipt,
-    decision: result.valid ? 'allow' : 'deny',
+    decision: result.valid && rulesMatch ? 'allow' : 'deny',
     simulation: result.summary,
-    checks: [...receipt.checks, ...result.checks],
+    checks: [...receipt.checks, ...result.checks, { id: 'gas:rules-match', status: rulesMatch ? 'pass' : 'deny', detail: `Authorization used gas rules ${receipt.gasRules?.hash ?? '(none)'}; simulation used ${result.summary?.gasRules?.hash ?? '(none)'}.` }],
   };
 }
 
