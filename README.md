@@ -73,12 +73,12 @@ The Next.js app serves the complete responsive demo from one origin:
 - `/runs` — guided two-transaction proof, custom agent tests, and persistent run history;
 - `/runs/:id` — complete evidence for one decision;
 - `/report` — interactive call-surface report;
-- `/policy` — zoomable wallet-policy block builder; and
+- `/policy` — AI-assisted plain-language policy builder with an advanced zoomable block editor; and
 - `/api/v1/agent/*` — the restricted interface used by an external AI agent.
 
 `npm run dev` owns the full local lifecycle: it compiles the demo contracts, starts two independent Anvil execution sources, deploys identical fixtures, starts the wallet-policy Gateway, and serves Next.js at `http://127.0.0.1:3000`. Press `Ctrl+C` once to stop the app and both child nodes. Run `npm run demo:reset` only when you intentionally want to delete generated local run history before recording a clean demo.
 
-The policy canvas compiles an executable draft; it does not activate or enforce it. Run `npx keybound policy validate <exported-policy.json>` before controlled activation. See the [live demo runbook](docs/anvil-demo.md), [Gateway API](docs/api.md), and [Vercel deployment](docs/deployment.md).
+The Policy Studio can translate a plain-language description into constrained rules and then into the visual graph. AI output is always an untrusted draft: server-side code resolves registry identities, rejects unsupported clauses, and runs the authoritative activation validator. Neither the prompt nor the canvas activates or enforces policy. Run `npx keybound policy validate <exported-policy.json>` before controlled activation. See the [policy reference](docs/policies.md), [Gateway API](docs/api.md), and [Vercel deployment](docs/deployment.md).
 
 The current Vercel configuration builds the Next.js interface. The local Anvil Gateway is deliberately loopback-only and is not a production serverless backend. The later testnet beta requires authenticated agents, durable storage, independent remote RPC providers, and an isolated signer adapter before `/runs` can execute hosted transactions; the deployment guide states this boundary explicitly.
 
@@ -268,7 +268,7 @@ npx keybound registry search uniswap
 npm run ruleset:build
 ```
 
-`npm run ruleset:build` generates two standalone tools. `ruleset.html` is the visual wallet-policy canvas; `pr-review-ruleset.html` controls PR Review Agent evidence and cannot grant wallet access. The legacy `scanner-ruleset.html` URL is emitted only as a compatibility copy. A policy exported from the canvas is still untrusted input until the deterministic CLI validator and guarded provider accept it.
+`npm run ruleset:build` generates two standalone artifacts. `ruleset.html` contains Policy Studio and its visual advanced editor; `pr-review-ruleset.html` controls PR Review Agent evidence and cannot grant wallet access. Plain-language generation calls the Next.js `/api/policy/compile-prompt` route, while the visual editor, import, export, and browser checks remain available in the standalone artifact. The app uses AI translation when `OPENAI_API_KEY` is configured and the strict canonical-rule fallback otherwise. A generated policy remains untrusted until the deterministic CLI validator and guarded provider accept it.
 
 ## Security posture
 

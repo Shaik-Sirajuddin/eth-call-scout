@@ -47,6 +47,6 @@ The client discovers capabilities, ABI-encodes an exact proposal, submits it wit
 
 Generated history survives an app restart under `demo/runtime/runs/`. For a clean recording, stop the app first and run `npm run demo:reset`; that command intentionally deletes only generated local history and recreates the restricted runtime directory.
 
-The Vercel build serves the Next.js product interface, report, and policy builder. It does not spawn Anvil inside a serverless function. Hosted transaction execution is the separate testnet-beta phase described in [Vercel deployment](deployment.md).
+The Vercel build serves the Next.js product interface, report, and AI-assisted policy builder. Prompt translation is authoring-only and cannot activate policy or access a signer. Vercel does not spawn Anvil inside a serverless function. Hosted transaction execution is the separate testnet-beta phase described in [Vercel deployment](deployment.md).
 
 The local chain uses Foundry's public development mnemonic and must never hold real assets. EIP-7702 remains explicitly denied by this demo policy.

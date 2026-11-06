@@ -17,9 +17,20 @@ In the Vercel dashboard, choose **Add New → Project**, import `x0rc1ph3r/eth-c
 
 The repository configuration supplies the framework, install, and build values. Do not set an output directory to `dist`; `dist/` contains generated monitoring artifacts, not the Next.js application output. The build uses the repository's JavaScript/TypeScript scanner for the bundled example report, so Vercel does not need Rust, Foundry, or Anvil.
 
+## Policy Studio AI configuration
+
+To enable free-form policy translation on Vercel, add these server-side environment variables under **Project Settings → Environment Variables** and redeploy:
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Optional | Enables server-side AI translation for `/api/policy/compile-prompt` |
+| `OPENAI_POLICY_MODEL` | Optional | Translation model; defaults to `gpt-6-astra` |
+
+Do not prefix the key with `NEXT_PUBLIC_`; it must never be included in browser JavaScript. Without the key, Policy Studio remains usable through its strict canonical-rule fallback and visual editor. The model only proposes a draft and receives public registry names plus the user's description. It has no wallet key, signer, live-state signing key, active-policy write path, or transaction submission capability.
+
 ## Phase boundary
 
-The current production build publishes the responsive landing page, report, policy builder, and run-history interface. The live phase-one Gateway deliberately binds to localhost and owns two local Anvil child processes. Vercel serverless functions are not a safe or durable place to run that local chain, store signing authority, or persist the current filesystem-backed history.
+The current production build publishes the responsive landing page, report, AI-assisted policy builder, and run-history interface. The policy translation endpoint is authoring-only. The live phase-one Gateway deliberately binds to localhost and owns two local Anvil child processes. Vercel serverless functions are not a safe or durable place to run that local chain, store signing authority, or persist the current filesystem-backed history.
 
 Therefore:
 

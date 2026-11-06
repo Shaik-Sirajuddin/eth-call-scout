@@ -33,6 +33,7 @@ const policyBuilderPath = path.join(root, 'ruleset.html');
 if (fs.existsSync(policyBuilderPath)) {
   const builder = fs.readFileSync(policyBuilderPath, 'utf8');
   if (!/id="canvas"/.test(builder)) errors.push('Policy builder must include the visual block canvas.');
+  if (!/id="policyPrompt"/.test(builder) || !/id="compilePrompt"/.test(builder)) errors.push('Policy builder must include plain-language policy generation.');
   if (!/id="zoomIn"/.test(builder) || !/id="fitView"/.test(builder)) errors.push('Policy builder must include zoom and fit-view controls.');
   if (!/__callScoutPolicyBuilder/.test(builder)) errors.push('Policy builder must expose deterministic compile and validation hooks.');
   if (!/keybound policy validate/.test(builder)) errors.push('Policy builder must disclose the authoritative CLI validation boundary.');
