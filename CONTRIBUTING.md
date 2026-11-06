@@ -21,6 +21,8 @@ Use Node.js 22 or newer. Do not commit `.env`, cache files, generated reports, w
 - Document new trusted inputs and changes to the trusted computing base.
 - Treat new RPC mutation methods as new parsers and policy surfaces, not simple allowlist additions.
 - Protocol-monitor changes must test pass quorum, mismatch quorum, source disagreement, lag, malformed RPC data, and endpoint restrictions.
+- Transaction-simulator changes must test the complete trace and state-diff path, pass/violation quorum, disagreement, lag, reverts, malformed data, and denied-request non-forwarding.
+- EIP-7702 changes must preserve default denial and test authorization recovery, authority/chain/nonce binding, delegate code-hash checks, existing delegation, expected code changes, and malicious internal effects.
 
 ## Pull requests
 

@@ -1,4 +1,5 @@
 import { authorizeIntent, sha256 } from './policy.js';
+import { failedSimulation, finalizeSimulation, simulateTransaction } from './transaction-simulator.js';
 
 const READ_ONLY_METHODS = new Set([
   'eth_accounts', 'eth_blockNumber', 'eth_call', 'eth_chainId', 'eth_estimateGas',
@@ -38,7 +39,7 @@ export class WalletGuardError extends Error {
  * exact eth_sendTransaction after deterministic policy authorization. Raw signing,
  * chain mutation, permissions, and opaque/batched wallet calls are denied.
  */
-export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, protocolState = null, stateSource = null, stateSequenceStore = null, onDecision = () => {}, now } = {}) {
+export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, simulator = simulateTransaction, simulationOptions = {}, protocolState = null, stateSource = null, stateSequenceStore = null, onDecision = () => {}, now } = {}) {
   if (!provider || typeof provider.request !== 'function') throw new TypeError('provider.request is required');
   if (!policy) throw new TypeError('wallet policy is required');
   if (stateSource != null && typeof stateSource !== 'function') throw new TypeError('stateSource must be a function');
@@ -78,7 +79,8 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         try { highestStateSequence = Math.max(highestStateSequence, await stateSequenceStore.read()); }
         catch (error) { sequenceStoreError = error; }
       }
-      let receipt = await authorize(policy, { ...transaction, chainId: transaction?.chainId ?? chainId }, {
+      const exactIntent = { ...transaction, chainId: transaction?.chainId ?? chainId };
+      let receipt = await authorize(policy, exactIntent, {
         now,
         protocolState: currentState,
         minimumStateSequence: highestStateSequence,
@@ -93,6 +95,10 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
       }
       if (sequenceStoreError && policy.protocolState?.required) {
         receipt = { ...receipt, decision: 'deny', checks: [...receipt.checks, { id: 'state:sequence-store', status: 'deny', detail: `Could not persist rollback protection: ${sequenceStoreError.message}` }] };
+      }
+      if (receipt.decision !== 'deny' && policy.simulation?.required) {
+        try { receipt = finalizeSimulation(receipt, await simulator(policy, exactIntent, simulationOptions)); }
+        catch (error) { receipt = failedSimulation(receipt, error); }
       }
       await onDecision(receipt);
       if (receipt.decision !== 'allow') throw new WalletGuardError('Wallet guard denied the transaction.', receipt);

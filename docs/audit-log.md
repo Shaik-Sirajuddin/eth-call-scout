@@ -20,6 +20,8 @@ Verify the chain at startup, during monitoring, or after an incident:
 callscout audit verify /trusted/callscout/receipts.jsonl
 ```
 
+Receipts should retain the authenticated live-state hash/sequence and simulation fingerprint/source summary alongside deterministic checks. This lets incident response distinguish a policy denial, live-state veto, simulation violation, quorum failure, and wallet-forwarded allow.
+
 The log detects modification, deletion in the middle, reordering, and insertion when a trusted head hash is retained. Hash chaining is tamper-evident, not immutable storage: an attacker who can replace the whole file and its expected head can rewrite history. Protect the file and periodically anchor or export its head hash to a separate trusted system.
 
 The built-in sink is single-writer. Use a transactional database or append-only service for concurrent production instances.

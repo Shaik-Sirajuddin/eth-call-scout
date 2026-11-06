@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { Wallet } from 'ethers';
 import { auditPolicy, authorizeIntent, canonicalJson, sha256, validatePolicy } from '../src/policy.js';
 import { addProtocolStateSignature, signProtocolState } from '../src/protocol-state.js';
 
@@ -63,9 +64,9 @@ test('canonical policy hashes do not depend on object key order', () => {
   assert.equal(sha256({ b: 2, a: 1 }), sha256({ a: 1, b: 2 }));
 });
 
-test('allows an exact transaction that satisfies every invariant', () => {
+test('advances an exact transaction to mandatory simulation after every deterministic invariant passes', () => {
   const receipt = authorizeIntent(fixture, intent, { now: NOW, protocolState: STATE });
-  assert.equal(receipt.decision, 'allow');
+  assert.equal(receipt.decision, 'simulate');
   assert.match(receipt.policy.hash, /^[0-9a-f]{64}$/);
   assert.match(receipt.intent.hash, /^[0-9a-f]{64}$/);
   assert.ok(receipt.checks.length >= 9);
@@ -86,12 +87,46 @@ test('denies an unknown target and selector', () => {
   assert.equal(receipt.checks.find((check) => check.id === 'method:allowlisted').status, 'deny');
 });
 
-test('denies unsupported transaction fields instead of omitting them from the receipt hash', () => {
+test('explicitly denies EIP-7702 authorization lists', () => {
   const eip7702 = clone(intent);
-  eip7702.authorizationList = [{ chainId: '0x1', address: intent.to }];
+  eip7702.type = '0x4';
+  eip7702.authorizationList = [{ chainId: '0x1', address: intent.to, nonce: '0x1', yParity: '0x0', r: '0x1', s: '0x2' }];
   const receipt = authorizeIntent(fixture, eip7702, { now: NOW, protocolState: STATE });
   assert.equal(receipt.decision, 'deny');
-  assert.ok(receipt.checks.some((check) => check.id === 'intent:unknown-field'));
+  assert.equal(receipt.checks.find((check) => check.id === 'eip7702:policy-enabled').status, 'deny');
+  assert.equal(receipt.intent.type, '4');
+});
+
+test('accepts only an opted-in EIP-7702 authorization signed by the guarded wallet', () => {
+  const wallet = Wallet.createRandom();
+  const delegate = '0x4444444444444444444444444444444444444444';
+  const signed = wallet.authorizeSync({ chainId: 1, address: delegate, nonce: 8 });
+  const eip7702 = {
+    ...clone(intent),
+    from: wallet.address,
+    type: '0x4',
+    authorizationList: [{
+      chainId: '0x1', address: delegate, nonce: '0x8',
+      yParity: signed.signature.yParity, r: signed.signature.r, s: signed.signature.s,
+    }],
+  };
+  const enabled = clone(fixture);
+  enabled.wallets = [wallet.address];
+  enabled.simulation.eip7702 = {
+    allowAuthorizationList: true,
+    allowDelegatedWallet: false,
+    maxAuthorizations: 1,
+    delegates: [{ chainId: 1, address: delegate, codeHash: `0x${'11'.repeat(32)}` }],
+  };
+  let receipt = authorizeIntent(enabled, eip7702, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'simulate');
+  assert.equal(receipt.checks.find((check) => check.id === 'eip7702:0:authority').status, 'pass');
+
+  eip7702.from = intent.from;
+  enabled.wallets = [intent.from];
+  receipt = authorizeIntent(enabled, eip7702, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'deny');
+  assert.equal(receipt.checks.find((check) => check.id === 'eip7702:0:authority').status, 'deny');
 });
 
 test('enforces ABI address and uint constraints directly from calldata', () => {
@@ -126,6 +161,22 @@ test('denies expired policies and missing mandatory fee fields', () => {
   receipt = authorizeIntent(fixture, noGas, { now: NOW, protocolState: STATE });
   assert.equal(receipt.decision, 'deny');
   assert.equal(receipt.checks.find((check) => check.id === 'gas:limit').status, 'deny');
+});
+
+test('supports a bounded legacy fee model and rejects mixed fee fields', () => {
+  const legacy = clone(intent);
+  legacy.type = '0x0';
+  legacy.gasPrice = '0x3b9aca00';
+  delete legacy.maxFeePerGas;
+  delete legacy.maxPriorityFeePerGas;
+  let receipt = authorizeIntent(fixture, legacy, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'simulate');
+  assert.equal(receipt.checks.find((check) => check.id === 'fee:legacy-max').status, 'pass');
+
+  legacy.maxFeePerGas = '0x3b9aca00';
+  receipt = authorizeIntent(fixture, legacy, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'deny');
+  assert.ok(receipt.checks.some((check) => check.id === 'intent:conflicting-fee-model'));
 });
 
 test('policy audit identifies broad but structurally valid permissions', () => {

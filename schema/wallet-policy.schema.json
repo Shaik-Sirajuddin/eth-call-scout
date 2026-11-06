@@ -4,7 +4,7 @@
   "title": "CallScout executable wallet policy",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "name", "defaultAction", "chains", "protocolState", "invariants", "contracts"],
+  "required": ["version", "name", "defaultAction", "chains", "protocolState", "simulation", "invariants", "contracts"],
   "properties": {
     "version": { "const": 1 },
     "name": { "type": "string", "minLength": 1 },
@@ -38,6 +38,90 @@
         }
       }
     },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "blockTag", "quorum", "maxBlockSkew", "maxGasEstimate", "maxCallDepth", "maxInternalCalls", "maxStateAccounts", "maxStorageWrites", "denyCodeChanges", "eip7702", "allowedCallTypes", "internalTargets", "assetLimits", "sources"],
+      "properties": {
+        "required": { "const": true },
+        "blockTag": { "enum": ["latest", "pending"] },
+        "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 30000 },
+        "quorum": { "type": "integer", "minimum": 1 },
+        "maxBlockSkew": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "maxGasEstimate": { "$ref": "#/$defs/uint" },
+        "maxCallDepth": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "maxInternalCalls": { "type": "integer", "minimum": 1, "maximum": 2000 },
+        "maxStateAccounts": { "type": "integer", "minimum": 1, "maximum": 5000 },
+        "maxStorageWrites": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "denyCodeChanges": { "const": true },
+        "eip7702": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowAuthorizationList", "allowDelegatedWallet", "maxAuthorizations", "delegates"],
+          "properties": {
+            "allowAuthorizationList": { "type": "boolean" },
+            "allowDelegatedWallet": { "type": "boolean" },
+            "maxAuthorizations": { "const": 1 },
+            "delegates": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["chainId", "address", "codeHash"],
+                "properties": {
+                  "chainId": { "type": "integer", "minimum": 1 },
+                  "address": { "$ref": "#/$defs/address" },
+                  "codeHash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" }
+                }
+              }
+            }
+          }
+        },
+        "allowedCallTypes": { "type": "array", "minItems": 1, "items": { "enum": ["CALL", "STATICCALL", "DELEGATECALL", "CALLCODE"] } },
+        "internalTargets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["chainId", "address"],
+            "properties": {
+              "chainId": { "type": "integer", "minimum": 1 },
+              "address": { "$ref": "#/$defs/address" }
+            }
+          }
+        },
+        "assetLimits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["chainId", "token", "maxOutflow", "maxApproval", "allowedRecipients", "allowedSpenders"],
+            "properties": {
+              "chainId": { "type": "integer", "minimum": 1 },
+              "token": { "$ref": "#/$defs/address" },
+              "maxOutflow": { "$ref": "#/$defs/uint" },
+              "maxApproval": { "$ref": "#/$defs/uint" },
+              "allowedRecipients": { "type": "array", "items": { "$ref": "#/$defs/address" } },
+              "allowedSpenders": { "type": "array", "items": { "$ref": "#/$defs/address" } }
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "env"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+            }
+          }
+        }
+      }
+    },
     "invariants": {
       "type": "object",
       "additionalProperties": false,
@@ -45,6 +129,7 @@
       "properties": {
         "maxNativeValueWei": { "$ref": "#/$defs/uint" },
         "maxGas": { "$ref": "#/$defs/uint" },
+        "maxGasPriceWei": { "$ref": "#/$defs/uint" },
         "maxFeePerGasWei": { "$ref": "#/$defs/uint" },
         "maxPriorityFeePerGasWei": { "$ref": "#/$defs/uint" },
         "requireCalldata": { "type": "boolean" },

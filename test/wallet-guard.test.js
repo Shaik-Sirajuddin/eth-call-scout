@@ -22,6 +22,11 @@ const statePayload = {
   protocols: [{ id: 'usdc', chainId: 1, status: 'operational', observedAt: '2026-12-01T00:00:00.000Z', contracts: [intent.to] }],
 };
 const protocolState = addProtocolStateSignature({ version: 1, payload: statePayload, signatures: [] }, signProtocolState(statePayload, { keyId: 'test', privateKey: stateKeys.privateKey }));
+const simulator = async () => ({
+  valid: true,
+  checks: [{ id: 'simulation:consensus', status: 'pass', detail: 'Test simulation quorum passed.' }],
+  summary: { fingerprint: 'test-simulation', agreeingSources: ['test-a', 'test-b'] },
+});
 
 function mockProvider() {
   const requests = [];
@@ -47,7 +52,7 @@ test('passes read-only methods through unchanged', async () => {
 test('authorizes then forwards the exact transaction', async () => {
   const provider = mockProvider();
   const decisions = [];
-  const guard = createGuardedProvider({ provider, policy, protocolState, now: new Date('2026-12-01T00:00:00.000Z'), onDecision: (receipt) => decisions.push(receipt) });
+  const guard = createGuardedProvider({ provider, policy, protocolState, simulator, now: new Date('2026-12-01T00:00:00.000Z'), onDecision: (receipt) => decisions.push(receipt) });
   const request = { method: 'eth_sendTransaction', params: [intent] };
   assert.equal(await guard.request(request), '0xtransactionhash');
   assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }, request]);
@@ -62,6 +67,21 @@ test('never forwards a transaction denied by policy', async () => {
   await assert.rejects(
     guard.request({ method: 'eth_sendTransaction', params: [denied] }),
     (error) => error instanceof WalletGuardError && error.code === 4100 && error.receipt.decision === 'deny',
+  );
+  assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
+});
+
+test('never forwards when mandatory full simulation denies', async () => {
+  const provider = mockProvider();
+  const denyingSimulator = async () => ({
+    valid: false,
+    checks: [{ id: 'simulation:policy', status: 'deny', detail: 'Unsafe internal call.' }],
+    summary: { fingerprint: null, agreeingSources: [], sources: [{ id: 'test-a', status: 'violation' }] },
+  });
+  const guard = createGuardedProvider({ provider, policy, protocolState, simulator: denyingSimulator, now: new Date('2026-12-01T00:00:00.000Z') });
+  await assert.rejects(
+    guard.request({ method: 'eth_sendTransaction', params: [intent] }),
+    (error) => error instanceof WalletGuardError && error.receipt.checks.some((check) => check.id === 'simulation:policy' && check.status === 'deny'),
   );
   assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
 });
