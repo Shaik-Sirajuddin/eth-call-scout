@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const css = fs.readFileSync(path.join(root, 'site', 'demo.css'), 'utf8');
+const explorer = fs.readFileSync(path.join(root, 'components', 'RunExplorer.jsx'), 'utf8');
+const screen = fs.readFileSync(path.join(root, 'components', 'RunsScreen.jsx'), 'utf8');
+const layout = fs.readFileSync(path.join(root, 'app', 'runs', 'layout.js'), 'utf8');
 
 test('Agent Runs uses the WalletCordon readable typography scale', () => {
   assert.match(css, /--type-micro:\s*12px/);
@@ -25,4 +28,11 @@ test('Recent Runs fills the desktop rail and keeps bounded mobile scrolling', ()
   assert.match(css, /\.run-list\s*\{[^}]*flex:\s*1[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/);
   assert.match(css, /@media\s*\(max-width:\s*820px\)[\s\S]*\.run-rail\s*\{[^}]*position:\s*static[^}]*height:\s*auto/);
   assert.match(css, /@media\s*\(max-width:\s*820px\)[\s\S]*\.run-list\s*\{[^}]*flex:\s*none[^}]*max-height:\s*390px[^}]*overflow-y:\s*auto/);
+});
+
+test('run selection stays mounted without a route or stylesheet flash', () => {
+  assert.doesNotMatch(explorer, /useRouter|router\.(?:push|replace)/);
+  assert.match(explorer, /window\.history\.replaceState/);
+  assert.doesNotMatch(screen, /legacy\/runs\.css/);
+  assert.match(layout, /legacy\/runs\.css/);
 });
