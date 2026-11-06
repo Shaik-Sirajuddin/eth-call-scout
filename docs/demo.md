@@ -37,7 +37,7 @@ No signing key is written to disk and no network transaction is sent.
 npm run verify
 ```
 
-The tests cover secure activation rejection, policy validation, exact calldata constraints, explicit outer nonce and active-chain binding, bounded access-list parsing, signature quorum, state tampering, stale/expired/compromised state, contract binding, rollback, persistent-store failure, monitor and simulation RPC quorums, full call traces, state diffs, trace disagreement, unauthorized internal calls, EIP-7702 default denial and safe opt-in, delegate code identity, bytecode mismatches, lagging nodes, cache fallback, audit-log tampering, and denied-request non-forwarding.
+The tests cover secure activation rejection, policy validation, exact calldata constraints, explicit outer nonce and active-chain binding, bounded access-list parsing, signature quorum, state tampering, stale/expired/compromised state, contract binding, rollback, persistent-store failure, monitor and simulation RPC quorums, full call traces, state diffs, trace disagreement, unauthorized internal calls, EIP-7702 default denial and safe opt-in, existing and freshly installed delegate batches, wallet-originated call/static-call policy and live-state checks, delegate code identity, bytecode mismatches, lagging nodes, cache fallback, audit-log tampering, and denied-request non-forwarding.
 
 ## Real monitor pipeline
 

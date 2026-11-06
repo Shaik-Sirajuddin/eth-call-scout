@@ -32,6 +32,7 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 - Simulation RPC data is untrusted; endpoint duplication, excessive lag, malformed traces, and missing consensus deny.
 - EIP-7702 is default-deny. Opt-in requires the guarded wallet's authorization signature, exact chain and next nonce, and a code-hash-pinned delegate.
 - An existing delegated EOA is detected from its delegation designator and denied unless separately enabled with the same delegate-code checks.
+- Every `CALL` and `STATICCALL` sent by the wallet, including calls inside a batch, must pass exact contract, selector, calldata, value, and signed live-state rules. The wallet may not originate `DELEGATECALL` or `CALLCODE`.
 
 ## Trusted computing base
 

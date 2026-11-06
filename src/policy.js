@@ -430,6 +430,64 @@ function serializableIntent(intent) {
   };
 }
 
+/** Apply one target's exact address, value, selector, approval, and ABI-word rules. */
+function evaluateTargetCall(policy, { chainId, to, data, value }, add, valueToTarget = value) {
+  const contract = policy.contracts.find((entry) => entry.chainId === chainId && entry.address.toLowerCase() === to);
+  add('target:allowlisted', Boolean(contract), `Target ${to} must match an exact contract entry on chain ${chainId}.`);
+  if (!contract) return null;
+  if (contract.maxNativeValueWei != null) add('value:contract-limit', valueToTarget <= BigInt(contract.maxNativeValueWei), `Native value to this target must not exceed ${contract.maxNativeValueWei} wei.`);
+  if (data === '0x') {
+    add('calldata:required', policy.invariants.requireCalldata !== true, 'Global policy requires calldata.');
+    add('target:empty-calldata', contract.allowEmptyCalldata === true, 'Target must explicitly allow empty calldata.');
+  } else if (data.length < 10) add('calldata:selector', false, 'Calldata must include a complete four-byte selector.');
+  else {
+    const selector = data.slice(0, 10);
+    const method = contract.methods?.find((entry) => entry.selector.toLowerCase() === selector);
+    add('method:allowlisted', Boolean(method), `Selector ${selector} must be allowlisted for this target.`);
+    if (selector === '0x095ea7b3') {
+      const amountWord = calldataWord(data, 1);
+      add('erc20:no-unlimited-approval', Boolean(amountWord) && BigInt(`0x${amountWord}`) !== MAX_UINT256, 'ERC-20 approval amount must not be uint256 max.');
+    }
+    for (const [index, constraint] of (method?.constraints ?? []).entries()) {
+      const result = evaluateConstraint(constraint, data);
+      add(`constraint:${index}:${constraint.type}`, result.ok, result.detail);
+    }
+  }
+  return contract;
+}
+
+/** Reapply policy and signed live-state checks to every trace call originating from the wallet. */
+export function evaluateWalletCalls(policy, chainId, calls, { protocolState = null, now = new Date(), minimumStateSequence = 0 } = {}) {
+  const failures = [];
+  const valueByTarget = new Map();
+  for (const [index, call] of calls.entries()) {
+    const label = `Wallet call ${index} to ${call.to ?? '(none)'}`;
+    if (!['CALL', 'STATICCALL'].includes(call.type) || !call.to) {
+      failures.push(`${label}: only CALL and STATICCALL may originate from the wallet, saw ${call.type}.`);
+      continue;
+    }
+    const value = BigInt(call.value);
+    if (call.type === 'STATICCALL' && value !== 0n) {
+      failures.push(`${label}: STATICCALL cannot carry native value.`);
+      continue;
+    }
+    const valueToTarget = (valueByTarget.get(call.to) ?? 0n) + value;
+    valueByTarget.set(call.to, valueToTarget);
+    const add = (id, ok, detail) => { if (!ok) failures.push(`${label} failed ${id}: ${detail}`); return ok; };
+    const contract = evaluateTargetCall(policy, { chainId, to: call.to, data: call.input, value }, add, valueToTarget);
+    if (!contract || policy.protocolState?.required !== true) continue;
+    const state = evaluateProtocolState(protocolState, policy.protocolState, {
+      protocolId: contract.protocolId,
+      chainId,
+      address: call.to,
+      now,
+      minimumSequence: minimumStateSequence,
+    });
+    for (const check of state.checks) add(check.id, check.status === 'pass', check.detail);
+  }
+  return failures;
+}
+
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
 export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0 } = {}) {
   const evaluatedAt = new Date(now).toISOString();
@@ -490,28 +548,7 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     add('fee:priority', invariants.maxPriorityFeePerGasWei != null && intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `EIP-1559 requires maxPriorityFeePerGasWei and the transaction field must not exceed ${invariants.maxPriorityFeePerGasWei ?? '(missing)'}.`);
   }
 
-  const contract = policy.contracts.find((entry) => entry.chainId === intent.chainId && entry.address.toLowerCase() === intent.to);
-  add('target:allowlisted', Boolean(contract), `Target ${intent.to} must match an exact contract entry on chain ${intent.chainId}.`);
-  if (contract) {
-    if (contract.maxNativeValueWei != null) add('value:contract-limit', intent.value <= BigInt(contract.maxNativeValueWei), `Native value must not exceed this contract's ${contract.maxNativeValueWei} wei limit.`);
-    if (intent.data === '0x') {
-      add('calldata:required', invariants.requireCalldata !== true, 'Global policy requires calldata.');
-      add('target:empty-calldata', contract.allowEmptyCalldata === true, 'Target must explicitly allow empty calldata.');
-    } else if (intent.data.length < 10) add('calldata:selector', false, 'Calldata must include a complete four-byte selector.');
-    else {
-      const selector = intent.data.slice(0, 10);
-      const method = contract.methods?.find((entry) => entry.selector.toLowerCase() === selector);
-      add('method:allowlisted', Boolean(method), `Selector ${selector} must be allowlisted for this target.`);
-      if (selector === '0x095ea7b3') {
-        const amountWord = calldataWord(intent.data, 1);
-        add('erc20:no-unlimited-approval', Boolean(amountWord) && BigInt(`0x${amountWord}`) !== MAX_UINT256, 'ERC-20 approval amount must not be uint256 max.');
-      }
-      for (const [index, constraint] of (method?.constraints ?? []).entries()) {
-        const result = evaluateConstraint(constraint, intent.data);
-        add(`constraint:${index}:${constraint.type}`, result.ok, result.detail);
-      }
-    }
-  }
+  const contract = evaluateTargetCall(policy, intent, add);
   let stateSummary = null;
   if (policy.protocolState?.required === true) {
     const stateResult = evaluateProtocolState(protocolState, policy.protocolState, {
@@ -540,6 +577,8 @@ export function auditPolicy(policy) {
   if ((policy.simulation?.sources?.length ?? 0) < 2) findings.push(issue('single-simulation-source', '$.simulation.sources', 'Secure activation requires at least two simulation sources.', 'high'));
   if ((policy.simulation?.quorum ?? 0) < 2) findings.push(issue('single-simulation-quorum', '$.simulation.quorum', 'Secure activation requires a simulation quorum of at least two.', 'high'));
   if (policy.invariants?.maxGas == null) findings.push(issue('uncapped-transaction-gas', '$.invariants.maxGas', 'Secure activation requires an explicit transaction gas cap.', 'high'));
+  const eip7702 = policy.simulation.eip7702;
+  if (eip7702.allowAuthorizationList && !eip7702.allowDelegatedWallet) findings.push(issue('eip7702-wallet-lockout', '$.simulation.eip7702.allowDelegatedWallet', 'A permitted delegation will make later transactions deny until delegated-wallet use is separately enabled.', 'medium'));
   policy.contracts.forEach((contract, index) => {
     if (!contract.protocolId) findings.push(issue('missing-protocol-binding', `$.contracts[${index}].protocolId`, 'Contract is not bound to a protocol identity for live-state enforcement.', 'high'));
     if (contract.allowEmptyCalldata) findings.push(issue('native-transfer-enabled', `$.contracts[${index}].allowEmptyCalldata`, 'Contract accepts empty-calldata native transfers.', 'medium'));
