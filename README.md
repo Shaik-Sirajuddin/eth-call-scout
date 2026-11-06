@@ -187,7 +187,7 @@ Never expose the underlying wallet provider, signer, seed phrase, private key, s
 
 Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, trace disagreement, missing quorum, or malformed output deny.
 
-EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
+EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. Delegated wallets can send batches through a self-call, and every call inside a batch must pass the same policy and live-state rules as a top-level transaction. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
 
 ## Live protocol veto
 

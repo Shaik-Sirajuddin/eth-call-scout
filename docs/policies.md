@@ -75,6 +75,22 @@ EIP-7702 is explicit and default-deny:
 
 `allowDelegatedWallet` is a separate permission for sending from an EOA that is already delegated. The simulator resolves the `0xef0100 || address` designator and checks the referenced code hash through every simulation source. The normal full trace and all policy limits still apply in both cases.
 
+To let a delegated wallet send batches, also list the wallet as a contract with its batch selector. Signed protocol state must name the wallet under the same `protocolId`:
+
+```json
+{
+  "chainId": 1,
+  "address": "0xYourWallet",
+  "protocolId": "agent-wallet",
+  "maxNativeValueWei": "0",
+  "methods": [{ "selector": "0xe9ae5c53", "name": "execute(bytes32,bytes)" }]
+}
+```
+
+The batch selector needs no ABI constraints, because every call inside the batch is checked against its own contract entry using the simulated call tree. See [Batches from a delegated wallet](transaction-simulation.md#batches-from-a-delegated-wallet).
+
+Enabling `allowAuthorizationList` alone locks the wallet after it upgrades, because later transactions come from a delegated wallet. Audit reports this as `eip7702-wallet-lockout`.
+
 Pinned code identity does not replace simulation, and simulation does not replace review of persistent delegate code. Production tooling should populate approved delegate identities from reviewed, authenticated state rather than asking users to copy hashes manually.
 
 ## Validation, audit, and authorization

@@ -43,7 +43,7 @@ agentTools.register('ethereum', guardedProvider);
 
 The guard exposes common read-only Ethereum methods. It supports one mutation path: `eth_sendTransaction` after policy authorization, authenticated live-state verification, and full transaction simulation.
 
-Legacy/type-0 and EIP-1559/type-2 requests are supported. Type-4 EIP-7702 requests are default-deny and require explicit policy opt-in plus signature, chain, nonce, delegate code-hash, and state-diff checks. Type-1, type-3 blob, and all other transaction envelopes deny until explicitly implemented. Every supported transaction that could be forwarded must reach simulation quorum; an earlier deterministic denial stops without wallet access.
+Legacy/type-0 and EIP-1559/type-2 requests are supported. Type-4 EIP-7702 requests are default-deny and require explicit policy opt-in plus signature, chain, nonce, delegate code-hash, and state-diff checks. A delegated wallet can send batches through a self-call; every call it sends is checked against policy using the simulated call tree. Type-1, type-3 blob, and all other transaction envelopes deny until explicitly implemented. Every supported transaction that could be forwarded must reach simulation quorum; an earlier deterministic denial stops without wallet access.
 
 It denies raw signing, message signing, typed-data signing, raw transaction submission, wallet permissions, chain switching/addition, and unsupported batch APIs. Supporting a new mutation method requires a purpose-built parser and policy evaluator; adding it to an allowlist is not enough.
 

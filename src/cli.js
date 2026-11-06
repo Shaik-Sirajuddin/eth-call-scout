@@ -100,7 +100,7 @@ async function runAuthorize(args) {
   const protocolState = statePath ? await readJsonInput(statePath) : null;
   let receipt = authorizeIntent(policy, intent, { protocolState });
   if (receipt.decision !== 'deny') {
-    try { receipt = finalizeSimulation(receipt, await simulateTransaction(policy, intent)); }
+    try { receipt = finalizeSimulation(receipt, await simulateTransaction(policy, intent, { protocolState })); }
     catch (error) { receipt = failedSimulation(receipt, error); }
   }
   writeJson(receipt, output);

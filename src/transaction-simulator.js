@@ -1,6 +1,6 @@
 import { id, keccak256 } from 'ethers';
 import { sha256 } from './canonical.js';
-import { normalizeIntent, validatePolicy } from './policy.js';
+import { evaluateWalletCalls, normalizeIntent, validatePolicy } from './policy.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
@@ -167,7 +167,7 @@ function analyzeAssets(logs, wallet, limits, chainId) {
   return { outflows: Object.fromEntries([...outflows].map(([token, amount]) => [token, amount.toString()])), approvals, violations };
 }
 
-function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate) {
+function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateContext) {
   const config = policy.simulation;
   const aggregate = { nodes: [], logs: [] };
   const normalizedTrace = normalizeTrace(callTrace, 0, aggregate);
@@ -194,6 +194,8 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate) {
     if (index > 0 && !node.to) failures.push(`Trace node ${index} creates or targets an unresolved contract.`);
     if (node.from === intent.from) nativeOutflow += BigInt(node.value);
   }
+  const walletCalls = aggregate.nodes.filter((node, index) => index > 0 && node.from === intent.from);
+  failures.push(...evaluateWalletCalls(policy, intent.chainId, walletCalls, stateContext));
   if (nativeOutflow > BigInt(policy.invariants.maxNativeValueWei)) failures.push(`Simulated native outflow ${nativeOutflow} exceeds policy limit ${policy.invariants.maxNativeValueWei}.`);
   if (gasEstimate > BigInt(config.maxGasEstimate)) failures.push(`Estimated gas ${gasEstimate} exceeds simulation limit ${config.maxGasEstimate}.`);
   if (intent.gas != null && gasEstimate > intent.gas) failures.push(`Estimated gas ${gasEstimate} exceeds transaction gas ${intent.gas}.`);
@@ -208,7 +210,7 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate) {
   failures.push(...assets.violations);
   return {
     failures,
-    metrics: { calls: aggregate.nodes.length, depth, nativeOutflow: nativeOutflow.toString(), gasEstimate: gasEstimate.toString(), ...state, outflows: assets.outflows, approvals: assets.approvals },
+    metrics: { calls: aggregate.nodes.length, depth, nativeOutflow: nativeOutflow.toString(), gasEstimate: gasEstimate.toString(), ...state, outflows: assets.outflows, approvals: assets.approvals, walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })) },
     fingerprint: sha256({ callResult: normalizedTrace.output, trace: normalizedTrace, stateDiff: diffTrace }),
   };
 }
@@ -257,7 +259,7 @@ async function inspectEip7702(policy, intent, senderCode, source, fetchImpl, tim
   return { failures, existingDelegate, delegates: [...new Map(delegates.map((delegate) => [delegate.address, delegate])).values()].map(({ address, codeHash, valid }) => ({ address, codeHash: codeHash ?? null, valid })) };
 }
 
-async function simulateSource(policy, intent, source, fetchImpl) {
+async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
   const config = policy.simulation;
   const tx = rpcTransaction(intent);
   const timeoutMs = config.timeoutMs ?? 12_000;
@@ -284,14 +286,14 @@ async function simulateSource(policy, intent, source, fetchImpl) {
   const callTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'callTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { withLog: true } }], { fetchImpl, timeoutMs });
   if (callTrace?.output != null && (!HEX_DATA.test(String(callTrace.output)) || String(callTrace.output).toLowerCase() !== String(callResult).toLowerCase())) throw new Error('eth_call and call trace returned different outputs.');
   const diffTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'prestateTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { diffMode: true, disableCode: false, disableStorage: false } }], { fetchImpl, timeoutMs });
-  const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate);
+  const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate, stateContext);
   analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702 });
   analysis.metrics = { ...analysis.metrics, senderCode, eip7702 };
   return { sourceId: source.id, blockNumber, kind: analysis.failures.length ? 'violation' : 'pass', ...analysis, eip7702Violation: false };
 }
 
 /** Run exact-transaction call, gas, full call-trace, log, and state-diff simulation through a quorum. */
-export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch } = {}) {
+export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date() } = {}) {
   const policyValidation = validatePolicy(policy);
   if (!policyValidation.valid) throw new Error(`Invalid simulation policy: ${policyValidation.errors.map((entry) => entry.message).join(' ')}`);
   const normalized = normalizeIntent(rawIntent);
@@ -306,7 +308,7 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
   });
   if (new Set(sources.map((source) => source.url.href)).size !== sources.length) throw new Error('Simulation sources must use distinct endpoint URLs.');
   const results = await Promise.all(sources.map(async (source) => {
-    try { return await simulateSource(policy, intent, source, fetchImpl); }
+    try { return await simulateSource(policy, intent, source, fetchImpl, { protocolState, minimumStateSequence, now }); }
     catch (cause) { return { sourceId: source.id, kind: 'error', failures: [cause.message], fingerprint: null, metrics: null, blockNumber: null, eip7702Violation: false }; }
   }));
   const blocks = results.map((result) => result.blockNumber).filter((value) => value != null);

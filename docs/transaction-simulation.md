@@ -23,7 +23,7 @@ RPC URLs must be HTTPS except for loopback development, may not contain credenti
 
 - omitted type, legacy/type `0`, and EIP-1559/type `2` use the normal policy, state, and simulation path;
 - EIP-7702/type `4` uses the additional controls below; and
-- type `1`, type `3` blob transactions, raw signed transactions, opaque message signing, wallet batches, and other wallet mutation APIs deny until purpose-built parsers and equivalent simulation coverage exist.
+- type `1`, type `3` blob transactions, raw signed transactions, opaque message signing, wallet batch APIs such as `wallet_sendCalls`, and other wallet mutation APIs deny until purpose-built parsers and equivalent simulation coverage exist.
 
 Native transfers require an exact contract entry with `allowEmptyCalldata: true` and compatible global policy. A transaction type being supported does not make its target or method allowed.
 
@@ -47,6 +47,22 @@ For an opted-in type-4 authorization list, CallScout requires:
 The type-4 transaction then undergoes the same call-tree, log, state, gas, value, and asset checks as every other transaction. A reverted execution is denied; CallScout will not forward it. This is especially important because EIP-7702 authorization processing is persistent even when the later execution fails.
 
 For an already-delegated EOA, CallScout reads its 23-byte delegation designator, requires the separate `allowDelegatedWallet` permission, resolves the delegate, and checks the same pinned runtime code hash before tracing. Unexpected sender code, an unapproved delegate, missing code, a hash mismatch, or a delegation chain denies.
+
+### Batches from a delegated wallet
+
+A delegated EOA can call itself through a batch function such as `execute(...)`. To allow this, add the wallet as a contract entry with its batch selector, and have signed protocol state name the wallet.
+
+CallScout does not decode batch formats, because each delegate has its own. It reads the simulated call tree instead. Every call sent by the wallet must pass the same target, selector, approval, ABI-word, native-value, and live-state rules as a top-level transaction:
+
+- This covers nested self-calls, so a batch cannot reach a wallet function such as `addOwner` unless policy lists that selector.
+- Native value is summed per target across the batch before the contract limit is applied.
+- `DELEGATECALL` and `CALLCODE` from the wallet deny, because they run other code with the wallet's authority. Delegates that are proxies are therefore not supported yet.
+- `STATICCALL` from the wallet cannot change state and needs only an allowed target.
+- `internalTargets` does not permit a call sent by the wallet. That call needs a full contract entry.
+
+Each receipt lists these calls under `simulation.metrics.walletCalls`.
+
+`wallet_sendCalls` stays denied. With that API the wallet chooses the final transaction, so CallScout cannot simulate the exact transaction it would forward.
 
 ## Security boundary and limitations
 
