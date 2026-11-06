@@ -10,8 +10,8 @@ Wallet policies are machine-enforced JSON, not prompts. The runtime validator in
 | `name` | Yes | Human-readable policy identity |
 | `defaultAction` | Yes | Must be `deny` |
 | `chains` | Yes | Exact allowed numeric chain IDs |
-| `wallets` | Recommended | Exact allowed sender addresses |
-| `validUntil` | Recommended | ISO-8601 expiry checked at authorization time |
+| `wallets` | Yes | Exact allowed sender addresses; at least one is required for activation |
+| `validUntil` | Yes | ISO-8601 expiry checked at authorization time |
 | `protocolState` | Yes | Signature threshold, freshness, and rollback trust policy |
 | `simulation` | Yes | Full-trace quorum, effect ceilings, source bindings, and EIP-7702 policy |
 | `invariants` | Yes | Global transaction ceilings |
@@ -28,7 +28,7 @@ EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`
 ## Global invariants
 
 - `maxNativeValueWei` is required and caps transaction value.
-- `maxGas` requires a gas limit and caps it when present in policy.
+- `maxGas` is required, requires an explicit transaction gas limit, and caps it.
 - `maxGasPriceWei` is required whenever a legacy `gasPrice` transaction is proposed and caps that exact field.
 - `maxFeePerGasWei` and `maxPriorityFeePerGasWei` require and cap EIP-1559 fee fields.
 - `requireCalldata` denies empty calldata.
@@ -56,7 +56,7 @@ Dynamic ABI values are intentionally unsupported in version 1. The engine denies
 
 ## Mandatory simulation policy
 
-`simulation.required` must be `true`. The policy binds trace execution to `latest` or `pending`, names independent RPC sources by environment variable, sets a quorum and maximum block skew, and caps gas estimate, call depth/count, touched accounts, and storage writes. `denyCodeChanges` must remain enabled.
+`simulation.required` must be `true`. Secure activation requires at least two independent RPC sources and a quorum of at least two. The policy binds trace execution to `latest` or `pending`, names sources by environment variable, sets a maximum block skew, and caps gas estimate, call depth/count, touched accounts, and storage writes. `denyCodeChanges` must remain enabled.
 
 `allowedCallTypes`, chain-bound `internalTargets`, and the contract/token addresses already present in policy determine which internal calls may occur. `assetLimits` are also chain-bound and apply exact ERC-20-specific maximum outflow and approval amounts plus recipient and spender allowlists. A token event emitted from the guarded wallet for a token without an asset rule on that chain is denied. NFT transfers and operator-wide approvals are not silently interpreted as fungible-token events; they deny until separately supported.
 
@@ -93,11 +93,11 @@ CALLSCOUT_SIM_SECONDARY='https://trace-b.example' \
 npx callscout authorize intent.json --policy policy.json --state state.json --out receipt.json
 ```
 
-Validation rejects non-executable or unsafe policy structures. Audit highlights broad but valid permissions, such as missing wallet binding, missing expiry, unconstrained methods, or approval rules without spender and amount constraints.
+`policy validate` applies the full secure activation profile and rejects incomplete drafts. `policy audit` performs structural validation and reports activation gaps, such as missing wallet binding, expiry, signer threshold, RPC quorum, or gas cap, so a draft can be reviewed before it is capable of authorizing a wallet.
 
 Authorization exit codes are `0` for allow, `2` for deny, and `1` for command/configuration errors. An `allow` requires both authenticated live state and simulation quorum.
 
-Policies that require live state must pin at least one Ed25519 public key, configure a valid threshold, and assign `protocolId` to every allowed contract. The audit command reports missing live state as high severity. See [Authenticated protocol state](protocol-state.md).
+Executable policies must pin at least two Ed25519 public keys, configure a signature threshold of at least two, and assign `protocolId` to every allowed contract. The audit command reports weaker draft settings as high severity. See [Authenticated protocol state](protocol-state.md).
 
 ## Policy operations
 

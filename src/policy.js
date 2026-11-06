@@ -171,8 +171,8 @@ function validateConstraint(constraint, path, errors) {
   else if (constraint.type === 'bytes32-equals' && !/^0x[a-fA-F0-9]{64}$/.test(String(constraint.value ?? ''))) errors.push(issue('invalid-bytes32', `${path}.value`, 'Expected a 32-byte hex value.'));
 }
 
-/** Validate the executable wallet policy. Invalid policies must never be evaluated as permissive. */
-export function validatePolicy(policy) {
+/** Validate a wallet policy. Activation checks may be disabled only for draft auditing. */
+export function validatePolicy(policy, { activation = true } = {}) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
   rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation']), '$', errors);
@@ -235,6 +235,15 @@ export function validatePolicy(policy) {
         });
       }
     });
+  }
+  if (activation) {
+    if (!Array.isArray(policy.wallets) || policy.wallets.length === 0) errors.push(issue('activation-wallet-binding', '$.wallets', 'Executable policies must bind at least one exact wallet address.'));
+    if (policy.validUntil == null) errors.push(issue('activation-expiry', '$.validUntil', 'Executable policies must have an ISO-8601 expiry.'));
+    if ((policy.protocolState?.trustedKeys?.length ?? 0) < 2) errors.push(issue('activation-state-keys', '$.protocolState.trustedKeys', 'The secure activation profile requires at least two independent live-state keys.'));
+    if ((policy.protocolState?.threshold ?? 0) < 2) errors.push(issue('activation-state-threshold', '$.protocolState.threshold', 'The secure activation profile requires a live-state signature threshold of at least two.'));
+    if ((policy.simulation?.sources?.length ?? 0) < 2) errors.push(issue('activation-simulation-sources', '$.simulation.sources', 'The secure activation profile requires at least two simulation sources.'));
+    if ((policy.simulation?.quorum ?? 0) < 2) errors.push(issue('activation-simulation-quorum', '$.simulation.quorum', 'The secure activation profile requires a simulation quorum of at least two.'));
+    if (policy.invariants?.maxGas == null) errors.push(issue('activation-gas-cap', '$.invariants.maxGas', 'Executable policies must require and cap the transaction gas limit.'));
   }
   return { valid: errors.length === 0, errors };
 }
@@ -477,8 +486,8 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
   if (invariants.maxGas != null) add('gas:limit', intent.gas != null && intent.gas <= BigInt(invariants.maxGas), `Gas must be present and at most ${invariants.maxGas}.`);
   if (legacyFees) add('fee:legacy-max', invariants.maxGasPriceWei != null && intent.gasPrice <= BigInt(invariants.maxGasPriceWei), `Legacy gasPrice requires maxGasPriceWei and must not exceed ${invariants.maxGasPriceWei ?? '(missing)'}.`);
   else {
-    if (invariants.maxFeePerGasWei != null) add('fee:max', intent.maxFeePerGas != null && intent.maxFeePerGas <= BigInt(invariants.maxFeePerGasWei), `maxFeePerGas must be present and at most ${invariants.maxFeePerGasWei}.`);
-    if (invariants.maxPriorityFeePerGasWei != null) add('fee:priority', intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `maxPriorityFeePerGas must be present and at most ${invariants.maxPriorityFeePerGasWei}.`);
+    add('fee:max', invariants.maxFeePerGasWei != null && intent.maxFeePerGas != null && intent.maxFeePerGas <= BigInt(invariants.maxFeePerGasWei), `EIP-1559 requires maxFeePerGasWei and the transaction field must not exceed ${invariants.maxFeePerGasWei ?? '(missing)'}.`);
+    add('fee:priority', invariants.maxPriorityFeePerGasWei != null && intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `EIP-1559 requires maxPriorityFeePerGasWei and the transaction field must not exceed ${invariants.maxPriorityFeePerGasWei ?? '(missing)'}.`);
   }
 
   const contract = policy.contracts.find((entry) => entry.chainId === intent.chainId && entry.address.toLowerCase() === intent.to);
@@ -521,11 +530,16 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
 
 /** Find structurally valid but broad rules that deserve human review before activation. */
 export function auditPolicy(policy) {
-  const validation = validatePolicy(policy);
+  const validation = validatePolicy(policy, { activation: false });
   const findings = [...validation.errors];
   if (!validation.valid) return { valid: false, policyHash: null, findings };
   if (!policy.wallets?.length) findings.push(issue('unbound-wallet', '$.wallets', 'Policy is not bound to a specific wallet.', 'high'));
   if (!policy.validUntil) findings.push(issue('no-expiry', '$.validUntil', 'Policy does not expire automatically.', 'medium'));
+  if ((policy.protocolState?.trustedKeys?.length ?? 0) < 2) findings.push(issue('single-state-key', '$.protocolState.trustedKeys', 'Secure activation requires at least two independent live-state keys.', 'high'));
+  if ((policy.protocolState?.threshold ?? 0) < 2) findings.push(issue('single-state-signer', '$.protocolState.threshold', 'Secure activation requires at least two live-state signatures.', 'high'));
+  if ((policy.simulation?.sources?.length ?? 0) < 2) findings.push(issue('single-simulation-source', '$.simulation.sources', 'Secure activation requires at least two simulation sources.', 'high'));
+  if ((policy.simulation?.quorum ?? 0) < 2) findings.push(issue('single-simulation-quorum', '$.simulation.quorum', 'Secure activation requires a simulation quorum of at least two.', 'high'));
+  if (policy.invariants?.maxGas == null) findings.push(issue('uncapped-transaction-gas', '$.invariants.maxGas', 'Secure activation requires an explicit transaction gas cap.', 'high'));
   policy.contracts.forEach((contract, index) => {
     if (!contract.protocolId) findings.push(issue('missing-protocol-binding', `$.contracts[${index}].protocolId`, 'Contract is not bound to a protocol identity for live-state enforcement.', 'high'));
     if (contract.allowEmptyCalldata) findings.push(issue('native-transfer-enabled', `$.contracts[${index}].allowEmptyCalldata`, 'Contract accepts empty-calldata native transfers.', 'medium'));

@@ -21,7 +21,7 @@ export function validateMonitorConfig(config) {
   if (!Number.isSafeInteger(config.chainId) || config.chainId < 1) error(errors, 'invalid-chain', '$.chainId', 'chainId must be a positive safe integer.');
   if (!Number.isSafeInteger(config.stateTtlSeconds) || config.stateTtlSeconds < 30 || config.stateTtlSeconds > 3600) error(errors, 'invalid-ttl', '$.stateTtlSeconds', 'stateTtlSeconds must be between 30 and 3600.');
   if (config.rpcTimeoutMs != null && (!Number.isSafeInteger(config.rpcTimeoutMs) || config.rpcTimeoutMs < 500 || config.rpcTimeoutMs > 30000)) error(errors, 'invalid-timeout', '$.rpcTimeoutMs', 'rpcTimeoutMs must be between 500 and 30000.');
-  if (!Array.isArray(config.sources) || !config.sources.length) error(errors, 'missing-sources', '$.sources', 'At least one independent RPC source is required.');
+  if (!Array.isArray(config.sources) || config.sources.length < 2) error(errors, 'missing-sources', '$.sources', 'The secure monitor profile requires at least two independent RPC sources.');
   else {
     const ids = new Set();
     config.sources.forEach((source, index) => {
@@ -34,7 +34,7 @@ export function validateMonitorConfig(config) {
       if (typeof source.env !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(source.env)) error(errors, 'invalid-source-env', `${at}.env`, 'env must name an uppercase environment variable.');
     });
   }
-  if (!Number.isSafeInteger(config.rpcQuorum) || config.rpcQuorum < 1 || (Array.isArray(config.sources) && config.rpcQuorum > config.sources.length)) error(errors, 'invalid-quorum', '$.rpcQuorum', 'rpcQuorum must be between 1 and the number of sources.');
+  if (!Number.isSafeInteger(config.rpcQuorum) || config.rpcQuorum < 2 || (Array.isArray(config.sources) && config.rpcQuorum > config.sources.length)) error(errors, 'invalid-quorum', '$.rpcQuorum', 'The secure monitor profile requires rpcQuorum between 2 and the number of sources.');
   if (!Number.isSafeInteger(config.maxBlockSkew) || config.maxBlockSkew < 0 || config.maxBlockSkew > 100) error(errors, 'invalid-block-skew', '$.maxBlockSkew', 'maxBlockSkew must be an integer from 0 to 100.');
   if (!Array.isArray(config.protocols) || !config.protocols.length) error(errors, 'missing-protocols', '$.protocols', 'At least one protocol monitor is required.');
   else {

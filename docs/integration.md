@@ -36,7 +36,7 @@ agentTools.register('ethereum', guardedProvider);
 6. Keep native wallet confirmation enabled for high-risk policies. CallScout is compatible with human approval and multisig flows.
 7. Use short-lived policies and low value/approval ceilings for unattended operation.
 8. Protect the persistent state-sequence store from agent writes and deletion.
-9. Configure independent trace-capable simulation RPCs through the environment variables named by policy. Do not reuse one URL under multiple source IDs.
+9. Configure at least two independent trace-capable simulation RPCs with quorum of at least two through the environment variables named by policy. Do not reuse one URL under multiple source IDs.
 10. Keep EIP-7702 disabled unless the integration can maintain a reviewed delegate allowlist and pinned runtime code hashes.
 
 ## RPC surface

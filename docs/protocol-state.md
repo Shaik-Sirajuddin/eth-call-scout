@@ -15,7 +15,7 @@ The schema is at `schema/protocol-state.schema.json`. Unknown fields are rejecte
 
 ## Trust policy
 
-The executable wallet policy pins trusted public keys and a signature threshold:
+The executable wallet policy pins at least two trusted public keys and requires a signature threshold of at least two:
 
 ```json
 {

@@ -30,6 +30,8 @@ The guarded provider:
 
 Missing data, invalid policies, unknown targets, unknown selectors, malformed calldata, and failed checks deny by default.
 
+Version 1 has a mandatory secure activation profile: an executable policy must be wallet-bound, expiring, gas-capped, protected by at least two live-state keys with a threshold of two, and configured with at least two simulation sources and a quorum of two. Drafts that do not yet satisfy activation can still be inspected with `callscout policy audit`, but they cannot authorize a wallet.
+
 ## Quick start
 
 Requirements: Node.js 22 or newer.
@@ -203,13 +205,13 @@ EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires a
 
 ## Live protocol veto
 
-Policies can require a fresh protocol-state bundle signed by a threshold of pinned Ed25519 keys. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
+Policies require a fresh protocol-state bundle signed by at least two pinned Ed25519 keys with a threshold of at least two. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
 
 Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
 
 ## Deterministic on-chain monitors
 
-CallScout can collect protocol observations from multiple independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. A quorum of matching sources produces `operational`; a quorum of deterministic mismatches produces `compromised`; disagreement or outages produce `degraded`.
+CallScout collects protocol observations from at least two independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. The secure monitor profile requires a quorum of at least two: matching sources produce `operational`, deterministic mismatches produce `compromised`, and disagreement or outages produce `degraded`.
 
 ```sh
 export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
