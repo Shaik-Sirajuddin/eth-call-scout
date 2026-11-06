@@ -1,0 +1,42 @@
+name: Post Secu pull request review
+
+on:
+  workflow_run:
+    workflows: [Secu contract call review]
+    types: [completed]
+
+permissions:
+  actions: read
+
+jobs:
+  comment:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests[0]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download Markdown review artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: secu-review-${{ github.event.workflow_run.pull_requests[0].number }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+      - name: Add review to pull request
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71
+        env:
+          REVIEW_PATH: secu-review.md
+        with:
+          script: |
+            const fs = require('node:fs');
+            const body = fs.readFileSync(process.env.REVIEW_PATH, 'utf8');
+            const pull = context.payload.workflow_run.pull_requests[0];
+            const review = await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull.number,
+              event: 'COMMENT',
+              body,
+            });
+            core.info(`Posted Secu review ${review.data.id} on PR #${pull.number}`);

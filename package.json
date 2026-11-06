@@ -8,12 +8,14 @@
     "eth-call-scout": "./bin/eth-call-scout.js"
   },
   "scripts": {
+    "build:parser": "cargo build --release --manifest-path parser-rs/Cargo.toml",
+    "prescan": "npm run build:parser",
     "scan": "node ./bin/eth-call-scout.js",
     "ruleset:build": "node ./scripts/build-ruleset-page.js",
-    "check": "node --check src/scanner.js && node --check bin/eth-call-scout.js"
+    "report:diff": "node scripts/diff-reports.js",
+    "check": "cargo check --manifest-path parser-rs/Cargo.toml && node --check src/rust-scanner.js && node --check src/cli.js && node --check bin/eth-call-scout.js"
   },
   "dependencies": {
-    "ethers": "^6.17.0",
-    "typescript": "^5.9.3"
+    "ethers": "^6.17.0"
   }
 }

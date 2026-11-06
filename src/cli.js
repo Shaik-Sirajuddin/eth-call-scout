@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { collectProjectFiles } from './project.js';
-import { scanFiles } from './scanner.js';
+import { scanProject } from './rust-scanner.js';
 import { renderReport } from './report.js';
 import { decodeFindings } from './decode.js';
 import { applyRuleset, enrichFindings, loadRegistry, searchRegistry, syncRegistry } from './registry.js';
@@ -59,8 +58,9 @@ export async function runCli(argv) {
       else paths.push(arg);
     }
     if (!paths.length) { process.stdout.write(HELP); process.exitCode = 1; return; }
-    const files = collectProjectFiles(paths);
-    let findings = scanFiles(files);
+    const scan = scanProject(paths);
+    const filesScanned = scan.scanned_files;
+    let findings = scan.findings;
     let registry = await loadRegistry();
     if (rulesetPath) {
       const ruleset = JSON.parse(fs.readFileSync(path.resolve(rulesetPath), 'utf8'));
@@ -69,7 +69,7 @@ export async function runCli(argv) {
     }
     findings = enrichFindings(findings, registry);
     if (decode) findings = await decodeFindings(findings, { chainId });
-    const reportData = { generatedAt: new Date().toISOString(), scannedFiles: files.length, findings };
+    const reportData = { generatedAt: new Date().toISOString(), scannedFiles: filesScanned, findings };
     if (!noHtml) {
       fs.mkdirSync(path.dirname(path.resolve(html)), { recursive: true });
       fs.writeFileSync(html, renderReport(reportData), 'utf8');
@@ -79,7 +79,7 @@ export async function runCli(argv) {
       fs.writeFileSync(json, JSON.stringify(reportData, null, 2) + '\n', 'utf8');
     }
     const contracts = new Set(findings.map((x) => x.address).filter((x) => x && x.startsWith('0x')));
-    process.stdout.write(`Scanned ${files.length} source file(s); found ${findings.length} Ethereum call(s) and ${contracts.size} literal contract address(es).${decode ? ' ABI/calldata decode enabled.' : ''}\n`);
+    process.stdout.write(`Scanned ${filesScanned} source file(s); found ${findings.length} Ethereum call(s) and ${contracts.size} literal contract address(es).${decode ? ' ABI/calldata decode enabled.' : ''}\n`);
     if (!noHtml) process.stdout.write(`HTML review: ${path.resolve(html)}\n`);
     if (json) process.stdout.write(`JSON findings: ${path.resolve(json)}\n`);
   } catch (error) {
