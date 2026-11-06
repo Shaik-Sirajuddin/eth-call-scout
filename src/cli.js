@@ -8,11 +8,15 @@ import { auditPolicy, authorizeIntent, loadPolicy, sha256, validatePolicy } from
 import { addProtocolStateSignature, evaluateProtocolState, signProtocolState } from './protocol-state.js';
 import { collectProtocolState } from './protocol-monitor.js';
 import { verifyAuditLog } from './audit-log.js';
+import { ALERT_SEVERITIES, formatAlert, readAlerts } from './alerts.js';
+import { DEFAULT_ATTACKER_LIST_URL, localAttackerListPath, updateLocalAttackerList } from './attacker-feed.js';
+import { ATTACKER_DOCUMENT, ATTACKER_LIST } from './attacker-list.js';
+import { createPolicyFromRuleSet, GENERAL_RULE_SET, ruleSetProfiles, toBaseUnits } from './rule-sets.js';
 import { failedSimulation, finalizeSimulation, simulateTransaction } from './transaction-simulator.js';
 
 const HELP = `Keybound — deterministic wallet authorization for AI agents\n\nUsage:\n  keybound authorize <intent.json|-> --policy <policy.json> [--state <bundle.json>] [--out <receipt.json>]\n  keybound policy <validate|audit> <policy.json>\n  keybound state <collect|sign|verify> ...\n  keybound audit verify <receipts.jsonl>\n  keybound scan <file-or-directory...> [scan options]\n  keybound registry <sync|list|search> ...\n\nThe agent may propose transactions, but executable policy and signed live protocol state decide\nwhether the exact request reaches the wallet. All unsupported mutation methods deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply review terms exported from pr-review-ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner is a monitoring feature, not the wallet authorization boundary.\n`;
 
-const POLICY_HELP = `Keybound executable wallet policies:\n  keybound policy validate <policy.json>\n  keybound policy audit <policy.json>\n  keybound authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction and state hashes in the receipt; the wallet guard must forward those same fields.\n`;
+const POLICY_HELP = `Keybound executable wallet policies:\n  keybound policy init --wallet <address> --state-key <id:base64> --state-key <id:base64> [--profile general|swapper|lender|payments] [--max-per-tx USDC=100] [--max-per-block USDC=100] [--max-slippage-bps 100] [--block <address>] [--payee <address>] [--valid-days 90] [--out <policy.json>]\n  keybound policy profiles\n  keybound policy validate <policy.json>\n  keybound policy audit <policy.json>\n  keybound authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction and state hashes in the receipt; the wallet guard must forward those same fields.\n`;
 
 const REGISTRY_HELP = `Registry commands:\n  eth-call-scout registry sync [all|tokens|protocols|volume|contracts]\n  eth-call-scout registry list [tokens|protocols|contracts|trackers|sources]\n  eth-call-scout registry search <query>\n\nLive sources are cached locally under .cache/eth-call-scout/registry.json.\n`;
 
@@ -59,9 +63,122 @@ function writeJson(value, output) {
   process.stdout.write(`${target}\n`);
 }
 
+/** Collect repeatable flags such as --state-key a --state-key b. */
+function readFlags(args, known) {
+  const flags = {};
+  for (let index = 0; index < args.length; index++) {
+    const name = args[index];
+    if (!known.includes(name)) throw new Error(`Unknown option ${name}`);
+    const value = args[++index];
+    if (value == null) throw new Error(`${name} requires a value`);
+    (flags[name] ??= []).push(value);
+  }
+  return flags;
+}
+
+function parseAmounts(entries = [], flag) {
+  return entries.map((entry) => {
+    const [symbol, amount] = entry.split('=');
+    if (!symbol || !amount) throw new Error(`${flag} expects SYMBOL=amount, for example USDC=100.`);
+    return [symbol.toUpperCase() === 'ETH' ? 'ETH' : symbol, amount];
+  });
+}
+
+/** Build a ready policy from the default rule set. Users set limits in normal units, not base units. */
+function runPolicyInit(args) {
+  const flags = readFlags(args, ['--wallet', '--profile', '--state-key', '--max-per-tx', '--max-per-block', '--max-slippage-bps', '--block', '--payee', '--valid-days', '--out']);
+  if (!flags['--wallet']?.[0]) throw new Error('policy init requires --wallet <address>');
+  const trustedKeys = (flags['--state-key'] ?? []).map((entry) => {
+    const separator = entry.indexOf(':');
+    if (separator < 1) throw new Error('--state-key expects id:base64PublicKey');
+    return { id: entry.slice(0, separator), algorithm: 'ed25519', publicKey: entry.slice(separator + 1) };
+  });
+  if (trustedKeys.length < 2) throw new Error('policy init requires two --state-key id:base64PublicKey values.');
+  const limits = {};
+  const native = {};
+  const decimalsOf = (symbol) => {
+    const asset = GENERAL_RULE_SET.assetLimits.find((entry) => entry.symbol === symbol);
+    if (!asset) throw new Error(`No limit can be set for ${symbol}. Known: ETH, ${GENERAL_RULE_SET.assetLimits.map((entry) => entry.symbol).join(', ')}.`);
+    return asset.decimals;
+  };
+  for (const [symbol, amount] of parseAmounts(flags['--max-per-tx'], '--max-per-tx')) {
+    if (symbol === 'ETH') native.maxValueWei = toBaseUnits(amount, 18);
+    else { const units = toBaseUnits(amount, decimalsOf(symbol)); limits[symbol] = { ...limits[symbol], maxOutflow: units, maxApproval: units }; }
+  }
+  for (const [symbol, amount] of parseAmounts(flags['--max-per-block'], '--max-per-block')) {
+    if (symbol === 'ETH') native.maxPerBlockWei = toBaseUnits(amount, 18);
+    else limits[symbol] = { ...limits[symbol], maxOutflowPerBlock: toBaseUnits(amount, decimalsOf(symbol)) };
+  }
+  const days = Number(flags['--valid-days']?.[0] ?? 90);
+  if (!Number.isFinite(days) || days <= 0) throw new Error('--valid-days must be a positive number.');
+  const policy = createPolicyFromRuleSet({
+    wallet: flags['--wallet'][0],
+    profile: flags['--profile']?.[0] ?? 'general',
+    trustedKeys,
+    limits,
+    native,
+    payees: flags['--payee'] ?? [],
+    blockedAddresses: flags['--block'] ?? [],
+    maxSlippageBps: flags['--max-slippage-bps']?.[0] ?? null,
+    validUntil: new Date(Date.now() + days * 86_400_000).toISOString(),
+  });
+  const validation = validatePolicy(policy);
+  if (!validation.valid) throw new Error(`The rule set built an invalid policy: ${validation.errors.map((entry) => entry.message).join(' ')}`);
+  writeJson(policy, flags['--out']?.[0]);
+}
+
+async function runAttackers(args) {
+  const action = args[0];
+  if (!action || action === '--help' || action === '-h') {
+    process.stdout.write(`Keybound attacker list:\n  keybound attackers info\n  keybound attackers check <address>\n  keybound attackers update [--from <url>] [--out <file>]\n\nThe list is always on. Updates can only add addresses. Default source: ${DEFAULT_ATTACKER_LIST_URL}\n`);
+    return;
+  }
+  if (action === 'info') {
+    writeJson({ listVersion: ATTACKER_LIST.version, hash: ATTACKER_LIST.hash, count: ATTACKER_LIST.count, generatedAt: ATTACKER_DOCUMENT.generatedAt ?? null, localFile: localAttackerListPath(), sources: ATTACKER_DOCUMENT.sources ?? [] });
+    return;
+  }
+  if (action === 'check') {
+    if (!args[1]) throw new Error('Usage: keybound attackers check <address>');
+    const match = ATTACKER_LIST.find(args[1]);
+    writeJson({ address: args[1].toLowerCase(), listed: Boolean(match), label: match?.label ?? null, sources: match?.sources ?? [], reference: match?.reference ?? null, listVersion: ATTACKER_LIST.version });
+    if (match) process.exitCode = 1;
+    return;
+  }
+  if (action === 'update') {
+    const flags = readFlags(args.slice(1), ['--from', '--out']);
+    writeJson(await updateLocalAttackerList(ATTACKER_DOCUMENT, { url: flags['--from']?.[0] ?? DEFAULT_ATTACKER_LIST_URL, file: flags['--out']?.[0] ?? localAttackerListPath() }));
+    return;
+  }
+  throw new Error(`Unknown attackers command: ${action}`);
+}
+
+async function runAlerts(args) {
+  const action = args[0];
+  if (!action || action === '--help' || action === '-h') {
+    process.stdout.write('Keybound alerts:\n  keybound alerts show <alerts.jsonl> [--severity critical|warning|info]\n  keybound alerts verify <alerts.jsonl>\n');
+    return;
+  }
+  const file = args[1];
+  if (!file) throw new Error(`Usage: keybound alerts ${action} <alerts.jsonl>`);
+  if (action === 'verify') {
+    const result = await verifyAuditLog(path.resolve(file));
+    writeJson(result);
+    if (!result.valid) process.exitCode = 2;
+    return;
+  }
+  if (action !== 'show') throw new Error(`Unknown alerts command: ${action}`);
+  const severity = readFlags(args.slice(2), ['--severity'])['--severity']?.[0] ?? null;
+  if (severity && !ALERT_SEVERITIES.includes(severity)) throw new Error(`--severity must be one of ${ALERT_SEVERITIES.join(', ')}`);
+  const alerts = (await readAlerts(file)).filter((alert) => !severity || alert.severity === severity);
+  if (!alerts.length) { process.stdout.write('No alerts.\n'); return; }
+  for (const alert of alerts) process.stdout.write(`${formatAlert(alert)}\n`);
+}
+
 async function runPolicy(args) {
   const action = args[0];
   if (!action || action === '--help' || action === '-h') { process.stdout.write(POLICY_HELP); return; }
+  if (action === 'init') { runPolicyInit(args.slice(1)); return; }
+  if (action === 'profiles') { writeJson(ruleSetProfiles()); return; }
   const file = args[1];
   if (!file) throw new Error(`${action} requires a policy JSON file`);
   const policy = await readJsonInput(file);
@@ -166,6 +283,8 @@ export async function runCli(argv) {
     if (argv[0] === 'authorize') { await runAuthorize(argv.slice(1)); return; }
     if (argv[0] === 'state') { await runState(argv.slice(1)); return; }
     if (argv[0] === 'audit') { await runAudit(argv.slice(1)); return; }
+    if (argv[0] === 'attackers') { await runAttackers(argv.slice(1)); return; }
+    if (argv[0] === 'alerts') { await runAlerts(argv.slice(1)); return; }
     if (argv[0] === 'registry') { runRegistry(argv.slice(1)).catch((error) => { process.stderr.write(`eth-call-scout: ${error.message}\n`); process.exitCode = 1; }); return; }
     if (argv[0] === 'scan') argv = argv.slice(1);
     const paths = [];

@@ -1,10 +1,13 @@
-import { id, keccak256 } from 'ethers';
+import { id, Interface, keccak256 } from 'ethers';
 import { sha256 } from './canonical.js';
-import { evaluateWalletCalls, normalizeIntent, validatePolicy } from './policy.js';
+import { assertAttackerList, ATTACKER_LIST, attackerListIdentity, attackerLookup, describeAttacker, findAttackersInEffects } from './attacker-list.js';
+import { assertGasRules, checkGasRuleVersions, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
+import { decodeSwapCall, evaluateWalletCalls, findSwapRule, listedSwapFees, normalizeIntent, resolveGasLimit, validatePolicy } from './policy.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
 const TRANSFER_TOPIC = id('Transfer(address,address,uint256)').toLowerCase();
+const QUOTER_ABI = new Interface(['function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96))']);
 const APPROVAL_TOPIC = id('Approval(address,address,uint256)').toLowerCase();
 const APPROVAL_FOR_ALL_TOPIC = id('ApprovalForAll(address,address,bool)').toLowerCase();
 const TRANSFER_SINGLE_TOPIC = id('TransferSingle(address,address,address,uint256,uint256)').toLowerCase();
@@ -38,7 +41,7 @@ function rpcTransaction(intent) {
   };
 }
 
-function validateUrl(value) {
+export function validateUrl(value) {
   const url = new URL(value);
   const local = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !local) throw new Error('Simulation endpoints must use HTTPS; HTTP is allowed only for loopback development.');
@@ -46,7 +49,7 @@ function validateUrl(value) {
   return url;
 }
 
-async function rpc(url, method, params, { fetchImpl, timeoutMs }) {
+export async function rpc(url, method, params, { fetchImpl = fetch, timeoutMs = 12_000 } = {}) {
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'keybound-simulator/0.1' },
@@ -79,6 +82,7 @@ function normalizeTrace(node, depth, aggregate) {
   if (node.value != null && (typeof node.value !== 'string' || !/^0x[0-9a-fA-F]+$/.test(node.value))) throw new Error('Malformed call trace value.');
   if (node.input != null && !HEX_DATA.test(String(node.input))) throw new Error('Malformed call trace input.');
   if (node.output != null && !HEX_DATA.test(String(node.output))) throw new Error('Malformed call trace output.');
+  if (node.gasUsed != null && (typeof node.gasUsed !== 'string' || !/^0x[0-9a-fA-F]+$/.test(node.gasUsed))) throw new Error('Malformed call trace gas.');
   const value = node.value == null ? 0n : BigInt(node.value);
   const logs = (node.logs ?? []).map(normalizeLog);
   const base = {
@@ -89,7 +93,8 @@ function normalizeTrace(node, depth, aggregate) {
     revertReason: node.revertReason ? String(node.revertReason) : null,
     logs,
   };
-  aggregate.nodes.push({ ...base, depth });
+  // Gas stays out of the agreed fingerprint: honest nodes can differ slightly on it.
+  aggregate.nodes.push({ ...base, depth, gasUsed: node.gasUsed ?? null });
   aggregate.logs.push(...logs);
   const calls = (node.calls ?? []).map((call) => normalizeTrace(call, depth + 1, aggregate));
   return { ...base, calls };
@@ -157,7 +162,7 @@ function normalizedStateEffects(diff, volatileBalanceAddresses = new Set()) {
   });
 }
 
-function analyzeAssets(logs, wallet, limits, chainId) {
+export function analyzeAssets(logs, wallet, limits, chainId) {
   const byToken = new Map(limits.filter((limit) => limit.chainId === chainId).map((limit) => [limit.token.toLowerCase(), limit]));
   const outflows = new Map();
   const approvals = [];
@@ -200,6 +205,7 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   const normalizedTrace = normalizeTrace(callTrace, 0, aggregate);
   const failures = [];
   const root = aggregate.nodes[0];
+  if (root.gasUsed == null) throw new Error('Malformed call trace: the root call has no gasUsed.');
   if (root.from !== intent.from) failures.push(`Trace root sender ${root.from ?? '(missing)'} does not match ${intent.from}.`);
   if (root.to !== intent.to) failures.push(`Trace root target ${root.to ?? '(missing)'} does not match ${intent.to}.`);
   if (root.input !== intent.data) failures.push('Trace root calldata does not match the proposed transaction.');
@@ -222,10 +228,20 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
     if (node.from === intent.from) nativeOutflow += BigInt(node.value);
   }
   const walletCalls = aggregate.nodes.filter((node, index) => index > 0 && node.from === intent.from);
+  if (walletCalls.some((call) => call.gasUsed == null)) throw new Error('Malformed call trace: a wallet call has no gasUsed.');
   failures.push(...evaluateWalletCalls(policy, intent.chainId, walletCalls, stateContext));
   if (nativeOutflow > BigInt(policy.invariants.maxNativeValueWei)) failures.push(`Simulated native outflow ${nativeOutflow} exceeds policy limit ${policy.invariants.maxNativeValueWei}.`);
   if (gasEstimate > BigInt(config.maxGasEstimate)) failures.push(`Estimated gas ${gasEstimate} exceeds simulation limit ${config.maxGasEstimate}.`);
   if (intent.gas != null && gasEstimate > intent.gas) failures.push(`Estimated gas ${gasEstimate} exceeds transaction gas ${intent.gas}.`);
+  const gasLimit = resolveGasLimit(policy, intent, { rules: stateContext.gasRules, statuses: stateContext.gasRuleStatuses });
+  const gasUsed = BigInt(root.gasUsed);
+  if (!gasLimit) failures.push('This function has no gas limit. Set maxGas in the policy.');
+  else {
+    // The transaction gas limit is what the chain enforces, even if execution later differs from this simulation.
+    if (intent.gas == null || intent.gas > gasLimit.limit) failures.push(`Transaction gas ${intent.gas ?? '(missing)'} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
+    if (gasEstimate > gasLimit.limit) failures.push(`Estimated gas ${gasEstimate} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
+    if (gasUsed > gasLimit.limit) failures.push(`Traced gas ${gasUsed} exceeds this function's limit of ${gasLimit.limit} (${gasLimit.source}).`);
+  }
   const expectedCodeChanges = new Map((intent.authorizationList ?? []).map((authorization) => [intent.from, `0xef0100${authorization.address.slice(2)}`]));
   const state = stateDiffStats(diffTrace, config.denyCodeChanges, expectedCodeChanges, intent.from);
   if (state.accounts > config.maxStateAccounts) failures.push(`State diff touches ${state.accounts} accounts; maximum is ${config.maxStateAccounts}.`);
@@ -238,6 +254,11 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   if (BigInt(state.walletBalanceDecrease) > maximumWalletBalanceDecrease) failures.push(`Wallet balance decrease ${state.walletBalanceDecrease} exceeds bounded native value plus maximum gas cost ${maximumWalletBalanceDecrease}.`);
   const assets = analyzeAssets(aggregate.logs, intent.from, config.assetLimits, intent.chainId);
   failures.push(...assets.violations);
+  const swaps = swapResults(stateContext.swapQuotes, aggregate.logs, intent.from, failures);
+  // Look at every transfer and call, not just the wallet's own. A swap can pay out to anyone.
+  const lookup = attackerLookup(stateContext.attackerList, policy);
+  const attackerHits = findAttackersInEffects({ calls: aggregate.nodes, logs: aggregate.logs, accounts: [...Object.keys(diffTrace.pre), ...Object.keys(diffTrace.post)] }, lookup);
+  for (const hit of attackerHits) failures.push(`Listed attacker ${describeAttacker(hit)} is involved: ${hit.reasons.join('; ')}.`);
   // The sender pays execution fees. Independent nodes can legitimately simulate
   // a slightly different base fee while agreeing on every contract effect. Each
   // source still enforces the sender's total balance decrease above; the quorum
@@ -253,16 +274,77 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
       depth,
       nativeOutflow: nativeOutflow.toString(),
       gasEstimate: gasEstimate.toString(),
+      gasUsed: gasUsed.toString(),
+      gasLimit: gasLimit?.limit.toString() ?? null,
+      gasLimitSource: gasLimit?.source ?? null,
+      gasRule: gasLimit?.rule ? { versionTag: gasLimit.rule.versionTag, measured: stateContext.gasRules.version, outdated: gasLimit.outdated } : null,
       ...state,
       maximumGasCost: maximumGasCost.toString(),
       maximumWalletBalanceDecrease: maximumWalletBalanceDecrease.toString(),
       outflows: assets.outflows,
       approvals: assets.approvals,
+      attackerHits,
+      swaps,
       walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })),
       consensusEvidence: { traceFingerprint, stateFingerprint },
     },
     fingerprint: sha256({ traceFingerprint, stateFingerprint }),
   };
+}
+
+/**
+ * Get a fresh on-chain quote for each swap, and require its minimum to be within the user's slippage limit of the
+ * best measured pool. A low minimum is denied, and so is routing through a pool with a much worse price.
+ */
+async function freshSwapQuotes(policy, intent, callTrace, readCall) {
+  const calls = [{ to: intent.to, data: intent.data }];
+  const visit = (node) => {
+    for (const call of Array.isArray(node?.calls) ? node.calls : []) {
+      if (String(call?.from).toLowerCase() === intent.from && call?.to && call?.input) calls.push({ to: call.to, data: call.input });
+      visit(call);
+    }
+  };
+  visit(callTrace);
+  const failures = [];
+  const swaps = [];
+  for (const call of calls) {
+    const rule = findSwapRule(policy, intent.chainId, call.to, call.data);
+    if (!rule) continue;
+    const swap = decodeSwapCall(rule, call.data);
+    if (!swap) { failures.push('Swap arguments could not be read, so no quote could be checked.'); continue; }
+    const quotes = new Map();
+    for (const fee of listedSwapFees(rule, swap.tokenIn, swap.tokenOut)) {
+      try {
+        const result = String(await readCall(rule.quoter, QUOTER_ABI.encodeFunctionData('quoteExactInputSingle', [{ tokenIn: swap.tokenIn, tokenOut: swap.tokenOut, amountIn: swap.amountIn, fee, sqrtPriceLimitX96: 0n }])));
+        const amount = /^0x[0-9a-fA-F]{64,}$/.test(result) ? BigInt(result.slice(0, 66)) : 0n;
+        if (amount > 0n) quotes.set(fee, amount);
+      } catch { /* Another listed pool may be empty. Only the chosen pool has to answer. */ }
+    }
+    if (!quotes.has(swap.fee)) { failures.push(`Could not get a fresh quote for ${swap.tokenIn} to ${swap.tokenOut} at fee ${swap.fee}.`); continue; }
+    const bestQuote = [...quotes.values()].reduce((best, amount) => (amount > best ? amount : best));
+    const maxSlippageBps = BigInt(policy.invariants.maxSlippageBps);
+    const requiredOut = (bestQuote * (10_000n - maxSlippageBps)) / 10_000n;
+    if (swap.minimumOut < requiredOut) failures.push(`Swap minimum ${swap.minimumOut} is below the ${requiredOut} required: the best fresh quote is ${bestQuote}, and the policy allows ${maxSlippageBps} basis points of slippage.`);
+    swaps.push({ tokenIn: swap.tokenIn, tokenOut: swap.tokenOut, fee: swap.fee.toString(), amountIn: swap.amountIn.toString(), minimumOut: swap.minimumOut.toString(), bestQuote: bestQuote.toString(), requiredOut: requiredOut.toString(), maxSlippageBps: maxSlippageBps.toString() });
+  }
+  return { failures, swaps };
+}
+
+/** Confirm the simulated swap really pays the wallet what the quote requires, not just that the call succeeded. */
+function swapResults(quotes, logs, wallet, failures) {
+  if (!quotes) return [];
+  failures.push(...quotes.failures);
+  const received = new Map();
+  for (const log of logs) {
+    if (log.topics[0] !== TRANSFER_TOPIC || addressTopic(log.topics[2]) !== wallet || !/^0x[0-9a-f]{64}$/.test(log.data)) continue;
+    received.set(log.address, (received.get(log.address) ?? 0n) + BigInt(log.data));
+  }
+  const required = new Map();
+  for (const swap of quotes.swaps) required.set(swap.tokenOut, (required.get(swap.tokenOut) ?? 0n) + BigInt(swap.requiredOut));
+  for (const [token, amount] of required) {
+    if ((received.get(token) ?? 0n) < amount) failures.push(`The wallet would receive ${received.get(token) ?? 0n} of ${token}, but the fresh quote requires at least ${amount}.`);
+  }
+  return quotes.swaps.map((swap) => ({ ...swap, received: (received.get(swap.tokenOut) ?? 0n).toString() }));
 }
 
 async function inspectDelegate(policy, address, chainId, source, fetchImpl, timeoutMs, cache) {
@@ -308,6 +390,24 @@ async function inspectEip7702(policy, intent, senderCode, source, fetchImpl, tim
   return { failures, existingDelegate, delegates: [...new Map(delegates.map((delegate) => [delegate.address, delegate])).values()].map(({ address, codeHash, valid }) => ({ address, codeHash: codeHash ?? null, valid })) };
 }
 
+/** Collect the gas rules for the transaction and for each call the wallet itself makes. */
+function gasRulesInTrace(rules, intent, callTrace) {
+  const found = [];
+  const addRule = (to, data) => {
+    const rule = /^0x[0-9a-fA-F]{8}/.test(String(data)) ? rules.find(intent.chainId, to, String(data).slice(0, 10).toLowerCase()) : null;
+    if (rule) found.push(rule);
+  };
+  addRule(intent.to, intent.data);
+  const visit = (node) => {
+    for (const call of Array.isArray(node?.calls) ? node.calls : []) {
+      if (String(call?.from).toLowerCase() === intent.from && call?.to) addRule(call.to, call.input);
+      visit(call);
+    }
+  };
+  visit(callTrace);
+  return found;
+}
+
 async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
   const config = policy.simulation;
   const tx = rpcTransaction(intent);
@@ -327,7 +427,7 @@ async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
       eip7702Violation: false,
     };
   }
-  const senderCode = String(await rpc(source.url, 'eth_getCode', [intent.from, config.blockTag], { fetchImpl, timeoutMs })).toLowerCase();
+  const senderCode = String(await rpc(source.url, 'eth_getCode', [intent.from, stateContext.blockTag], { fetchImpl, timeoutMs })).toLowerCase();
   if (!HEX_DATA.test(senderCode)) throw new Error('eth_getCode returned malformed sender code.');
   const eip7702 = await inspectEip7702(policy, intent, senderCode, source, fetchImpl, timeoutMs);
   if (eip7702.failures.length) {
@@ -341,21 +441,39 @@ async function simulateSource(policy, intent, source, fetchImpl, stateContext) {
       eip7702Violation: true,
     };
   }
-  const callResult = await rpc(source.url, 'eth_call', [tx, config.blockTag], { fetchImpl, timeoutMs });
+  const callResult = await rpc(source.url, 'eth_call', [tx, stateContext.blockTag], { fetchImpl, timeoutMs });
   if (!HEX_DATA.test(String(callResult))) throw new Error('eth_call returned malformed data.');
-  const gasEstimate = BigInt(await rpc(source.url, 'eth_estimateGas', [tx, config.blockTag], { fetchImpl, timeoutMs }));
-  const callTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'callTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { withLog: true } }], { fetchImpl, timeoutMs });
+  const gasEstimate = BigInt(await rpc(source.url, 'eth_estimateGas', [tx, stateContext.blockTag], { fetchImpl, timeoutMs }));
+  const callTrace = await rpc(source.url, 'debug_traceCall', [tx, stateContext.blockTag, { tracer: 'callTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { withLog: true } }], { fetchImpl, timeoutMs });
   if (callTrace?.output != null && (!HEX_DATA.test(String(callTrace.output)) || String(callTrace.output).toLowerCase() !== String(callResult).toLowerCase())) throw new Error('eth_call and call trace returned different outputs.');
-  const diffTrace = await rpc(source.url, 'debug_traceCall', [tx, config.blockTag, { tracer: 'prestateTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { diffMode: true, disableCode: false, disableStorage: false } }], { fetchImpl, timeoutMs });
-  const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate, stateContext);
-  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702 });
+  const diffTrace = await rpc(source.url, 'debug_traceCall', [tx, stateContext.blockTag, { tracer: 'prestateTracer', timeout: `${Math.ceil(timeoutMs / 1000)}s`, tracerConfig: { diffMode: true, disableCode: false, disableStorage: false } }], { fetchImpl, timeoutMs });
+  const gasRuleStatuses = await checkGasRuleVersions(stateContext.gasRules, gasRulesInTrace(stateContext.gasRules, intent, callTrace), (method, params) => rpc(source.url, method, params, { fetchImpl, timeoutMs }), { blockTag: stateContext.blockTag, now: stateContext.now });
+  const swapQuotes = await freshSwapQuotes(policy, intent, callTrace, (to, data) => rpc(source.url, 'eth_call', [{ to, data }, stateContext.blockTag], { fetchImpl, timeoutMs }));
+  const analysis = analyzeTrace(policy, intent, { ...callTrace, output: callTrace.output ?? callResult }, diffTrace, gasEstimate, { ...stateContext, gasRuleStatuses, swapQuotes });
+  analysis.fingerprint = sha256({ trace: analysis.fingerprint, senderCode, eip7702, attackerListHash: stateContext.attackerList.hash, gasRulesHash: stateContext.gasRules.hash, gasLimit: analysis.metrics.gasLimit, gasRuleOutdated: analysis.metrics.gasRule?.outdated ?? null });
   analysis.metrics = { ...analysis.metrics, senderCode, eip7702 };
   return { sourceId: source.id, blockNumber, kind: analysis.failures.length ? 'violation' : 'pass', ...analysis, eip7702Violation: false };
 }
 
+/**
+ * Read "latest" at one block number that every source has. A head that moves between calls, or differs by a block
+ * between nodes, changes the output of any busy pool, and two honest nodes would then appear to disagree.
+ * "pending" cannot be pinned, because each node's mempool is its own.
+ */
+async function resolveBlockTag(config, sources, fetchImpl) {
+  if (config.blockTag !== 'latest') return { tag: config.blockTag, number: null };
+  const heads = await Promise.allSettled(sources.map(async (source) => BigInt(await rpc(source.url, 'eth_blockNumber', [], { fetchImpl, timeoutMs: config.timeoutMs ?? 12_000 }))));
+  const known = heads.filter((head) => head.status === 'fulfilled').map((head) => head.value);
+  if (!known.length) return { tag: 'latest', number: null };
+  const lowest = known.reduce((minimum, value) => (value < minimum ? value : minimum));
+  return { tag: `0x${lowest.toString(16)}`, number: lowest };
+}
+
 /** Run exact-transaction call, gas, full call-trace, log, and state-diff simulation through a quorum. */
-export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date() } = {}) {
-  const policyValidation = validatePolicy(policy);
+export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fetchImpl = fetch, protocolState = null, minimumStateSequence = 0, now = new Date(), gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
+  assertGasRules(gasRules);
+  assertAttackerList(attackerList);
+  const policyValidation = validatePolicy(policy, { gasRules, attackerList });
   if (!policyValidation.valid) throw new Error(`Invalid simulation policy: ${policyValidation.errors.map((entry) => entry.message).join(' ')}`);
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) throw new Error(`Invalid simulation intent: ${normalized.errors.map((entry) => entry.message).join(' ')}`);
@@ -368,8 +486,9 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
     return { ...source, url: validateUrl(value) };
   });
   if (new Set(sources.map((source) => source.url.href)).size !== sources.length) throw new Error('Simulation sources must use distinct endpoint URLs.');
+  const pinned = await resolveBlockTag(config, sources, fetchImpl);
   const results = await Promise.all(sources.map(async (source) => {
-    try { return await simulateSource(policy, intent, source, fetchImpl, { protocolState, minimumStateSequence, now }); }
+    try { return await simulateSource(policy, intent, source, fetchImpl, { protocolState, minimumStateSequence, now, gasRules, attackerList, blockTag: pinned.tag }); }
     catch (cause) { return { sourceId: source.id, kind: 'error', failures: [cause.message], fingerprint: null, metrics: null, blockNumber: null, eip7702Violation: false }; }
   }));
   const blocks = results.map((result) => result.blockNumber).filter((value) => value != null);
@@ -388,8 +507,11 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
   const conflictingPassQuorums = [...fingerprints.values()].filter((group) => group.length >= config.quorum).length > 1;
   const passQuorum = consensus[1].length >= config.quorum && !conflictingPassQuorums;
   const violationQuorum = violations.length >= config.quorum;
-  const valid = passQuorum && !violationQuorum;
+  // One source seeing an attacker is enough to stop. There is no quorum on sending funds to a thief.
+  const attackerHits = [...new Map(results.flatMap((result) => result.metrics?.attackerHits ?? []).map((hit) => [hit.address, hit])).values()];
+  const valid = passQuorum && !violationQuorum && attackerHits.length === 0;
   const checks = [
+    { id: 'attacker:effects', status: attackerHits.length ? 'deny' : 'pass', detail: attackerHits.length ? `Simulation shows a listed attacker involved: ${attackerHits.map((hit) => `${describeAttacker(hit)}, ${hit.reasons.join('; ')}`).join(' | ')}.` : 'No listed attacker receives funds or approvals in simulation.' },
     { id: 'eip7702:security', status: results.filter((result) => result.eip7702Violation).length >= config.quorum ? 'deny' : 'pass', detail: `${results.filter((result) => result.eip7702Violation).length}/${sources.length} sources observed an unsafe or unauthorized EIP-7702 state; deny quorum is ${config.quorum}.` },
     { id: 'simulation:available', status: results.some((result) => result.kind !== 'error') ? 'pass' : 'deny', detail: `${results.filter((result) => result.kind !== 'error').length}/${sources.length} simulation sources responded.` },
     { id: 'simulation:policy', status: violationQuorum ? 'deny' : 'pass', detail: `${violations.length}/${sources.length} sources observed policy violations; deny quorum is ${config.quorum}.` },
@@ -400,8 +522,11 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
     valid,
     checks,
     summary: {
+      gasRules: gasRulesIdentity(gasRules),
+      attackerList: attackerListIdentity(attackerList),
+      attackerHits,
       blockTag: config.blockTag,
-      blockNumber: selected?.blockNumber?.toString() ?? null,
+      blockNumber: pinned.number?.toString() ?? selected?.blockNumber?.toString() ?? null,
       fingerprint: passQuorum ? consensus[0] : null,
       quorum: config.quorum,
       agreeingSources: consensus[1].map((result) => result.sourceId),
@@ -420,11 +545,14 @@ export async function simulateTransaction(policy, rawIntent, { rpcUrls = {}, fet
 
 export function finalizeSimulation(receipt, result) {
   if (receipt.decision === 'deny') return receipt;
+  // The receipt must name the rule set that really decided, so a mismatch can never become an allow.
+  const rulesMatch = receipt.gasRules?.hash != null && result.summary?.gasRules?.hash === receipt.gasRules.hash;
+  const attackerListMatch = receipt.attackerList?.hash != null && result.summary?.attackerList?.hash === receipt.attackerList.hash;
   return {
     ...receipt,
-    decision: result.valid ? 'allow' : 'deny',
+    decision: result.valid && rulesMatch && attackerListMatch ? 'allow' : 'deny',
     simulation: result.summary,
-    checks: [...receipt.checks, ...result.checks],
+    checks: [...receipt.checks, ...result.checks, { id: 'attacker:list-match', status: attackerListMatch ? 'pass' : 'deny', detail: `Authorization used attacker list ${receipt.attackerList?.hash ?? '(none)'}; simulation used ${result.summary?.attackerList?.hash ?? '(none)'}.` }, { id: 'gas:rules-match', status: rulesMatch ? 'pass' : 'deny', detail: `Authorization used gas rules ${receipt.gasRules?.hash ?? '(none)'}; simulation used ${result.summary?.gasRules?.hash ?? '(none)'}.` }],
   };
 }
 

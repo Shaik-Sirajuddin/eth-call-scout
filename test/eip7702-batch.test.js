@@ -59,15 +59,15 @@ function batchPolicy({ requireCalldata = true } = {}) {
     delegates: [{ chainId: 1, address: DELEGATE, codeHash: keccak256(DELEGATE_CODE) }],
   };
   policy.invariants.requireCalldata = requireCalldata;
-  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)' });
+  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)', maxGas: '100000' });
   policy.contracts.push(
-    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
-    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', allowEmptyCalldata: true },
+    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', maxGas: '500000', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
+    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', maxGas: '100000', allowEmptyCalldata: true },
   );
   return policy;
 }
 
-const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x' });
+const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x', gasUsed: '0xc350' });
 
 /** A delegated wallet on a fake chain whose simulated call tree contains the given frames. */
 function fakeChain(frames) {
@@ -79,11 +79,11 @@ function fakeChain(frames) {
       eth_getTransactionCount: () => '0x7',
       eth_getCode: () => (request.params[0].toLowerCase() === DELEGATE ? DELEGATE_CODE : `0xef0100${DELEGATE.slice(2)}`),
       eth_call: () => '0x',
-      eth_estimateGas: () => '0x30d40',
+      eth_estimateGas: () => '0xea60',
       debug_traceCall: () => {
         if (request.params[2].tracer === 'prestateTracer') return { pre: {}, post: {} };
         const tx = request.params[0];
-        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', calls: frames };
+        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', gasUsed: '0xea60', calls: frames };
       },
     };
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: results[request.method]() }));
@@ -172,7 +172,7 @@ test('leaves calls made by other contracts to the existing internal-call rules',
 test('the guard never forwards a batch that hides a disallowed call', async () => {
   const requests = [];
   const provider = { async request(request) { requests.push(request.method); return request.method === 'eth_chainId' ? '0x1' : '0xhash'; } };
-  const guardFor = (frames, state = signedState()) => createGuardedProvider({ provider, policy: batchPolicy(), protocolState: state, now: NOW, simulationOptions: { rpcUrls, fetchImpl: fakeChain(frames) } });
+  const guardFor = (frames, state = signedState()) => createGuardedProvider({ verification: false, provider, policy: batchPolicy(), protocolState: state, now: NOW, simulationOptions: { rpcUrls, fetchImpl: fakeChain(frames) } });
   const request = { method: 'eth_sendTransaction', params: [batchTx] };
 
   await assert.rejects(guardFor([frame(token.encodeFunctionData('setOperator', [ATTACKER]))]).request(request), WalletGuardError);
@@ -191,7 +191,7 @@ test('the guard gives the simulator the live state it just evaluated', async () 
     received = options;
     return { valid: false, checks: [{ id: 'simulation:policy', status: 'deny', detail: 'test' }], summary: {} };
   };
-  const guard = createGuardedProvider({ provider, policy: batchPolicy(), protocolState: state, now: NOW, simulator, simulationOptions: { rpcUrls } });
+  const guard = createGuardedProvider({ verification: false, provider, policy: batchPolicy(), protocolState: state, now: NOW, simulator, simulationOptions: { rpcUrls } });
   await assert.rejects(guard.request({ method: 'eth_sendTransaction', params: [batchTx] }), WalletGuardError);
   assert.equal(received.protocolState, state);
   assert.equal(received.minimumStateSequence, 1);

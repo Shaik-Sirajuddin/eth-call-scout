@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "note": "Hand-checked addresses that the public feeds miss. Each entry needs a reference that names the address.",
+  "entries": [
+    {
+      "address": "0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc",
+      "label": "BNB Bridge Exploiter (Binance cross-chain bridge, October 2022)",
+      "reference": "https://hub.elliptic.co/analysis/attack-mints-569-million-worth-of-bnb-tokens-in-bsc-bridge-exploit/"
+    },
+    {
+      "address": "0x47666Fab8bd0Ac7003bCe3f5C3585383F09486E2",
+      "label": "Bybit Exploiter 1 (February 2025)",
+      "reference": "https://etherscan.io/address/0x47666fab8bd0ac7003bce3f5c3585383f09486e2"
+    }
+  ]
+}

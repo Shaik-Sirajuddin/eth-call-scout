@@ -69,8 +69,20 @@ Each receipt lists these calls under `simulation.metrics.walletCalls`.
 
 The same trace rules apply when a type-4 transaction installs a delegate and invokes its batch path immediately; safety is not deferred until a later transaction.
 
+## Gas limits per function
+
+Passing simulation does not prove a call is cheap. An attacker can keep the same valid function and pad it, for example with extra swap hops, so funds stay safe and the wallet still pays for the waste.
+
+After tracing, each source reads the code version of every contract with a measured gas rule, then applies the function's limit to the transaction `gas`, the estimate, and the root trace's `gasUsed`. Each call the wallet itself makes inside a batch is checked against its own function limit. A trace that omits `gasUsed` on its root or on a call the wallet makes is malformed, so that source fails. A rule whose pinned code version no longer matches stops denying, and the policy's contract limit or overall cap applies instead. A failed version read fails closed. See [Function gas limits](policies.md#function-gas-limits).
+
 ## Security boundary and limitations
 
 Simulation describes one exact transaction against one sampled state. Between simulation and inclusion, balances, storage, prices, mempool ordering, block values, and protocol state may change. Independent RPC quorum reduces reliance on one provider but does not eliminate common client bugs or coordinated provider failure.
 
 Use short-lived policies, conservative slippage and asset ceilings, fresh signed protocol state, protected delegate registries, and wallet-native confirmation for high-value actions. A passing simulation is an authorization requirement, not a guarantee of economic profit or future contract safety.
+
+## Keeping independent nodes in agreement
+
+With `blockTag: "latest"`, every read runs at one block number that all sources have: the lowest head they report. Without this, a head that moves during a simulation, or one node being a block ahead, changes the output of any busy pool, and two honest nodes appear to disagree. The default rule sets use it. With `"pending"`, reads cannot be pinned because each node's mempool is its own, so a swap on an active pool can occasionally be denied for disagreement.
+
+Simulating one fixed block also means a transaction that depends on your own unmined transaction, such as a swap right after its approval, should wait for the first one to be mined.

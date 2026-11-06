@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { verifyAuthorization } from 'ethers';
 import { canonicalJson, sha256 } from './canonical.js';
+import { assertAttackerList, ATTACKER_LIST, attackerListIdentity, attackerLookup, describeAttacker, findAttackersInHex } from './attacker-list.js';
+import { assertGasRules, GAS_RULES, gasRulesIdentity } from './gas-limits.js';
 import { evaluateProtocolState } from './protocol-state.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -10,8 +12,15 @@ const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
 const STORAGE_KEY = /^0x[a-fA-F0-9]{64}$/;
 const DECIMAL_UINT = /^(?:0|[1-9][0-9]*)$/;
 const MAX_UINT256 = (1n << 256n) - 1n;
+const SWAP_QUOTE_KINDS = new Set(['uniswap-v3-exact-input-single']);
+const MAX_SLIPPAGE_BPS = 5000n;
+const HIGH_SLIPPAGE_BPS = 500n;
+// Common swap functions, flagged by audit when a policy allows them with no fresh-quote check.
+const UNQUOTED_SWAP_SELECTORS = new Set(['0x04e45aaf', '0x414bf389', '0xb858183f', '0xc04b8d59', '0x38ed1739', '0x7ff36ab5', '0x18cbafe5', '0x8803dbee', '0xfb3bdb41', '0x4a25d94a', '0x3593564c', '0x24856bc3']);
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const MIN_TRANSACTION_GAS = 21000n;
+const PER_AUTHORIZATION_GAS = 25000n;
 
 function issue(code, path, message, severity = 'error') {
   return { code, path, message, severity };
@@ -89,13 +98,14 @@ function validateSimulationConfig(config, errors) {
     config.assetLimits.forEach((limit, index) => {
       const at = `${path}.assetLimits[${index}]`;
       if (!isPlainObject(limit)) { errors.push(issue('invalid-asset-limit', at, 'Asset limit must be an object.')); return; }
-      rejectUnknown(limit, new Set(['chainId', 'token', 'maxOutflow', 'maxApproval', 'allowedRecipients', 'allowedSpenders']), at, errors);
+      rejectUnknown(limit, new Set(['chainId', 'token', 'maxOutflow', 'maxOutflowPerBlock', 'maxApproval', 'allowedRecipients', 'allowedSpenders']), at, errors);
       if (!Number.isSafeInteger(limit.chainId) || limit.chainId < 1) errors.push(issue('invalid-chain', `${at}.chainId`, 'chainId must be a positive safe integer.'));
       if (!ADDRESS.test(String(limit.token ?? ''))) errors.push(issue('invalid-address', `${at}.token`, 'Asset limit requires an exact token address.'));
       const token = `${limit.chainId}:${String(limit.token).toLowerCase()}`;
       if (tokens.has(token)) errors.push(issue('duplicate-asset-limit', at, 'Each token may have only one asset limit.'));
       tokens.add(token);
       parseUint(limit.maxOutflow, `${at}.maxOutflow`, errors, { optional: false });
+      parseUint(limit.maxOutflowPerBlock, `${at}.maxOutflowPerBlock`, errors);
       parseUint(limit.maxApproval, `${at}.maxApproval`, errors, { optional: false });
       for (const field of ['allowedRecipients', 'allowedSpenders']) {
         if (!Array.isArray(limit[field])) errors.push(issue('invalid-address-list', `${at}.${field}`, `${field} must be an array.`));
@@ -158,6 +168,27 @@ function parseUint(value, path, errors, { optional = true } = {}) {
   catch { errors.push(issue('invalid-uint', path, 'Value is outside the supported integer range.')); return null; }
 }
 
+function validateGasCeiling(value, path, errors) {
+  if (value == null) return;
+  const parsed = parseUint(value, path, errors);
+  if (parsed != null && parsed < MIN_TRANSACTION_GAS) errors.push(issue('invalid-gas-limit', path, `Gas limit must be at least ${MIN_TRANSACTION_GAS}.`));
+}
+
+/** Bind a swap to a fresh quote. Only Uniswap V3 single-pool swaps are supported so far. */
+function validateSwapQuote(rule, path, errors) {
+  if (!isPlainObject(rule)) { errors.push(issue('invalid-swap-quote', path, 'swapQuote must be an object.')); return; }
+  rejectUnknown(rule, new Set(['kind', 'quoter', 'wrappedNative', 'arguments', 'pools']), path, errors);
+  if (!SWAP_QUOTE_KINDS.has(rule.kind)) errors.push(issue('invalid-swap-quote', `${path}.kind`, `Unsupported swap quote kind ${rule.kind}.`));
+  for (const field of ['quoter', 'wrappedNative']) if (!ADDRESS.test(String(rule[field] ?? ''))) errors.push(issue('invalid-address', `${path}.${field}`, 'Expected a 20-byte 0x address.'));
+  if (!isPlainObject(rule.arguments)) errors.push(issue('invalid-swap-quote', `${path}.arguments`, 'arguments must map each swap field to a calldata word.'));
+  else for (const field of ['tokenIn', 'tokenOut', 'fee', 'amountIn', 'minimumOut']) if (!Number.isInteger(rule.arguments[field]) || rule.arguments[field] < 0 || rule.arguments[field] > 63) errors.push(issue('invalid-swap-quote', `${path}.arguments.${field}`, 'Expected a calldata word index.'));
+  if (!Array.isArray(rule.pools) || !rule.pools.length) errors.push(issue('invalid-swap-quote', `${path}.pools`, 'List at least one measured pool.'));
+  else rule.pools.forEach((pool, index) => {
+    const at = `${path}.pools[${index}]`;
+    if (!isPlainObject(pool) || !ADDRESS.test(String(pool.tokenA ?? '')) || !ADDRESS.test(String(pool.tokenB ?? '')) || !Number.isSafeInteger(pool.fee) || pool.fee <= 0) errors.push(issue('invalid-swap-quote', at, 'Each pool needs tokenA, tokenB and a fee tier.'));
+  });
+}
+
 function validateConstraint(constraint, path, errors) {
   if (!isPlainObject(constraint)) { errors.push(issue('invalid-constraint', path, 'Constraint must be an object.')); return; }
   rejectUnknown(constraint, new Set(['type', 'argument', 'addresses', 'value']), path, errors);
@@ -172,10 +203,53 @@ function validateConstraint(constraint, path, errors) {
 }
 
 /** Validate a wallet policy. Activation checks may be disabled only for draft auditing. */
-export function validatePolicy(policy, { activation = true } = {}) {
+/** List allowed calls that have no gas ceiling from the policy or the measured rule set. */
+function uncappedGasFindings(policy, gasRules) {
+  const findings = [];
+  if (!Array.isArray(policy.contracts)) return findings;
+  policy.contracts.forEach((contract, index) => {
+    if (!isPlainObject(contract)) return;
+    const path = `$.contracts[${index}]`;
+    if (contract.allowEmptyCalldata === true && contract.maxGas == null) findings.push(issue('uncapped-empty-calldata-gas', `${path}.maxGas`, 'Native transfers to this contract need a contract maxGas.', 'high'));
+    (Array.isArray(contract.methods) ? contract.methods : []).forEach((method, methodIndex) => {
+      if (!isPlainObject(method) || method.maxGas != null || contract.maxGas != null) return;
+      if (!gasRules.find(contract.chainId, contract.address, method.selector)) findings.push(issue('uncapped-function-gas', `${path}.methods[${methodIndex}].maxGas`, `Selector ${method.selector} has no measured gas rule, so the policy must set maxGas.`, 'high'));
+    });
+  });
+  return findings;
+}
+
+/** Find attacker addresses a policy tries to allow. Listing one must fail loudly, not quietly deny later. */
+function attackersInPolicy(policy, attackerList) {
+  if (!attackerList) return [];
+  const found = [];
+  const check = (address, path) => {
+    const match = attackerList.find(address);
+    if (match) found.push({ address: match.address, label: match.label, path });
+  };
+  const contracts = Array.isArray(policy.contracts) ? policy.contracts : [];
+  contracts.forEach((contract, index) => {
+    check(contract?.address, `$.contracts[${index}].address`);
+    (Array.isArray(contract?.methods) ? contract.methods : []).forEach((method, methodIndex) => {
+      (Array.isArray(method?.constraints) ? method.constraints : []).forEach((constraint, constraintIndex) => {
+        if (constraint?.type === 'address-in' && Array.isArray(constraint.addresses)) constraint.addresses.forEach((address, addressIndex) => check(address, `$.contracts[${index}].methods[${methodIndex}].constraints[${constraintIndex}].addresses[${addressIndex}]`));
+      });
+      if (method?.swapQuote?.quoter) check(method.swapQuote.quoter, `$.contracts[${index}].methods[${methodIndex}].swapQuote.quoter`);
+    });
+  });
+  const simulation = policy.simulation;
+  (Array.isArray(simulation?.internalTargets) ? simulation.internalTargets : []).forEach((target, index) => check(target?.address, `$.simulation.internalTargets[${index}].address`));
+  (Array.isArray(simulation?.assetLimits) ? simulation.assetLimits : []).forEach((limit, index) => {
+    check(limit?.token, `$.simulation.assetLimits[${index}].token`);
+    for (const field of ['allowedRecipients', 'allowedSpenders']) (Array.isArray(limit?.[field]) ? limit[field] : []).forEach((address, addressIndex) => check(address, `$.simulation.assetLimits[${index}].${field}[${addressIndex}]`));
+  });
+  return found;
+}
+
+export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
-  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation']), '$', errors);
+  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation', 'blockedAddresses']), '$', errors);
   if (policy.version !== 1) errors.push(issue('unsupported-version', '$.version', 'Wallet policy version must be 1.'));
   if (typeof policy.name !== 'string' || !policy.name.trim()) errors.push(issue('missing-name', '$.name', 'Policy requires a non-empty name.'));
   if (policy.defaultAction !== 'deny') errors.push(issue('unsafe-default', '$.defaultAction', 'defaultAction must be "deny". Allow-by-default policies are not supported.'));
@@ -185,6 +259,10 @@ export function validatePolicy(policy, { activation = true } = {}) {
     if (!Array.isArray(policy.wallets)) errors.push(issue('invalid-wallets', '$.wallets', 'wallets must be an array of exact addresses.'));
     else policy.wallets.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.wallets[${index}]`, 'Expected a 20-byte 0x address.')); });
   }
+  if (policy.blockedAddresses != null) {
+    if (!Array.isArray(policy.blockedAddresses)) errors.push(issue('invalid-blocked-addresses', '$.blockedAddresses', 'blockedAddresses must be an array of exact addresses.'));
+    else policy.blockedAddresses.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.blockedAddresses[${index}]`, 'Expected a 20-byte 0x address.')); });
+  }
   if (policy.validUntil != null && (typeof policy.validUntil !== 'string' || !Number.isFinite(Date.parse(policy.validUntil)))) errors.push(issue('invalid-expiry', '$.validUntil', 'validUntil must be an ISO-8601 timestamp.'));
   if (policy.protocolState == null) errors.push(issue('missing-state-policy', '$.protocolState', 'Executable wallet policies must require authenticated live protocol state.'));
   else validateProtocolStateConfig(policy.protocolState, errors);
@@ -193,8 +271,11 @@ export function validatePolicy(policy, { activation = true } = {}) {
 
   if (!isPlainObject(policy.invariants)) errors.push(issue('missing-invariants', '$.invariants', 'Policy requires an invariants object.'));
   else {
-    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
+    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxNativeOutflowPerBlockWei', 'maxSlippageBps', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
     parseUint(policy.invariants.maxNativeValueWei, '$.invariants.maxNativeValueWei', errors, { optional: false });
+    parseUint(policy.invariants.maxNativeOutflowPerBlockWei, '$.invariants.maxNativeOutflowPerBlockWei', errors);
+    const slippage = parseUint(policy.invariants.maxSlippageBps, '$.invariants.maxSlippageBps', errors);
+    if (slippage != null && (slippage < 1n || slippage > MAX_SLIPPAGE_BPS)) errors.push(issue('invalid-slippage-limit', '$.invariants.maxSlippageBps', `maxSlippageBps must be between 1 and ${MAX_SLIPPAGE_BPS}.`));
     parseUint(policy.invariants.maxGas, '$.invariants.maxGas', errors);
     parseUint(policy.invariants.maxGasPriceWei, '$.invariants.maxGasPriceWei', errors);
     parseUint(policy.invariants.maxFeePerGasWei, '$.invariants.maxFeePerGasWei', errors);
@@ -203,13 +284,16 @@ export function validatePolicy(policy, { activation = true } = {}) {
     if (policy.invariants.denyUnlimitedApproval === false) errors.push(issue('unsafe-approval-setting', '$.invariants.denyUnlimitedApproval', 'Unlimited ERC-20 approvals cannot be enabled in the secure policy profile.'));
   }
 
+  for (const finding of attackersInPolicy(policy, attackerList)) errors.push(issue('attacker-in-policy', finding.path, `${finding.address} is on the attacker list (${finding.label}), so a policy cannot allow it.`));
+
   if (!Array.isArray(policy.contracts) || !policy.contracts.length) errors.push(issue('missing-contracts', '$.contracts', 'Policy requires at least one exact contract allowlist entry.'));
   else {
     const contracts = new Set();
     policy.contracts.forEach((contract, index) => {
       const path = `$.contracts[${index}]`;
       if (!isPlainObject(contract)) { errors.push(issue('invalid-contract', path, 'Contract entry must be an object.')); return; }
-      rejectUnknown(contract, new Set(['chainId', 'address', 'protocolId', 'maxNativeValueWei', 'allowEmptyCalldata', 'methods']), path, errors);
+      rejectUnknown(contract, new Set(['chainId', 'address', 'protocolId', 'maxNativeValueWei', 'maxGas', 'allowEmptyCalldata', 'methods']), path, errors);
+      validateGasCeiling(contract.maxGas, `${path}.maxGas`, errors);
       if (!Number.isSafeInteger(contract.chainId) || contract.chainId < 1) errors.push(issue('invalid-chain', `${path}.chainId`, 'Contract chainId must be a positive safe integer.'));
       if (!ADDRESS.test(String(contract.address ?? ''))) errors.push(issue('invalid-address', `${path}.address`, 'Contract requires an exact 20-byte address.'));
       if (policy.protocolState?.required === true && (typeof contract.protocolId !== 'string' || !contract.protocolId.trim())) errors.push(issue('missing-protocol-binding', `${path}.protocolId`, 'Live-state policies require every contract to name its protocolId.'));
@@ -225,7 +309,12 @@ export function validatePolicy(policy, { activation = true } = {}) {
         contract.methods.forEach((method, methodIndex) => {
           const methodPath = `${path}.methods[${methodIndex}]`;
           if (!isPlainObject(method)) { errors.push(issue('invalid-method', methodPath, 'Method entry must be an object.')); return; }
-          rejectUnknown(method, new Set(['selector', 'name', 'constraints']), methodPath, errors);
+          rejectUnknown(method, new Set(['selector', 'name', 'maxGas', 'constraints', 'swapQuote']), methodPath, errors);
+          if (method.swapQuote != null) {
+            validateSwapQuote(method.swapQuote, `${methodPath}.swapQuote`, errors);
+            if (policy.invariants?.maxSlippageBps == null) errors.push(issue('missing-slippage-limit', '$.invariants.maxSlippageBps', 'A swap with a quote check needs maxSlippageBps, the most slippage the user accepts.'));
+          }
+          validateGasCeiling(method.maxGas, `${methodPath}.maxGas`, errors);
           if (!SELECTOR.test(String(method.selector ?? ''))) errors.push(issue('invalid-selector', `${methodPath}.selector`, 'Expected a four-byte selector such as 0x095ea7b3.'));
           const selector = String(method.selector ?? '').toLowerCase();
           if (selectors.has(selector)) errors.push(issue('duplicate-selector', methodPath, 'Selector is duplicated for this contract.'));
@@ -244,6 +333,7 @@ export function validatePolicy(policy, { activation = true } = {}) {
     if ((policy.simulation?.sources?.length ?? 0) < 2) errors.push(issue('activation-simulation-sources', '$.simulation.sources', 'The secure activation profile requires at least two simulation sources.'));
     if ((policy.simulation?.quorum ?? 0) < 2) errors.push(issue('activation-simulation-quorum', '$.simulation.quorum', 'The secure activation profile requires a simulation quorum of at least two.'));
     if (policy.invariants?.maxGas == null) errors.push(issue('activation-gas-cap', '$.invariants.maxGas', 'Executable policies must require and cap the transaction gas limit.'));
+    for (const finding of uncappedGasFindings(policy, gasRules)) errors.push(issue(`activation-${finding.code}`, finding.path, finding.message));
   }
   return { valid: errors.length === 0, errors };
 }
@@ -261,10 +351,15 @@ export function loadPolicy(file) {
   return policy;
 }
 
-function normalizeQuantity(value, path, errors, { required = false, fallback = null } = {}) {
+function normalizeQuantity(value, path, errors, { required = false, fallback = null, hexOnly = false } = {}) {
   if (value == null || value === '') {
     if (required) errors.push(issue('missing-quantity', path, 'Required quantity is missing.'));
     return fallback;
+  }
+  // Wallets disagree on non-hex quantities, so a checked gas value could mean far more gas once forwarded.
+  if (hexOnly && (typeof value !== 'string' || !/^0x[0-9a-fA-F]+$/.test(value))) {
+    errors.push(issue('invalid-gas-quantity', path, 'Gas and fee quantities must be 0x hexadecimal strings.'));
+    return null;
   }
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value) || value < 0) { errors.push(issue('invalid-quantity', path, 'Numeric quantities must be non-negative safe integers. Prefer hex or decimal strings.')); return null; }
@@ -355,10 +450,11 @@ export function normalizeIntent(intent) {
   if (!HEX_DATA.test(String(data))) errors.push(issue('invalid-calldata', '$.data', 'Calldata must be even-length hexadecimal bytes.'));
   const value = normalizeQuantity(intent.value, '$.value', errors, { fallback: 0n });
   if (intent.gas != null && intent.gasLimit != null && String(intent.gas) !== String(intent.gasLimit)) errors.push(issue('conflicting-gas', '$.gasLimit', 'gas and gasLimit must not disagree.'));
-  const gas = normalizeQuantity(intent.gas ?? intent.gasLimit, '$.gas', errors);
-  const gasPrice = normalizeQuantity(intent.gasPrice, '$.gasPrice', errors);
-  const maxFeePerGas = normalizeQuantity(intent.maxFeePerGas, '$.maxFeePerGas', errors);
-  const maxPriorityFeePerGas = normalizeQuantity(intent.maxPriorityFeePerGas, '$.maxPriorityFeePerGas', errors);
+  if (intent.gasLimit != null && intent.gas == null) errors.push(issue('gas-field-required', '$.gas', 'Send the gas limit as gas. A wallet can ignore gasLimit and pick its own limit.'));
+  const gas = normalizeQuantity(intent.gas ?? intent.gasLimit, '$.gas', errors, { hexOnly: true });
+  const gasPrice = normalizeQuantity(intent.gasPrice, '$.gasPrice', errors, { hexOnly: true });
+  const maxFeePerGas = normalizeQuantity(intent.maxFeePerGas, '$.maxFeePerGas', errors, { hexOnly: true });
+  const maxPriorityFeePerGas = normalizeQuantity(intent.maxPriorityFeePerGas, '$.maxPriorityFeePerGas', errors, { hexOnly: true });
   const nonce = normalizeQuantity(intent.nonce, '$.nonce', errors, { required: true });
   if (nonce != null && nonce >= MAX_UINT64) errors.push(issue('invalid-nonce', '$.nonce', 'Transaction nonce must be less than 2^64 - 1.'));
   if (gasPrice != null && (maxFeePerGas != null || maxPriorityFeePerGas != null)) errors.push(issue('conflicting-fee-model', '$.gasPrice', 'Legacy gasPrice cannot be combined with EIP-1559 fee fields.'));
@@ -391,6 +487,43 @@ function calldataWord(data, argument) {
   const start = 10 + argument * 64;
   if (data.length < start + 64) return null;
   return data.slice(start, start + 64).toLowerCase();
+}
+
+/** The swap rule for a call, if the policy binds that function to a fresh quote. */
+export function findSwapRule(policy, chainId, to, data) {
+  if (!/^0x[0-9a-fA-F]{8}/.test(String(data))) return null;
+  const selector = String(data).slice(0, 10).toLowerCase();
+  const contract = policy.contracts?.find((entry) => entry.chainId === chainId && entry.address.toLowerCase() === String(to).toLowerCase());
+  return contract?.methods?.find((entry) => entry.selector.toLowerCase() === selector)?.swapQuote ?? null;
+}
+
+/** Read a swap's arguments from fixed calldata words. Returns null unless every word is well formed. */
+export function decodeSwapCall(rule, data) {
+  const lower = String(data).toLowerCase();
+  const uint = (name) => { const word = calldataWord(lower, rule.arguments[name]); return word ? BigInt(`0x${word}`) : null; };
+  const address = (name) => { const word = calldataWord(lower, rule.arguments[name]); return word && /^0{24}[0-9a-f]{40}$/.test(word) ? `0x${word.slice(24)}` : null; };
+  const swap = { tokenIn: address('tokenIn'), tokenOut: address('tokenOut'), fee: uint('fee'), amountIn: uint('amountIn'), minimumOut: uint('minimumOut') };
+  return Object.values(swap).some((value) => value == null) ? null : swap;
+}
+
+/** The fee tiers of the measured pools for a pair. Only these count as a fair price. */
+export function listedSwapFees(rule, tokenIn, tokenOut) {
+  const a = String(tokenIn).toLowerCase();
+  const b = String(tokenOut).toLowerCase();
+  return rule.pools
+    .filter((pool) => { const x = pool.tokenA.toLowerCase(); const y = pool.tokenB.toLowerCase(); return (x === a && y === b) || (x === b && y === a); })
+    .map((pool) => BigInt(pool.fee));
+}
+
+/** What can be checked without the chain. The fresh quote itself is checked during simulation. */
+function evaluateSwapCall(rule, data, value, add) {
+  const swap = decodeSwapCall(rule, data);
+  if (!add('swap:decoded', Boolean(swap), 'Swap arguments must decode to exact tokens and amounts.')) return;
+  add('swap:pool-listed', listedSwapFees(rule, swap.tokenIn, swap.tokenOut).includes(swap.fee), `The pool for ${swap.tokenIn} to ${swap.tokenOut} at fee ${swap.fee} must be one of the measured pools.`);
+  add('swap:amount-set', swap.amountIn > 0n, 'Swap amount must be greater than zero.');
+  add('swap:minimum-set', swap.minimumOut > 0n, 'Swap minimum output must be greater than zero.');
+  // Extra ETH stays in the router, where anyone can take it.
+  add('swap:native-input', value === 0n || (swap.tokenIn === rule.wrappedNative.toLowerCase() && value === swap.amountIn), `Native value ${value} must be 0, or exactly the amount in when swapping from the wrapped native token.`);
 }
 
 function evaluateConstraint(constraint, data) {
@@ -452,12 +585,39 @@ function evaluateTargetCall(policy, { chainId, to, data, value }, add, valueToTa
       const result = evaluateConstraint(constraint, data);
       add(`constraint:${index}:${constraint.type}`, result.ok, result.detail);
     }
+    if (method?.swapQuote) evaluateSwapCall(method.swapQuote, data, value, add);
   }
   return contract;
 }
 
+/**
+ * Find the gas ceiling for one call. A valid call can still waste gas, so passing simulation is not enough.
+ * Order: the policy's method limit, then a measured rule whose code version is still current, then the policy's
+ * contract limit, then the overall cap. Without version statuses, as before simulation, a rule cannot be trusted
+ * yet, so the overall cap applies. An outdated rule never denies, because an upgrade can change honest gas costs.
+ */
+export function resolveGasLimit(policy, { chainId, to, data, authorizationList = null }, { rules = GAS_RULES, statuses = null } = {}) {
+  const contract = policy.contracts.find((entry) => entry.chainId === chainId && entry.address.toLowerCase() === to);
+  if (!contract) return null;
+  const selector = data.length >= 10 ? data.slice(0, 10) : null;
+  const method = selector ? contract.methods?.find((entry) => entry.selector.toLowerCase() === selector) : null;
+  const rule = selector ? rules.find(chainId, to, selector) : null;
+  const status = rule ? statuses?.get(rule) ?? null : null;
+  let ceiling = null;
+  let source = null;
+  if (method?.maxGas != null) { ceiling = method.maxGas; source = 'policy method limit'; }
+  else if (status?.current) { ceiling = rule.maxGas; source = `gas rule ${rule.versionTag}, measured ${rules.version}`; }
+  else if (rule) {
+    const useContract = status != null && contract.maxGas != null;
+    ceiling = useContract ? contract.maxGas : policy.invariants?.maxGas;
+    source = `${useContract ? 'policy contract limit' : 'overall gas cap'}; gas rule ${rule.versionTag} ${status ? `not used because ${status.reason}` : 'not version-checked yet'}`;
+  } else if (contract.maxGas != null) { ceiling = contract.maxGas; source = 'policy contract limit'; }
+  if (ceiling == null) return null;
+  return { limit: BigInt(ceiling) + BigInt(authorizationList?.length ?? 0) * PER_AUTHORIZATION_GAS, source, rule: rule ?? null, outdated: status?.current === false };
+}
+
 /** Reapply policy and signed live-state checks to every trace call originating from the wallet. */
-export function evaluateWalletCalls(policy, chainId, calls, { protocolState = null, now = new Date(), minimumStateSequence = 0 } = {}) {
+export function evaluateWalletCalls(policy, chainId, calls, { protocolState = null, now = new Date(), minimumStateSequence = 0, gasRules = GAS_RULES, gasRuleStatuses = null } = {}) {
   const failures = [];
   const valueByTarget = new Map();
   for (const [index, call] of calls.entries()) {
@@ -475,6 +635,12 @@ export function evaluateWalletCalls(policy, chainId, calls, { protocolState = nu
     valueByTarget.set(call.to, valueToTarget);
     const add = (id, ok, detail) => { if (!ok) failures.push(`${label} failed ${id}: ${detail}`); return ok; };
     const contract = evaluateTargetCall(policy, { chainId, to: call.to, data: call.input, value }, add, valueToTarget);
+    if (contract) {
+      const gasLimit = resolveGasLimit(policy, { chainId, to: call.to, data: call.input }, { rules: gasRules, statuses: gasRuleStatuses });
+      const used = call.gasUsed == null ? null : BigInt(call.gasUsed);
+      const limitText = gasLimit ? `this function allows ${gasLimit.limit} (${gasLimit.source})` : 'this function has no gas limit';
+      add('gas:function-limit', gasLimit != null && used != null && used <= gasLimit.limit, used == null ? `The trace reports no gas for this call; ${limitText}.` : `Used ${used} gas; ${limitText}.`);
+    }
     if (!contract || policy.protocolState?.required !== true) continue;
     const state = evaluateProtocolState(protocolState, policy.protocolState, {
       protocolId: contract.protocolId,
@@ -489,20 +655,24 @@ export function evaluateWalletCalls(policy, chainId, calls, { protocolState = nu
 }
 
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
-export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0 } = {}) {
+export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0, gasRules = GAS_RULES, attackerList = ATTACKER_LIST } = {}) {
+  assertGasRules(gasRules);
+  assertAttackerList(attackerList);
+  const attackerRecord = attackerListIdentity(attackerList);
   const evaluatedAt = new Date(now).toISOString();
-  const policyValidation = validatePolicy(policy);
+  const policyValidation = validatePolicy(policy, { gasRules, attackerList });
+  const gasRulesRecord = gasRulesIdentity(gasRules);
   const policyHash = policyValidation.valid ? sha256(policy) : null;
   const checks = [];
   const add = (id, ok, detail) => { checks.push({ id, status: ok ? 'pass' : 'deny', detail }); return ok; };
   if (!policyValidation.valid) {
     policyValidation.errors.forEach((error) => add(`policy:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: null, checks };
   }
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) {
     normalized.errors.forEach((error) => add(`intent:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, protocolState: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: null, checks };
   }
   const intent = normalized.intent;
   const summary = { ...serializableIntent(intent), selector: intent.data.length >= 10 ? intent.data.slice(0, 10) : null };
@@ -548,7 +718,18 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     add('fee:priority', invariants.maxPriorityFeePerGasWei != null && intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `EIP-1559 requires maxPriorityFeePerGasWei and the transaction field must not exceed ${invariants.maxPriorityFeePerGasWei ?? '(missing)'}.`);
   }
 
+  // These apply before anything else about the call is trusted, whatever the policy allows.
+  const lookup = attackerLookup(attackerList, policy);
+  const targetAttacker = lookup(intent.to);
+  add('attacker:target', !targetAttacker, targetAttacker ? `Target is a listed attacker: ${describeAttacker(targetAttacker)}.` : `Target is not on the attacker list (${attackerList.count} addresses, version ${attackerList.version}).`);
+  const calldataAttackers = findAttackersInHex(intent.data, lookup);
+  add('attacker:calldata', calldataAttackers.length === 0, calldataAttackers.length ? `Calldata names a listed attacker: ${calldataAttackers.map(describeAttacker).join(', ')}.` : 'Calldata names no listed attacker.');
+  const delegateAttackers = (intent.authorizationList ?? []).map((authorization) => lookup(authorization.address)).filter(Boolean);
+  if (intent.authorizationList != null) add('attacker:delegate', delegateAttackers.length === 0, delegateAttackers.length ? `EIP-7702 delegate is a listed attacker: ${delegateAttackers.map(describeAttacker).join(', ')}.` : 'EIP-7702 delegates are not on the attacker list.');
+
   const contract = evaluateTargetCall(policy, intent, add);
+  const gasLimit = contract ? resolveGasLimit(policy, intent, { rules: gasRules }) : null;
+  if (contract) add('gas:function-limit', gasLimit != null && intent.gas != null && intent.gas <= gasLimit.limit, gasLimit ? `Gas must be present and at most ${gasLimit.limit} for this function (${gasLimit.source}).` : 'This function has no gas limit. Set maxGas in the policy.');
   let stateSummary = null;
   if (policy.protocolState?.required === true) {
     const stateResult = evaluateProtocolState(protocolState, policy.protocolState, {
@@ -562,12 +743,12 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
     stateSummary = stateResult.summary;
   }
   const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'simulate';
-  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, protocolState: stateSummary, simulation: null, checks };
+  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, gasRules: gasRulesRecord, attackerList: attackerRecord, protocolState: stateSummary, simulation: null, checks };
 }
 
 /** Find structurally valid but broad rules that deserve human review before activation. */
-export function auditPolicy(policy) {
-  const validation = validatePolicy(policy, { activation: false });
+export function auditPolicy(policy, { gasRules = GAS_RULES } = {}) {
+  const validation = validatePolicy(policy, { activation: false, gasRules });
   const findings = [...validation.errors];
   if (!validation.valid) return { valid: false, policyHash: null, findings };
   if (!policy.wallets?.length) findings.push(issue('unbound-wallet', '$.wallets', 'Policy is not bound to a specific wallet.', 'high'));
@@ -579,10 +760,18 @@ export function auditPolicy(policy) {
   if (policy.invariants?.maxGas == null) findings.push(issue('uncapped-transaction-gas', '$.invariants.maxGas', 'Secure activation requires an explicit transaction gas cap.', 'high'));
   const eip7702 = policy.simulation.eip7702;
   if (eip7702.allowAuthorizationList && !eip7702.allowDelegatedWallet) findings.push(issue('eip7702-wallet-lockout', '$.simulation.eip7702.allowDelegatedWallet', 'A permitted delegation will make later transactions deny until delegated-wallet use is separately enabled.', 'medium'));
+  findings.push(...uncappedGasFindings(policy, gasRules));
+  if (policy.invariants?.maxSlippageBps != null && BigInt(policy.invariants.maxSlippageBps) > HIGH_SLIPPAGE_BPS) findings.push(issue('high-slippage-limit', '$.invariants.maxSlippageBps', `Allowing more than ${HIGH_SLIPPAGE_BPS} basis points of slippage leaves swaps open to heavy price manipulation.`, 'high'));
+  if (Date.parse(gasRules.validUntil) <= Date.now()) findings.push(issue('gas-rules-expired', '$.contracts', `The gas rule set expired on ${gasRules.validUntil}, so only the overall gas cap applies. Run npm run gas:sync.`, 'medium'));
   policy.contracts.forEach((contract, index) => {
+    contract.methods?.forEach((method, methodIndex) => {
+      const rule = gasRules.find(contract.chainId, contract.address, method.selector);
+      if (rule && method.maxGas != null && BigInt(method.maxGas) > BigInt(rule.maxGas)) findings.push(issue('function-gas-above-rule', `$.contracts[${index}].methods[${methodIndex}].maxGas`, `maxGas ${method.maxGas} is above the measured ${rule.versionTag} limit of ${rule.maxGas}.`, 'medium'));
+    });
     if (!contract.protocolId) findings.push(issue('missing-protocol-binding', `$.contracts[${index}].protocolId`, 'Contract is not bound to a protocol identity for live-state enforcement.', 'high'));
     if (contract.allowEmptyCalldata) findings.push(issue('native-transfer-enabled', `$.contracts[${index}].allowEmptyCalldata`, 'Contract accepts empty-calldata native transfers.', 'medium'));
     contract.methods?.forEach((method, methodIndex) => {
+      if (UNQUOTED_SWAP_SELECTORS.has(method.selector.toLowerCase()) && !method.swapQuote) findings.push(issue('swap-without-fresh-quote', `$.contracts[${index}].methods[${methodIndex}]`, `Selector ${method.selector} is a swap with no swapQuote, so nothing stops a very low minimum output.`, 'high'));
       if (!(method.constraints?.length)) findings.push(issue('unconstrained-method', `$.contracts[${index}].methods[${methodIndex}]`, `Selector ${method.selector} has no argument constraints.`, 'medium'));
       if (method.selector.toLowerCase() === '0x095ea7b3') {
         const constraints = method.constraints ?? [];

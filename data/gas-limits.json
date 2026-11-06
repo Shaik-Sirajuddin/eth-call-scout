@@ -1,0 +1,1586 @@
+{
+  "version": 1,
+  "rulesVersion": "2026-11-06",
+  "validUntil": "2027-05-05T10:52:53.857Z",
+  "generatedAt": "2026-11-06T10:52:53.857Z",
+  "source": "Successful Ethereum mainnet transactions sent directly to each contract, sampled every 16 blocks from 26304821 to 26355220",
+  "transactionsMeasured": 13002,
+  "blocksFailed": 0,
+  "omitted": [],
+  "method": "maxGas is the 99th percentile of observed gas used, plus 25%, rounded up to the next 5000. Functions with fewer than 20 samples are left out, and so are functions whose 99th percentile is more than 4 times their median, because they bundle variable work and one number would mean little. A policy must set its own limit for those. Samples from before a proxy's latest upgrade are dropped, because they describe other code, and a contract whose history cannot be read is left out. Each rule pins the code it was measured on. Once that code changes or the set passes validUntil, the rule stops denying and the policy's overall gas cap applies.",
+  "rules": [
+    {
+      "chainId": 1,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "protocolId": "1inch",
+      "versionTag": "1inch-v6",
+      "contract": "1inch Aggregation Router V6",
+      "selector": "0x07ed2379",
+      "signature": "swap(address,(address,address,address,address,uint256,uint256,uint256),bytes)",
+      "maxGas": "1080000",
+      "codeVersion": {
+        "codeHash": "0xa5a286be4b80006cc547d7e899871aa01a0e0551e2a509233375405f92098c2f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 225664,
+        "p95": 625969,
+        "p99": 863949,
+        "max": 1647227,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "protocolId": "1inch",
+      "versionTag": "1inch-v6",
+      "contract": "1inch Aggregation Router V6",
+      "selector": "0x83800a8e",
+      "signature": "unoswap(uint256,uint256,uint256,uint256)",
+      "maxGas": "190000",
+      "codeVersion": {
+        "codeHash": "0xa5a286be4b80006cc547d7e899871aa01a0e0551e2a509233375405f92098c2f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 34,
+        "p50": 124464,
+        "p95": 147385,
+        "p99": 150862,
+        "max": 150862,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "protocolId": "1inch",
+      "versionTag": "1inch-v6",
+      "contract": "1inch Aggregation Router V6",
+      "selector": "0xb68fb020",
+      "signature": null,
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xa5a286be4b80006cc547d7e899871aa01a0e0551e2a509233375405f92098c2f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 302,
+        "p50": 46128,
+        "p95": 46176,
+        "p99": 46176,
+        "max": 46188,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "protocolId": "1inch",
+      "versionTag": "1inch-v6",
+      "contract": "1inch Aggregation Router V6",
+      "selector": "0xc3cf8043",
+      "signature": null,
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xa5a286be4b80006cc547d7e899871aa01a0e0551e2a509233375405f92098c2f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 48,
+        "p50": 29305,
+        "p95": 46405,
+        "p99": 46405,
+        "max": 46405,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0x02c205f0",
+      "signature": "supplyWithPermit(address,uint256,address,uint16,uint256,uint8,bytes32,bytes32)",
+      "maxGas": "285000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 51,
+        "p50": 180437,
+        "p95": 219693,
+        "p99": 224885,
+        "max": 224885,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0x573ade81",
+      "signature": "repay(address,uint256,uint256,address)",
+      "maxGas": "210000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 110,
+        "p50": 156798,
+        "p95": 167545,
+        "p99": 167696,
+        "max": 167696,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0x617ba037",
+      "signature": "supply(address,uint256,address,uint16)",
+      "maxGas": "240000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 213,
+        "p50": 155811,
+        "p95": 179610,
+        "p99": 191922,
+        "max": 228343,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0x69328dec",
+      "signature": "withdraw(address,uint256,address)",
+      "maxGas": "545000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 208,
+        "p50": 183700,
+        "p95": 350631,
+        "p99": 435207,
+        "max": 505308,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0xa415bcad",
+      "signature": "borrow(address,uint256,uint256,uint16,address)",
+      "maxGas": "630000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 248,
+        "p50": 314495,
+        "p95": 443762,
+        "p99": 502790,
+        "max": 725157,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave",
+      "versionTag": "aave-v3",
+      "contract": "Aave V3 Ethereum Pool",
+      "selector": "0xee3e210b",
+      "signature": "repayWithPermit(address,uint256,uint256,address,uint256,uint8,bytes32,bytes32)",
+      "maxGas": "275000",
+      "codeVersion": {
+        "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+        }
+      },
+      "observed": {
+        "samples": 34,
+        "p50": 181235,
+        "p95": 217847,
+        "p99": 217847,
+        "max": 217847,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+      "protocolId": "aave-token",
+      "versionTag": "aave-erc20",
+      "contract": "AAVE",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0x98a3150c9759d754a4b31f6fb3f4828371c60c2c07fb0754cfa2b230cb601001",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x5d4aa78b08bc7c530e21bf7447988b1be7991322"
+        }
+      },
+      "observed": {
+        "samples": 65,
+        "p50": 53557,
+        "p95": 53857,
+        "p99": 53857,
+        "max": 53857,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+      "protocolId": "aave-token",
+      "versionTag": "aave-erc20",
+      "contract": "AAVE",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "80000",
+      "codeVersion": {
+        "codeHash": "0x98a3150c9759d754a4b31f6fb3f4828371c60c2c07fb0754cfa2b230cb601001",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+          "address": "0x5d4aa78b08bc7c530e21bf7447988b1be7991322"
+        }
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 39508,
+        "p95": 61396,
+        "p99": 61408,
+        "max": 61408,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "protocolId": "dai",
+      "versionTag": "dai-erc20",
+      "contract": "DAI",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0x4e36f96ee1667a663dfaac57c4d185a0e369a3a217e0079d49620f34f85d1ac7",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 217,
+        "p50": 46158,
+        "p95": 46458,
+        "p99": 46458,
+        "max": 46458,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "protocolId": "dai",
+      "versionTag": "dai-erc20",
+      "contract": "DAI",
+      "selector": "0x23b872dd",
+      "signature": "transferFrom(address,address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0x4e36f96ee1667a663dfaac57c4d185a0e369a3a217e0079d49620f34f85d1ac7",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 24,
+        "p50": 37966,
+        "p95": 55066,
+        "p99": 55078,
+        "max": 55078,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "protocolId": "dai",
+      "versionTag": "dai-erc20",
+      "contract": "DAI",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "65000",
+      "codeVersion": {
+        "codeHash": "0x4e36f96ee1667a663dfaac57c4d185a0e369a3a217e0079d49620f34f85d1ac7",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 34730,
+        "p95": 51830,
+        "p99": 51842,
+        "max": 51854,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+      "protocolId": "lido",
+      "versionTag": "lido-v2",
+      "contract": "Lido stETH",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "85000",
+      "codeVersion": {
+        "codeHash": "0xb9c1c929064cd21734c102a698e68bf617feefcfa5a9f62407c45401546736bf",
+        "implementation": {
+          "kind": "call",
+          "address": "0x028271e30a695c0527a0c50ca30603fed004cdb0"
+        }
+      },
+      "observed": {
+        "samples": 84,
+        "p50": 65352,
+        "p95": 65592,
+        "p99": 65652,
+        "max": 65652,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+      "protocolId": "lido",
+      "versionTag": "lido-v2",
+      "contract": "Lido stETH",
+      "selector": "0xa1903eab",
+      "signature": "submit(address)",
+      "maxGas": "120000",
+      "codeVersion": {
+        "codeHash": "0xb9c1c929064cd21734c102a698e68bf617feefcfa5a9f62407c45401546736bf",
+        "implementation": {
+          "kind": "call",
+          "address": "0x028271e30a695c0527a0c50ca30603fed004cdb0"
+        }
+      },
+      "observed": {
+        "samples": 117,
+        "p50": 77175,
+        "p95": 94275,
+        "p99": 94275,
+        "max": 94275,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+      "protocolId": "lido",
+      "versionTag": "lido-v2",
+      "contract": "Lido stETH",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "110000",
+      "codeVersion": {
+        "codeHash": "0xb9c1c929064cd21734c102a698e68bf617feefcfa5a9f62407c45401546736bf",
+        "implementation": {
+          "kind": "call",
+          "address": "0x028271e30a695c0527a0c50ca30603fed004cdb0"
+        }
+      },
+      "observed": {
+        "samples": 92,
+        "p50": 67293,
+        "p95": 84405,
+        "p99": 84417,
+        "max": 84417,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      "protocolId": "link",
+      "versionTag": "link-erc20",
+      "contract": "LINK",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0x77c633ba07c8cb94cd4864092fd8b31e31cf9d065f6fb6acf617298bc0008785",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 148,
+        "p50": 46451,
+        "p95": 46739,
+        "p99": 46739,
+        "max": 46739,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      "protocolId": "link",
+      "versionTag": "link-erc20",
+      "contract": "LINK",
+      "selector": "0x23b872dd",
+      "signature": "transferFrom(address,address,uint256)",
+      "maxGas": "75000",
+      "codeVersion": {
+        "codeHash": "0x77c633ba07c8cb94cd4864092fd8b31e31cf9d065f6fb6acf617298bc0008785",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 63,
+        "p50": 35936,
+        "p95": 40724,
+        "p99": 57824,
+        "max": 57824,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      "protocolId": "link",
+      "versionTag": "link-erc20",
+      "contract": "LINK",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0x77c633ba07c8cb94cd4864092fd8b31e31cf9d065f6fb6acf617298bc0008785",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 35001,
+        "p95": 52101,
+        "p99": 52101,
+        "max": 52113,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F",
+      "protocolId": "sushi",
+      "versionTag": "sushi-v2",
+      "contract": "SushiSwap V2 Router02",
+      "selector": "0x38ed1739",
+      "signature": "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+      "maxGas": "225000",
+      "codeVersion": {
+        "codeHash": "0x2cd062d965df55b27a1f2d3c926212a046256dfc4191d9c32c82c5efbf3b231f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 25,
+        "p50": 135482,
+        "p95": 144928,
+        "p99": 177125,
+        "max": 177125,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+      "protocolId": "uni",
+      "versionTag": "uni-erc20",
+      "contract": "UNI",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xdeba17f16fdba566b45d8019575e068625403cc6986fa17ceadd6edf08aa0868",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 107,
+        "p50": 46874,
+        "p95": 47047,
+        "p99": 47047,
+        "max": 47047,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+      "protocolId": "uni",
+      "versionTag": "uni-erc20",
+      "contract": "UNI",
+      "selector": "0x23b872dd",
+      "signature": "transferFrom(address,address,uint256)",
+      "maxGas": "80000",
+      "codeVersion": {
+        "codeHash": "0xdeba17f16fdba566b45d8019575e068625403cc6986fa17ceadd6edf08aa0868",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 28,
+        "p50": 43023,
+        "p95": 43047,
+        "p99": 60123,
+        "max": 60123,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+      "protocolId": "uni",
+      "versionTag": "uni-erc20",
+      "contract": "UNI",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "75000",
+      "codeVersion": {
+        "codeHash": "0xdeba17f16fdba566b45d8019575e068625403cc6986fa17ceadd6edf08aa0868",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 40106,
+        "p95": 57218,
+        "p99": 57230,
+        "max": 85187,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-permit2",
+      "contract": "Permit2",
+      "selector": "0x2b67b570",
+      "signature": "permit(address,((address,uint160,uint48,uint48),address,uint256),bytes)",
+      "maxGas": "75000",
+      "codeVersion": {
+        "codeHash": "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 193,
+        "p50": 57770,
+        "p95": 57770,
+        "p99": 57770,
+        "max": 57770,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-permit2",
+      "contract": "Permit2",
+      "selector": "0x3ff9dcb1",
+      "signature": null,
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 28,
+        "p50": 28837,
+        "p95": 45937,
+        "p99": 45937,
+        "max": 45937,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-permit2",
+      "contract": "Permit2",
+      "selector": "0x87517c45",
+      "signature": "approve(address,address,uint160,uint48)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 47794,
+        "p95": 47818,
+        "p99": 47818,
+        "max": 47818,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-permit2",
+      "contract": "Permit2",
+      "selector": "0xcc53287f",
+      "signature": "lockdown((address,address)[])",
+      "maxGas": "40000",
+      "codeVersion": {
+        "codeHash": "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 35,
+        "p50": 29934,
+        "p95": 29934,
+        "p99": 29934,
+        "max": 29934,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-universal-v4",
+      "contract": "Uniswap Universal Router V4",
+      "selector": "0x3593564c",
+      "signature": "execute(bytes,bytes[],uint256)",
+      "maxGas": "280000",
+      "codeVersion": {
+        "codeHash": "0x6a5f46971b50c6e1b7eef97902311444e479d734e4f80ad88367783cf373fe7f",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 117833,
+        "p95": 165543,
+        "p99": 223797,
+        "max": 235206,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x02751cec",
+      "signature": "removeLiquidityETH(address,uint256,uint256,uint256,address,uint256)",
+      "maxGas": "275000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 33,
+        "p50": 217289,
+        "p95": 217601,
+        "p99": 217601,
+        "max": 217601,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x18cbafe5",
+      "signature": "swapExactTokensForETH(uint256,uint256,address[],address,uint256)",
+      "maxGas": "180000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 56,
+        "p50": 113932,
+        "p95": 142186,
+        "p99": 142812,
+        "max": 142812,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x38ed1739",
+      "signature": "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)",
+      "maxGas": "240000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 117908,
+        "p95": 165480,
+        "p99": 190191,
+        "max": 216499,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x5c11d795",
+      "signature": "swapExactTokensForTokensSupportingFeeOnTransferTokens(uint256,uint256,address[],address,uint256)",
+      "maxGas": "270000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 222,
+        "p50": 112186,
+        "p95": 194533,
+        "p99": 212020,
+        "max": 281498,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x791ac947",
+      "signature": "swapExactTokensForETHSupportingFeeOnTransferTokens(uint256,uint256,address[],address,uint256)",
+      "maxGas": "250000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 117884,
+        "p95": 154811,
+        "p99": 198071,
+        "max": 250562,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x7ff36ab5",
+      "signature": "swapExactETHForTokens(uint256,address[],address,uint256)",
+      "maxGas": "195000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 118910,
+        "p95": 130241,
+        "p99": 154057,
+        "max": 154069,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0x8803dbee",
+      "signature": "swapTokensForExactTokens(uint256,uint256,address[],address,uint256)",
+      "maxGas": "240000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 79,
+        "p50": 107339,
+        "p95": 135569,
+        "p99": 190593,
+        "max": 190593,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0xb6f9de95",
+      "signature": "swapExactETHForTokensSupportingFeeOnTransferTokens(uint256,address[],address,uint256)",
+      "maxGas": "350000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 192,
+        "p50": 130446,
+        "p95": 276955,
+        "p99": 276955,
+        "max": 276955,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2",
+      "contract": "Uniswap V2 Router02",
+      "selector": "0xf305d719",
+      "signature": "addLiquidityETH(address,uint256,uint256,uint256,address,uint256)",
+      "maxGas": "3420000",
+      "codeVersion": {
+        "codeHash": "0xa324bc7db3d091b6f1a2d526e48a9c7039e03b3cc35f7d44b15ac7a1544c11d2",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 37,
+        "p50": 2721089,
+        "p95": 2724357,
+        "p99": 2735959,
+        "max": 2735959,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 Positions NFT",
+      "selector": "0x219f5d17",
+      "signature": "increaseLiquidity((uint256,uint256,uint256,uint256,uint256,uint256))",
+      "maxGas": "425000",
+      "codeVersion": {
+        "codeHash": "0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 52,
+        "p50": 195723,
+        "p95": 331083,
+        "p99": 339643,
+        "max": 339643,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 Positions NFT",
+      "selector": "0x88316456",
+      "signature": "mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))",
+      "maxGas": "675000",
+      "codeVersion": {
+        "codeHash": "0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 103,
+        "p50": 416112,
+        "p95": 514526,
+        "p99": 536596,
+        "max": 550333,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 Positions NFT",
+      "selector": "0xb88d4fde",
+      "signature": "safeTransferFrom(address,address,uint256,bytes)",
+      "maxGas": "2675000",
+      "codeVersion": {
+        "codeHash": "0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 25,
+        "p50": 693197,
+        "p95": 1926113,
+        "p99": 2138791,
+        "max": 2138791,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 Positions NFT",
+      "selector": "0xfc6f7865",
+      "signature": "collect((uint256,address,uint128,uint128))",
+      "maxGas": "290000",
+      "codeVersion": {
+        "codeHash": "0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 69,
+        "p50": 150792,
+        "p95": 203204,
+        "p99": 231502,
+        "max": 231502,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 SwapRouter",
+      "selector": "0x414bf389",
+      "signature": "exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))",
+      "maxGas": "210000",
+      "codeVersion": {
+        "codeHash": "0xbb90113d2f9a5e9b7feb15a1d1fff06c1ee1575b3f9b1181778ffd0cf633e7ea",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 125827,
+        "p95": 154591,
+        "p99": 167331,
+        "max": 207545,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 SwapRouter",
+      "selector": "0xc04b8d59",
+      "signature": "exactInput((bytes,address,uint256,uint256,uint256))",
+      "maxGas": "390000",
+      "codeVersion": {
+        "codeHash": "0xbb90113d2f9a5e9b7feb15a1d1fff06c1ee1575b3f9b1181778ffd0cf633e7ea",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 22,
+        "p50": 117700,
+        "p95": 213080,
+        "p99": 311493,
+        "max": 311493,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v3",
+      "contract": "Uniswap V3 SwapRouter",
+      "selector": "0xdb3e2198",
+      "signature": "exactOutputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))",
+      "maxGas": "200000",
+      "codeVersion": {
+        "codeHash": "0xbb90113d2f9a5e9b7feb15a1d1fff06c1ee1575b3f9b1181778ffd0cf633e7ea",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 127775,
+        "p95": 140425,
+        "p99": 157039,
+        "max": 163532,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2-v3",
+      "contract": "Uniswap V3 SwapRouter02",
+      "selector": "0x04e45aaf",
+      "signature": "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))",
+      "maxGas": "190000",
+      "codeVersion": {
+        "codeHash": "0x6ec798e80f3a19de650826338677604e54d6664f44a33b53a20b22b1939f402e",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 139685,
+        "p95": 144339,
+        "p99": 149668,
+        "max": 165522,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2-v3",
+      "contract": "Uniswap V3 SwapRouter02",
+      "selector": "0x5ae401dc",
+      "signature": "multicall(uint256,bytes[])",
+      "maxGas": "405000",
+      "codeVersion": {
+        "codeHash": "0x6ec798e80f3a19de650826338677604e54d6664f44a33b53a20b22b1939f402e",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 138907,
+        "p95": 228210,
+        "p99": 321854,
+        "max": 470571,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2-v3",
+      "contract": "Uniswap V3 SwapRouter02",
+      "selector": "0xac9650d8",
+      "signature": "multicall(bytes[])",
+      "maxGas": "290000",
+      "codeVersion": {
+        "codeHash": "0x6ec798e80f3a19de650826338677604e54d6664f44a33b53a20b22b1939f402e",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 132818,
+        "p95": 184685,
+        "p99": 230277,
+        "max": 230346,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "protocolId": "uniswap",
+      "versionTag": "uniswap-v2-v3",
+      "contract": "Uniswap V3 SwapRouter02",
+      "selector": "0xb858183f",
+      "signature": "exactInput((bytes,address,uint256,uint256))",
+      "maxGas": "375000",
+      "codeVersion": {
+        "codeHash": "0x6ec798e80f3a19de650826338677604e54d6664f44a33b53a20b22b1939f402e",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 43,
+        "p50": 203168,
+        "p95": 267721,
+        "p99": 297919,
+        "max": 297919,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 55570,
+        "p95": 55906,
+        "p99": 55906,
+        "max": 55906,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0x23b872dd",
+      "signature": "transferFrom(address,address,uint256)",
+      "maxGas": "90000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 53931,
+        "p95": 71043,
+        "p99": 71055,
+        "max": 71055,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0x39509351",
+      "signature": "increaseAllowance(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 27,
+        "p50": 55838,
+        "p95": 55862,
+        "p99": 55874,
+        "max": 55874,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0x40c10f19",
+      "signature": "mint(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 48,
+        "p50": 55636,
+        "p95": 55660,
+        "p99": 55660,
+        "max": 55660,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0x42966c68",
+      "signature": "burn(uint256)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 77,
+        "p50": 47319,
+        "p95": 47331,
+        "p99": 47331,
+        "max": 47331,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "80000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 304,
+        "p50": 45160,
+        "p95": 62260,
+        "p99": 62272,
+        "max": 62272,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0xcf092995",
+      "signature": "transferWithAuthorization(address,address,uint256,uint256,uint256,bytes32,bytes)",
+      "maxGas": "130000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 97,
+        "p50": 81465,
+        "p95": 103413,
+        "p99": 103425,
+        "max": 103425,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0xd505accf",
+      "signature": "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
+      "maxGas": "120000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 215,
+        "p50": 76436,
+        "p95": 93596,
+        "p99": 94187,
+        "max": 94207,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "versionTag": "usdc-erc20",
+      "contract": "USDC",
+      "selector": "0xe3ee160e",
+      "signature": "transferWithAuthorization(address,address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)",
+      "maxGas": "130000",
+      "codeVersion": {
+        "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+        "implementation": {
+          "kind": "slot",
+          "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+          "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+        }
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 81041,
+        "p95": 98153,
+        "p99": 102953,
+        "max": 108810,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "protocolId": "usdt",
+      "versionTag": "usdt-erc20",
+      "contract": "USDT",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "65000",
+      "codeVersion": {
+        "codeHash": "0xb44fb4e949d0f78f87f79ee46428f23a2a5713ce6fc6e0beb3dda78c2ac1ea55",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 48561,
+        "p95": 48897,
+        "p99": 48897,
+        "max": 48897,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "protocolId": "usdt",
+      "versionTag": "usdt-erc20",
+      "contract": "USDT",
+      "selector": "0x23b872dd",
+      "signature": "transferFrom(address,address,uint256)",
+      "maxGas": "90000",
+      "codeVersion": {
+        "codeHash": "0xb44fb4e949d0f78f87f79ee46428f23a2a5713ce6fc6e0beb3dda78c2ac1ea55",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 48518,
+        "p95": 66118,
+        "p99": 68788,
+        "max": 68800,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "protocolId": "usdt",
+      "versionTag": "usdt-erc20",
+      "contract": "USDT",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "80000",
+      "codeVersion": {
+        "codeHash": "0xb44fb4e949d0f78f87f79ee46428f23a2a5713ce6fc6e0beb3dda78c2ac1ea55",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 305,
+        "p50": 46109,
+        "p95": 63209,
+        "p99": 63221,
+        "max": 63221,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+      "protocolId": "wbtc",
+      "versionTag": "wbtc-erc20",
+      "contract": "WBTC",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "65000",
+      "codeVersion": {
+        "codeHash": "0x131ff5c755b710d543ea70fede2eb38e5d15b1456df0ae932ba12e2786f7e5df",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 257,
+        "p50": 48320,
+        "p95": 48668,
+        "p99": 48668,
+        "max": 48668,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+      "protocolId": "wbtc",
+      "versionTag": "wbtc-erc20",
+      "contract": "WBTC",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "70000",
+      "codeVersion": {
+        "codeHash": "0x131ff5c755b710d543ea70fede2eb38e5d15b1456df0ae932ba12e2786f7e5df",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 37311,
+        "p95": 54411,
+        "p99": 54411,
+        "max": 54411,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "protocolId": "weth",
+      "versionTag": "weth9",
+      "contract": "WETH",
+      "selector": "0x095ea7b3",
+      "signature": "approve(address,uint256)",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 46052,
+        "p95": 46364,
+        "p99": 46364,
+        "max": 46364,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "protocolId": "weth",
+      "versionTag": "weth9",
+      "contract": "WETH",
+      "selector": "0x2e1a7d4d",
+      "signature": "withdraw(uint256)",
+      "maxGas": "50000",
+      "codeVersion": {
+        "codeHash": "0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 301,
+        "p50": 30428,
+        "p95": 35228,
+        "p99": 37878,
+        "max": 37883,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "protocolId": "weth",
+      "versionTag": "weth9",
+      "contract": "WETH",
+      "selector": "0xa9059cbb",
+      "signature": "transfer(address,uint256)",
+      "maxGas": "65000",
+      "codeVersion": {
+        "codeHash": "0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 299,
+        "p50": 34506,
+        "p95": 51594,
+        "p99": 51606,
+        "max": 51618,
+        "fromBlock": 26304821
+      }
+    },
+    {
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "protocolId": "weth",
+      "versionTag": "weth9",
+      "contract": "WETH",
+      "selector": "0xd0e30db0",
+      "signature": "deposit()",
+      "maxGas": "60000",
+      "codeVersion": {
+        "codeHash": "0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23",
+        "implementation": null
+      },
+      "observed": {
+        "samples": 300,
+        "p50": 27938,
+        "p95": 45038,
+        "p99": 45138,
+        "max": 45374,
+        "fromBlock": 26304821
+      }
+    }
+  ]
+}

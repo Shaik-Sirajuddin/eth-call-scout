@@ -1,0 +1,831 @@
+{
+  "version": 1,
+  "id": "general",
+  "name": "General user",
+  "description": "Low limits for everyday use: wrap ETH, swap major tokens back to your own wallet, and lend on Aave. Borrowing, flash loans, transfers to other people, and everything else stay denied.",
+  "chainId": 1,
+  "measuredAt": "2026-11-06T19:13:51.900Z",
+  "forkBlock": 26357877,
+  "profiles": {
+    "general": [
+      "wrap",
+      "swap",
+      "lending"
+    ],
+    "swapper": [
+      "wrap",
+      "swap"
+    ],
+    "lender": [
+      "wrap",
+      "lending"
+    ]
+  },
+  "native": {
+    "maxValueWei": "500000000000000000",
+    "maxPerBlockWei": "500000000000000000"
+  },
+  "invariants": {
+    "maxSlippageBps": "100",
+    "maxGas": "700000",
+    "maxGasPriceWei": "100000000000",
+    "maxFeePerGasWei": "100000000000",
+    "maxPriorityFeePerGasWei": "5000000000"
+  },
+  "simulation": {
+    "maxCallDepth": 16,
+    "maxInternalCalls": 128,
+    "maxStateAccounts": 64,
+    "maxStorageWrites": 128,
+    "allowedCallTypes": [
+      "CALL",
+      "DELEGATECALL",
+      "STATICCALL"
+    ]
+  },
+  "assetLimits": [
+    {
+      "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "symbol": "USDC",
+      "group": "tokens",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "1000000000",
+      "allowedRecipients": [
+        "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+        "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+        "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+        "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+        "0x7858E59e0C01EA06Df3aF3D20aC7B0003275D4Bf",
+        "0xEe4Cf3b78A74aFfa38C6a926282bCd8B5952818d",
+        "0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168",
+        "0x6c6Bc977E13Df9b0de53b251522280BB72383700",
+        "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c"
+      ],
+      "allowedSpenders": [
+        "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+      ]
+    },
+    {
+      "token": "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c",
+      "symbol": "aUSDC",
+      "group": "lending",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0x72E95b8931767C79bA4EeE721354d6E99a61D004",
+      "symbol": "variableDebtUSDC",
+      "group": "lending",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "symbol": "USDT",
+      "group": "tokens",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "1000000000",
+      "allowedRecipients": [
+        "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+        "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+        "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+        "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+        "0x7858E59e0C01EA06Df3aF3D20aC7B0003275D4Bf",
+        "0xEe4Cf3b78A74aFfa38C6a926282bCd8B5952818d",
+        "0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a"
+      ],
+      "allowedSpenders": [
+        "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+      ]
+    },
+    {
+      "token": "0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a",
+      "symbol": "aUSDT",
+      "group": "lending",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0x6df1C1E379bC5a00a7b4C6e67A203333772f45A8",
+      "symbol": "variableDebtUSDT",
+      "group": "lending",
+      "decimals": 6,
+      "maxOutflow": "1000000000",
+      "maxOutflowPerBlock": "1000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "symbol": "DAI",
+      "group": "tokens",
+      "decimals": 18,
+      "maxOutflow": "1000000000000000000000",
+      "maxOutflowPerBlock": "1000000000000000000000",
+      "maxApproval": "1000000000000000000000",
+      "allowedRecipients": [
+        "0x60594a405d53811d3BC4766596EFD80fd545A270",
+        "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+        "0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168",
+        "0x6c6Bc977E13Df9b0de53b251522280BB72383700",
+        "0x018008bfb33d285247A21d44E50697654f754e63"
+      ],
+      "allowedSpenders": [
+        "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+      ]
+    },
+    {
+      "token": "0x018008bfb33d285247A21d44E50697654f754e63",
+      "symbol": "aDAI",
+      "group": "lending",
+      "decimals": 18,
+      "maxOutflow": "1000000000000000000000",
+      "maxOutflowPerBlock": "1000000000000000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0xcF8d0c70c850859266f5C338b38F9D663181C314",
+      "symbol": "variableDebtDAI",
+      "group": "lending",
+      "decimals": 18,
+      "maxOutflow": "1000000000000000000000",
+      "maxOutflowPerBlock": "1000000000000000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "symbol": "WETH",
+      "group": "tokens",
+      "decimals": 18,
+      "maxOutflow": "500000000000000000",
+      "maxOutflowPerBlock": "500000000000000000",
+      "maxApproval": "500000000000000000",
+      "allowedRecipients": [
+        "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+        "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+        "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+        "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+        "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+        "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+        "0x60594a405d53811d3BC4766596EFD80fd545A270",
+        "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+        "0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8"
+      ],
+      "allowedSpenders": [
+        "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+      ]
+    },
+    {
+      "token": "0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8",
+      "symbol": "aWETH",
+      "group": "lending",
+      "decimals": 18,
+      "maxOutflow": "500000000000000000",
+      "maxOutflowPerBlock": "500000000000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    },
+    {
+      "token": "0xeA51d7853EEFb32b6ee06b1C12E6dcCA88Be0fFE",
+      "symbol": "variableDebtWETH",
+      "group": "lending",
+      "decimals": 18,
+      "maxOutflow": "500000000000000000",
+      "maxOutflowPerBlock": "500000000000000000",
+      "maxApproval": "0",
+      "allowedRecipients": [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "allowedSpenders": []
+    }
+  ],
+  "contracts": [
+    {
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "name": "USDC",
+      "protocolId": "usdc",
+      "group": "tokens",
+      "codeHash": "0xd80d4b7c890cb9d6a4893e6b52bc34b56b25335cb13716e0d1d31383e6b41505",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "signature": "approve(address,uint256)",
+          "selector": "0x095ea7b3",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "$tokenLimit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "name": "USDT",
+      "protocolId": "usdt",
+      "group": "tokens",
+      "codeHash": "0xb44fb4e949d0f78f87f79ee46428f23a2a5713ce6fc6e0beb3dda78c2ac1ea55",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "signature": "approve(address,uint256)",
+          "selector": "0x095ea7b3",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "$tokenLimit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "name": "DAI",
+      "protocolId": "dai",
+      "group": "tokens",
+      "codeHash": "0x4e36f96ee1667a663dfaac57c4d185a0e369a3a217e0079d49620f34f85d1ac7",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "signature": "approve(address,uint256)",
+          "selector": "0x095ea7b3",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "$tokenLimit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "name": "WETH",
+      "protocolId": "weth",
+      "group": "tokens",
+      "codeHash": "0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23",
+      "maxNativeValueWei": "$nativeLimit",
+      "methods": [
+        {
+          "signature": "approve(address,uint256)",
+          "selector": "0x095ea7b3",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "$tokenLimit"
+            }
+          ]
+        },
+        {
+          "signature": "deposit()",
+          "selector": "0xd0e30db0",
+          "group": "wrap",
+          "constraints": []
+        },
+        {
+          "signature": "withdraw(uint256)",
+          "selector": "0x2e1a7d4d",
+          "group": "wrap",
+          "constraints": [
+            {
+              "type": "uint-max",
+              "argument": 0,
+              "value": "$nativeLimit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "name": "Uniswap V3 SwapRouter02",
+      "protocolId": "uniswap-v3",
+      "group": "swap",
+      "codeHash": "0x6ec798e80f3a19de650826338677604e54d6664f44a33b53a20b22b1939f402e",
+      "maxNativeValueWei": "$nativeLimit",
+      "methods": [
+        {
+          "signature": "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))",
+          "selector": "0x04e45aaf",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 1,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 3,
+              "addresses": [
+                "$wallet"
+              ]
+            },
+            {
+              "type": "uint-equals",
+              "argument": 6,
+              "value": "0"
+            }
+          ],
+          "swapQuote": {
+            "kind": "uniswap-v3-exact-input-single",
+            "quoter": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+            "wrappedNative": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "arguments": {
+              "tokenIn": 0,
+              "tokenOut": 1,
+              "fee": 2,
+              "amountIn": 4,
+              "minimumOut": 5
+            },
+            "pools": [
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "name": "Aave V3 Ethereum Pool",
+      "protocolId": "aave-v3",
+      "group": "lending",
+      "codeHash": "0x96107dc4006b4c7fecd1827cfb275ffeef31e6194cd50466f85f8eb24ccf2679",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "signature": "supply(address,uint256,address,uint16)",
+          "selector": "0x617ba037",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 2,
+              "addresses": [
+                "$wallet"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "withdraw(address,uint256,address)",
+          "selector": "0x69328dec",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 2,
+              "addresses": [
+                "$wallet"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "repay(address,uint256,uint256,address)",
+          "selector": "0x573ade81",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 3,
+              "addresses": [
+                "$wallet"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "internalTargets": {
+    "wrap": [
+      "0x47a7c19a541227911cd4bd7493e66dac64daf10a"
+    ],
+    "swap": [
+      "0x11b815efb8f581194ae79006d24e0d814b7697f6",
+      "0x3416cf6c708da44db2624d63ea0aaef7113527c6",
+      "0x43506849d7c04f9138d1a2050bbf3a0c054402dd",
+      "0x4e68ccd3e89f51c3074ca5072bbac773960dfa36",
+      "0x5777d92f208679db4b9778590fa3cab3ac9e2168",
+      "0x60594a405d53811d3bc4766596efd80fd545a270",
+      "0x6c6bc977e13df9b0de53b251522280bb72383700",
+      "0x7858e59e0c01ea06df3af3d20ac7b0003275d4bf",
+      "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+      "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8",
+      "0xc2e9f25be6257c210d7adf0d4cd6e3e881ba25f8",
+      "0xc7bbec68d12a0d1830360f8ec58fa599ba1b0e9b",
+      "0xe0554a476a092703abdb3ef35c80e0d76d32939f",
+      "0xee4cf3b78a74affa38c6a926282bcd8b5952818d"
+    ],
+    "lending": [
+      "0x2f39d218133afab8f2b819b1066c7e434ad94e9e",
+      "0x43506849d7c04f9138d1a2050bbf3a0c054402dd",
+      "0x52da0ce88202d1542543598d1e1e27f0d344726a",
+      "0x584c7d8c4cb05304fe5ac7fbc97f20a10fb07564",
+      "0x728a138a4823392c2efa55e028d434f526fe03cf",
+      "0x8164cc65827dcfe994ab23944cbc90e0aa80bfcb",
+      "0x9ec6f08190dea04a54f8afc53db96134e5e3fdfb",
+      "0xadc45df3cf1584624c97338bef33363bf5b97ada",
+      "0xb27c52c7f84819e3157993489741cb60786ae330",
+      "0xe7b67f44ea304dd7f6d215b13686637ff64cd2b2"
+    ]
+  },
+  "observedGas": [
+    {
+      "label": "wrap ETH",
+      "gasUsed": "45038"
+    },
+    {
+      "label": "unwrap WETH",
+      "gasUsed": "35204"
+    },
+    {
+      "label": "approve USDC for swaps",
+      "gasUsed": "55570"
+    },
+    {
+      "label": "approve USDC for lending",
+      "gasUsed": "55570"
+    },
+    {
+      "label": "approve USDT for swaps",
+      "gasUsed": "48561"
+    },
+    {
+      "label": "approve USDT for lending",
+      "gasUsed": "48561"
+    },
+    {
+      "label": "approve DAI for swaps",
+      "gasUsed": "46170"
+    },
+    {
+      "label": "approve DAI for lending",
+      "gasUsed": "46170"
+    },
+    {
+      "label": "approve WETH for swaps",
+      "gasUsed": "46076"
+    },
+    {
+      "label": "approve WETH for lending",
+      "gasUsed": "46076"
+    },
+    {
+      "label": "ETH to USDC (fee 100)",
+      "gasUsed": "119799"
+    },
+    {
+      "label": "WETH to USDC (fee 100)",
+      "gasUsed": "119825"
+    },
+    {
+      "label": "USDC to WETH (fee 100)",
+      "gasUsed": "124093"
+    },
+    {
+      "label": "ETH to USDC (fee 500)",
+      "gasUsed": "119721"
+    },
+    {
+      "label": "WETH to USDC (fee 500)",
+      "gasUsed": "119747"
+    },
+    {
+      "label": "USDC to WETH (fee 500)",
+      "gasUsed": "124062"
+    },
+    {
+      "label": "ETH to USDC (fee 3000)",
+      "gasUsed": "119781"
+    },
+    {
+      "label": "WETH to USDC (fee 3000)",
+      "gasUsed": "119807"
+    },
+    {
+      "label": "USDC to WETH (fee 3000)",
+      "gasUsed": "124363"
+    },
+    {
+      "label": "ETH to USDT (fee 100)",
+      "gasUsed": "120695"
+    },
+    {
+      "label": "WETH to USDT (fee 100)",
+      "gasUsed": "120721"
+    },
+    {
+      "label": "USDT to WETH (fee 100)",
+      "gasUsed": "121012"
+    },
+    {
+      "label": "ETH to USDT (fee 500)",
+      "gasUsed": "120753"
+    },
+    {
+      "label": "WETH to USDT (fee 500)",
+      "gasUsed": "120779"
+    },
+    {
+      "label": "USDT to WETH (fee 500)",
+      "gasUsed": "121077"
+    },
+    {
+      "label": "ETH to USDT (fee 3000)",
+      "gasUsed": "120749"
+    },
+    {
+      "label": "WETH to USDT (fee 3000)",
+      "gasUsed": "120775"
+    },
+    {
+      "label": "USDT to WETH (fee 3000)",
+      "gasUsed": "121083"
+    },
+    {
+      "label": "ETH to DAI (fee 500)",
+      "gasUsed": "117923"
+    },
+    {
+      "label": "WETH to DAI (fee 500)",
+      "gasUsed": "109312"
+    },
+    {
+      "label": "DAI to WETH (fee 500)",
+      "gasUsed": "110331"
+    },
+    {
+      "label": "ETH to DAI (fee 3000)",
+      "gasUsed": "109280"
+    },
+    {
+      "label": "WETH to DAI (fee 3000)",
+      "gasUsed": "108360"
+    },
+    {
+      "label": "DAI to WETH (fee 3000)",
+      "gasUsed": "109439"
+    },
+    {
+      "label": "USDC to USDT (fee 100)",
+      "gasUsed": "135084"
+    },
+    {
+      "label": "USDT to USDC (fee 100)",
+      "gasUsed": "131632"
+    },
+    {
+      "label": "USDC to USDT (fee 500)",
+      "gasUsed": "134956"
+    },
+    {
+      "label": "USDT to USDC (fee 500)",
+      "gasUsed": "131634"
+    },
+    {
+      "label": "USDC to USDT (fee 3000)",
+      "gasUsed": "135178"
+    },
+    {
+      "label": "USDT to USDC (fee 3000)",
+      "gasUsed": "131597"
+    },
+    {
+      "label": "USDC to DAI (fee 100)",
+      "gasUsed": "123786"
+    },
+    {
+      "label": "DAI to USDC (fee 100)",
+      "gasUsed": "120726"
+    },
+    {
+      "label": "USDC to DAI (fee 500)",
+      "gasUsed": "122841"
+    },
+    {
+      "label": "DAI to USDC (fee 500)",
+      "gasUsed": "119801"
+    },
+    {
+      "label": "supply USDC",
+      "gasUsed": "182837"
+    },
+    {
+      "label": "withdraw part of USDC",
+      "gasUsed": "166026"
+    },
+    {
+      "label": "supply USDT",
+      "gasUsed": "181466"
+    },
+    {
+      "label": "withdraw part of USDT",
+      "gasUsed": "167329"
+    },
+    {
+      "label": "supply DAI",
+      "gasUsed": "170611"
+    },
+    {
+      "label": "withdraw part of DAI",
+      "gasUsed": "155584"
+    },
+    {
+      "label": "supply WETH",
+      "gasUsed": "193924"
+    },
+    {
+      "label": "withdraw part of WETH",
+      "gasUsed": "155544"
+    },
+    {
+      "label": "repay USDC",
+      "gasUsed": "167277"
+    }
+  ]
+}

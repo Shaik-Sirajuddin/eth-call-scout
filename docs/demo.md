@@ -18,14 +18,15 @@ npm run demo
 
 The demo uses two independent monitor RPC endpoints and two independent trace-simulation endpoints, deterministic bytecode/storage/view-call monitoring, two ephemeral Ed25519 signers, a mandatory signature threshold, executable wallet policy, a guarded mock wallet, rollback tracking, and a hash-chained audit log.
 
-It runs six scenarios:
+It runs seven scenarios:
 
 1. healthy protocol plus bounded approval — allowed and forwarded;
 2. whitelisted contract with changed runtime bytecode — denied by live state;
 3. healthy protocol with an unapproved spender — denied by calldata policy;
 4. simulation reveals an unauthorized internal call — denied by trace policy and consensus;
-5. stale signed state — denied by freshness and expiry; and
-6. opaque `personal_sign` — denied at the RPC boundary.
+5. a valid call that wastes gas — denied by its function gas limit;
+6. stale signed state — denied by freshness and expiry; and
+7. opaque `personal_sign` — denied at the RPC boundary.
 
 The final summary must report `forwardedTransactions: 1`. Every denied scenario must report `walletForwarded: false`, and the audit chain must be valid with six records.
 
@@ -98,3 +99,28 @@ npx keybound scan examples/variations.ts \
 ```
 
 Open `reports/eth-calls.html`. Explain that this report is supporting evidence, while the executable policy and provider guard are the authorization boundary.
+
+## Recording the two-transaction demo
+
+This shows real Ethereum contracts: an honest swap that is allowed, then the same swap with the Binance bridge exploiter as the recipient, which is denied.
+
+```sh
+# 1. Rehearse on two real mainnet nodes. Nothing is signed or sent, and no key is needed.
+npm run demo:swap
+
+# 2. Record with a mined transaction on local mainnet forks. No real money. Needs a recent Foundry (run foundryup).
+npm run demo:swap -- --fork --block-limit
+
+# 3. Optional: send a real swap. Uses real ETH, so use a throwaway wallet with a small balance.
+KEYBOUND_DEMO_PRIVATE_KEY=0x... npm run demo:swap -- --mainnet --confirm --amount-eth 0.001
+```
+
+The exploiter is `0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc`, from the October 2022 BNB bridge attack. Transaction 2 is denied in every mode, so it never costs gas. Add `--low-minimum` to also show a one-unit minimum output being denied against a fresh quote.
+
+The same two cases are in the control room at `/runs` as **Safe path** and **Exploiter recipient**, on local demo tokens. **Block spend limit** shows a second swap in the same block being denied. Each run shows its on-chain check and alerts.
+
+Alerts from the control room are in `demo/runtime/alerts.jsonl`:
+
+```sh
+npx keybound alerts show demo/runtime/alerts.jsonl
+```

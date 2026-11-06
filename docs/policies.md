@@ -44,7 +44,7 @@ EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`
 ## Global invariants
 
 - `maxNativeValueWei` is required and caps transaction value.
-- `maxGas` is required, requires an explicit transaction gas limit, and caps it.
+- `maxGas` is required, requires an explicit transaction gas limit, and caps it. It is the overall ceiling. Each function also has its own, smaller limit: see [Function gas limits](#function-gas-limits).
 - `maxGasPriceWei` is required whenever a legacy `gasPrice` transaction is proposed and caps that exact field.
 - `maxFeePerGasWei` and `maxPriorityFeePerGasWei` require and cap EIP-1559 fee fields.
 - `requireCalldata` denies empty calldata.
@@ -54,7 +54,44 @@ EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`
 
 A contract entry is identified by exact `chainId` and `address`. `protocolId` connects the target to authenticated live state. `maxNativeValueWei` can be stricter than the global limit. `allowEmptyCalldata` must be explicit.
 
-Each method entry names an exact four-byte selector. The optional `name` is display-only.
+Each method entry names an exact four-byte selector. The optional `name` is display-only. `maxGas` on a method or contract sets a [function gas limit](#function-gas-limits).
+
+## Function gas limits
+
+A call can be valid, keep funds safe, and still waste the wallet's gas. For example, a Uniswap swap path can be padded with extra hops that return to the same token. It passes every asset check and simulates cleanly. On a mainnet fork, a normal V3 swap used about 141,000 gas, and the same swap padded to 24 hops used about 1.2 million.
+
+So every allowed call has its own gas ceiling. It is checked against the transaction's `gas` field, the simulated estimate, and the traced gas. The ceiling is the first of these that applies:
+
+1. `maxGas` on the method in the policy.
+2. The measured rule in `data/gas-limits.json`, if its code version is still current.
+3. `maxGas` on the contract in the policy.
+4. `invariants.maxGas`, when a measured rule exists but cannot be used.
+
+Activation requires every allowed function to have a limit from one of the first three. Native transfers need a contract `maxGas`.
+
+Each measured rule has a `versionTag`, such as `aave-v3`, and a `codeVersion` that pins the contract's code hash and any proxy implementation it was measured on. Simulation compares these with the live contract. If the protocol has upgraded, or the rule set is past its `validUntil`, the old number is no longer trusted. The rule stops denying, so outdated data does not block honest calls. The overall cap still applies, and the receipt's `simulation.metrics.gasLimitSource` and `gasRule` say what happened. Refresh the rules with `npm run gas:sync`. Samples from before a proxy's latest upgrade are dropped, because they describe other code. This reads old contract state, so `ETHEREUM_HISTORY_RPC_URL` must point to a node that keeps it. A contract whose history cannot be read is left out, so a policy must set its limit.
+
+Rules measured on 2026-11-06:
+
+| Version tag | Function | Typical gas (p50) | p99 | Limit |
+| --- | --- | ---: | ---: | ---: |
+| `usdc-erc20` | USDC `approve` | 55,570 | 55,906 | 70,000 |
+| `usdc-erc20` | USDC `transfer` | 45,160 | 62,272 | 80,000 |
+| `weth9` | WETH `deposit` | 27,938 | 45,138 | 60,000 |
+| `uniswap-v2` | Uniswap V2 Router02 `swapExactTokensForTokens` | 117,908 | 190,191 | 240,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInputSingle` | 125,827 | 167,331 | 210,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInput` | 117,700 | 311,493 | 390,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInputSingle` | 139,685 | 149,668 | 190,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInput` | 203,168 | 297,919 | 375,000 |
+| `uniswap-universal-v4` | Uniswap Universal Router V4 `execute` | 117,833 | 223,797 | 280,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `supply` | 155,811 | 191,922 | 240,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `withdraw` | 183,700 | 435,207 | 545,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `borrow` | 314,495 | 502,790 | 630,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `repay` | 156,798 | 167,696 | 210,000 |
+
+The limit is the 99th percentile of gas used on mainnet plus 25%, rounded up. A function has no rule if it had too few samples, such as Aave flash loans and most Sushi, Curve, Balancer and Compound calls, or if its cost varies too much to give one number, such as positions `multicall`. A policy must set `maxGas` for those, and activation stops until it does. A policy can set a method's `maxGas` above the rule, and audit reports this as `function-gas-above-rule`.
+
+Gas and fee fields must be `0x` hex strings, and the limit must be sent as `gas`. Wallets read other forms differently, so a checked value could mean far more gas once forwarded.
 
 ## Static ABI-word constraints
 
@@ -134,3 +171,59 @@ Executable policies must pin at least two Ed25519 public keys, configure a signa
 ## Policy operations
 
 Treat policy activation as a privileged operation. Keep authoring separate from activation, review policy hashes, use version control or signed releases, and do not let the agent write its own active policy. A policy change should generate an operational audit event independent of transaction receipts.
+
+## Default rule sets
+
+Most users should not have to write selectors. `keybound policy init` builds a complete policy from rules measured on real mainnet contracts, with low limits:
+
+```sh
+npx keybound policy init --wallet 0xYourWallet \
+  --state-key ops:BASE64_KEY --state-key security:BASE64_KEY \
+  --profile general --max-per-block USDC=100 --max-per-block ETH=0.05 --out policy.json
+```
+
+| Profile | Allows | Stays denied |
+|---|---|---|
+| `general` | Wrap ETH, single swaps paid back to the wallet, Aave supply, withdraw and repay | Borrowing, flash loans, transfers to other people, everything else |
+| `swapper` | Wrap ETH, single swaps paid back to the wallet | Lending, transfers to other people |
+| `lender` | Wrap ETH, Aave supply, withdraw and repay | Swaps, borrowing, flash loans |
+| `payments` | Transfers to the addresses given with `--payee` | Everything else |
+
+The rules are in `data/rule-sets/general.json`. `npm run rules:general` rebuilds them by running each call on a local mainnet fork and recording what it really touches. The policy builder opens with the `general` rules loaded, so users can edit them instead of starting from nothing.
+
+The limits are examples of a low starting point, not advice on what is safe for you.
+
+## Swap slippage
+
+A fixed minimum output can never be right, because prices move. So swaps in the default rule sets are checked against a fresh quote when the bot proposes them:
+
+1. The simulation sources ask the on-chain quoter for the same swap on each measured pool for that pair.
+2. The swap minimum must be within `invariants.maxSlippageBps` of the best quote. The default is 100 (1%). Set your own with `--max-slippage-bps`.
+3. The simulation must show the wallet really receiving at least that amount.
+
+A one-unit minimum is denied, and so is routing through a measured pool with a much worse price. Swap value must be 0, or exactly the amount in when spending wrapped ETH, because extra ETH stays in the router where anyone can take it. A non-zero price limit is refused for the same reason.
+
+Set this on a method with `swapQuote`. Audit reports common swap functions without it as `swap-without-fresh-quote`, and a limit over 500 basis points as `high-slippage-limit`.
+
+This protects against a bad minimum and a bad pool. It cannot detect a price that was manipulated across all the measured pools just before the quote, and it does not cover multi-hop swaps yet.
+
+## Per-block spend limits
+
+Set the most a wallet may send in one block, across all of its transactions:
+
+- `simulation.assetLimits[].maxOutflowPerBlock` for a token, in base units.
+- `invariants.maxNativeOutflowPerBlockWei` for ETH, in wei.
+
+A transaction that would go over is denied with `spend:block-limit` and writes a `block-limit-reached` alert. The wallet is not called.
+
+Spend is counted against the block the simulation ran on, because the guard cannot know which block a transaction will land in. Two transactions simulated on different blocks could still land together, so the on-chain check recounts by the real block and raises `onchain-limit-exceeded` if a limit was passed.
+
+Totals are held in memory, so they restart with the guard. That is enough for a window of one block. Limits over longer periods are not built yet.
+
+## Blocked addresses
+
+The [attacker list](attacker-list.md) always applies. Add your own with `blockedAddresses`:
+
+```json
+{ "blockedAddresses": ["0x0000000000000000000000000000000000000bad"] }
+```

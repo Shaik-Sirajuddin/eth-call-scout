@@ -108,6 +108,13 @@ Supporting evidence: source scanner -> registry -> ABI decoder -> review report
 
 The complete trust model is in [Architecture](docs/architecture.md) and [Security model](docs/security-model.md).
 
+## Protection on by default
+
+- **Attacker list:** `data/attacker-addresses.json` holds known attacker and exploiter addresses, always on. A transaction that would pay, approve or name one is denied. A [free API](docs/attacker-list.md) serves the latest list, and `npx keybound attackers update` downloads it.
+- **Per-block spend limits:** set the most a wallet may send in one block. Going over denies the transaction and writes an alert. See [Per-block spend limits](docs/policies.md#per-block-spend-limits).
+- **On-chain checks:** after a transaction lands, the guard confirms it matches what was approved. Failures go to an alert log you can read with `npx keybound alerts show`. See [Alerts and on-chain checks](docs/integration.md#alerts-and-on-chain-checks).
+- **Default rule sets:** `npx keybound policy init` builds a policy for a general user, swapper, lender or payments wallet, with low limits you can change. See [Default rule sets](docs/policies.md#default-rule-sets).
+
 ## Executable policies
 
 Policies use exact values rather than natural-language intent. The version 1 schema is at [schema/wallet-policy.schema.json](schema/wallet-policy.schema.json).
@@ -219,6 +226,8 @@ Every transaction eligible for forwarding must pass the same exact-transaction s
 
 EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. For both existing and newly installed delegates, every wallet-originated `CALL` and `STATICCALL` in the trace must pass exact contract, selector, calldata, value, and signed live-state rules; wallet-originated `DELEGATECALL` and `CALLCODE` deny. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
 
+Every allowed function also has its own gas limit, measured from real mainnet use of Uniswap, Aave and other listed protocols, so a valid call padded to waste gas is denied even when simulation finds nothing else wrong. Each rule carries a version tag and is pinned to the contract code it was measured on. After a protocol upgrade it stops denying, so outdated numbers do not block honest calls. See [Function gas limits](docs/policies.md#function-gas-limits).
+
 ## Live protocol veto
 
 Policies require a fresh protocol-state bundle signed by at least two pinned Ed25519 keys with a threshold of at least two. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
@@ -294,6 +303,7 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Authorization audit log](docs/audit-log.md)
 - [Wallet integration](docs/integration.md)
 - [Gateway API](docs/api.md)
+- [Attacker list and free API](docs/attacker-list.md)
 - [Monitoring and scanner](docs/monitoring.md)
 - [Live dual-Anvil runbook](docs/anvil-demo.md)
 - [Demo and verification guide](docs/demo.md)

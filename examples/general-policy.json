@@ -1,0 +1,675 @@
+{
+  "version": 1,
+  "name": "General user: default rules",
+  "defaultAction": "deny",
+  "chains": [
+    1
+  ],
+  "wallets": [
+    "0x1111111111111111111111111111111111111111"
+  ],
+  "validUntil": "2030-01-01T00:00:00.000Z",
+  "blockedAddresses": [],
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "maxClockSkewSeconds": 15,
+    "minimumSequence": 1,
+    "threshold": 2,
+    "trustedKeys": [
+      {
+        "id": "demo-operations",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAggr+2Q9zdj11F+msBRF2HXBnaSj5jBwadKnGkCEp450="
+      },
+      {
+        "id": "demo-security",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAGYPQAi+KlxPvtvHMuS7FFpeqK5nXIjDeuVjalSMFbyY="
+      }
+    ]
+  },
+  "simulation": {
+    "required": true,
+    "blockTag": "latest",
+    "timeoutMs": 25000,
+    "quorum": 2,
+    "maxBlockSkew": 5,
+    "maxGasEstimate": "700000",
+    "maxCallDepth": 16,
+    "maxInternalCalls": 128,
+    "maxStateAccounts": 64,
+    "maxStorageWrites": 128,
+    "allowedCallTypes": [
+      "CALL",
+      "DELEGATECALL",
+      "STATICCALL"
+    ],
+    "denyCodeChanges": true,
+    "eip7702": {
+      "allowAuthorizationList": false,
+      "allowDelegatedWallet": false,
+      "maxAuthorizations": 1,
+      "delegates": []
+    },
+    "internalTargets": [
+      {
+        "chainId": 1,
+        "address": "0x47a7c19a541227911cd4bd7493e66dac64daf10a"
+      },
+      {
+        "chainId": 1,
+        "address": "0x11b815efb8f581194ae79006d24e0d814b7697f6"
+      },
+      {
+        "chainId": 1,
+        "address": "0x3416cf6c708da44db2624d63ea0aaef7113527c6"
+      },
+      {
+        "chainId": 1,
+        "address": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+      },
+      {
+        "chainId": 1,
+        "address": "0x4e68ccd3e89f51c3074ca5072bbac773960dfa36"
+      },
+      {
+        "chainId": 1,
+        "address": "0x5777d92f208679db4b9778590fa3cab3ac9e2168"
+      },
+      {
+        "chainId": 1,
+        "address": "0x60594a405d53811d3bc4766596efd80fd545a270"
+      },
+      {
+        "chainId": 1,
+        "address": "0x6c6bc977e13df9b0de53b251522280bb72383700"
+      },
+      {
+        "chainId": 1,
+        "address": "0x7858e59e0c01ea06df3af3d20ac7b0003275d4bf"
+      },
+      {
+        "chainId": 1,
+        "address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
+      },
+      {
+        "chainId": 1,
+        "address": "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
+      },
+      {
+        "chainId": 1,
+        "address": "0xc2e9f25be6257c210d7adf0d4cd6e3e881ba25f8"
+      },
+      {
+        "chainId": 1,
+        "address": "0xc7bbec68d12a0d1830360f8ec58fa599ba1b0e9b"
+      },
+      {
+        "chainId": 1,
+        "address": "0xe0554a476a092703abdb3ef35c80e0d76d32939f"
+      },
+      {
+        "chainId": 1,
+        "address": "0xee4cf3b78a74affa38c6a926282bcd8b5952818d"
+      },
+      {
+        "chainId": 1,
+        "address": "0x2f39d218133afab8f2b819b1066c7e434ad94e9e"
+      },
+      {
+        "chainId": 1,
+        "address": "0x52da0ce88202d1542543598d1e1e27f0d344726a"
+      },
+      {
+        "chainId": 1,
+        "address": "0x584c7d8c4cb05304fe5ac7fbc97f20a10fb07564"
+      },
+      {
+        "chainId": 1,
+        "address": "0x728a138a4823392c2efa55e028d434f526fe03cf"
+      },
+      {
+        "chainId": 1,
+        "address": "0x8164cc65827dcfe994ab23944cbc90e0aa80bfcb"
+      },
+      {
+        "chainId": 1,
+        "address": "0x9ec6f08190dea04a54f8afc53db96134e5e3fdfb"
+      },
+      {
+        "chainId": 1,
+        "address": "0xadc45df3cf1584624c97338bef33363bf5b97ada"
+      },
+      {
+        "chainId": 1,
+        "address": "0xb27c52c7f84819e3157993489741cb60786ae330"
+      },
+      {
+        "chainId": 1,
+        "address": "0xe7b67f44ea304dd7f6d215b13686637ff64cd2b2"
+      }
+    ],
+    "assetLimits": [
+      {
+        "chainId": 1,
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "1000000000",
+        "allowedRecipients": [
+          "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+          "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+          "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+          "0x7858E59e0C01EA06Df3aF3D20aC7B0003275D4Bf",
+          "0xEe4Cf3b78A74aFfa38C6a926282bCd8B5952818d",
+          "0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168",
+          "0x6c6Bc977E13Df9b0de53b251522280BB72383700",
+          "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c"
+        ],
+        "allowedSpenders": [
+          "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+          "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+        ]
+      },
+      {
+        "chainId": 1,
+        "token": "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0x72E95b8931767C79bA4EeE721354d6E99a61D004",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "1000000000",
+        "allowedRecipients": [
+          "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+          "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+          "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+          "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6",
+          "0x7858E59e0C01EA06Df3aF3D20aC7B0003275D4Bf",
+          "0xEe4Cf3b78A74aFfa38C6a926282bCd8B5952818d",
+          "0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a"
+        ],
+        "allowedSpenders": [
+          "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+          "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+        ]
+      },
+      {
+        "chainId": 1,
+        "token": "0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0x6df1C1E379bC5a00a7b4C6e67A203333772f45A8",
+        "maxOutflow": "1000000000",
+        "maxOutflowPerBlock": "1000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "maxOutflow": "1000000000000000000000",
+        "maxOutflowPerBlock": "1000000000000000000000",
+        "maxApproval": "1000000000000000000000",
+        "allowedRecipients": [
+          "0x60594a405d53811d3BC4766596EFD80fd545A270",
+          "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+          "0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168",
+          "0x6c6Bc977E13Df9b0de53b251522280BB72383700",
+          "0x018008bfb33d285247A21d44E50697654f754e63"
+        ],
+        "allowedSpenders": [
+          "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+          "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+        ]
+      },
+      {
+        "chainId": 1,
+        "token": "0x018008bfb33d285247A21d44E50697654f754e63",
+        "maxOutflow": "1000000000000000000000",
+        "maxOutflowPerBlock": "1000000000000000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0xcF8d0c70c850859266f5C338b38F9D663181C314",
+        "maxOutflow": "1000000000000000000000",
+        "maxOutflowPerBlock": "1000000000000000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "maxOutflow": "500000000000000000",
+        "maxOutflowPerBlock": "500000000000000000",
+        "maxApproval": "500000000000000000",
+        "allowedRecipients": [
+          "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+          "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+          "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+          "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+          "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+          "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+          "0x60594a405d53811d3BC4766596EFD80fd545A270",
+          "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+          "0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8"
+        ],
+        "allowedSpenders": [
+          "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+          "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+        ]
+      },
+      {
+        "chainId": 1,
+        "token": "0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8",
+        "maxOutflow": "500000000000000000",
+        "maxOutflowPerBlock": "500000000000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      },
+      {
+        "chainId": 1,
+        "token": "0xeA51d7853EEFb32b6ee06b1C12E6dcCA88Be0fFE",
+        "maxOutflow": "500000000000000000",
+        "maxOutflowPerBlock": "500000000000000000",
+        "maxApproval": "0",
+        "allowedRecipients": [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "allowedSpenders": []
+      }
+    ],
+    "sources": [
+      {
+        "id": "sim-primary",
+        "env": "CALLSCOUT_SIM_PRIMARY"
+      },
+      {
+        "id": "sim-secondary",
+        "env": "CALLSCOUT_SIM_SECONDARY"
+      }
+    ]
+  },
+  "invariants": {
+    "maxNativeValueWei": "500000000000000000",
+    "maxNativeOutflowPerBlockWei": "500000000000000000",
+    "maxSlippageBps": "100",
+    "maxGas": "700000",
+    "maxGasPriceWei": "100000000000",
+    "maxFeePerGasWei": "100000000000",
+    "maxPriorityFeePerGasWei": "5000000000",
+    "requireCalldata": true,
+    "denyUnlimitedApproval": true
+  },
+  "contracts": [
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "1000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "protocolId": "usdt",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "1000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "protocolId": "dai",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "1000000000000000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "protocolId": "weth",
+      "maxNativeValueWei": "500000000000000000",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+              ]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "500000000000000000"
+            }
+          ]
+        },
+        {
+          "selector": "0xd0e30db0",
+          "name": "deposit()",
+          "constraints": []
+        },
+        {
+          "selector": "0x2e1a7d4d",
+          "name": "withdraw(uint256)",
+          "constraints": [
+            {
+              "type": "uint-max",
+              "argument": 0,
+              "value": "500000000000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "protocolId": "uniswap-v3",
+      "maxNativeValueWei": "500000000000000000",
+      "methods": [
+        {
+          "selector": "0x04e45aaf",
+          "name": "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))",
+          "swapQuote": {
+            "kind": "uniswap-v3-exact-input-single",
+            "quoter": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+            "wrappedNative": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "arguments": {
+              "tokenIn": 0,
+              "tokenOut": 1,
+              "fee": 2,
+              "amountIn": 4,
+              "minimumOut": 5
+            },
+            "pools": [
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              }
+            ]
+          },
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 1,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 3,
+              "addresses": [
+                "0x1111111111111111111111111111111111111111"
+              ]
+            },
+            {
+              "type": "uint-equals",
+              "argument": 6,
+              "value": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "address": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      "protocolId": "aave-v3",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x617ba037",
+          "name": "supply(address,uint256,address,uint16)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 2,
+              "addresses": [
+                "0x1111111111111111111111111111111111111111"
+              ]
+            }
+          ]
+        },
+        {
+          "selector": "0x69328dec",
+          "name": "withdraw(address,uint256,address)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 2,
+              "addresses": [
+                "0x1111111111111111111111111111111111111111"
+              ]
+            }
+          ]
+        },
+        {
+          "selector": "0x573ade81",
+          "name": "repay(address,uint256,uint256,address)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": [
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+              ]
+            },
+            {
+              "type": "address-in",
+              "argument": 3,
+              "addresses": [
+                "0x1111111111111111111111111111111111111111"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

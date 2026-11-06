@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const [registry, policy] = await Promise.all([
       fs.readFile(path.join(process.cwd(), 'data', 'registry.static.json'), 'utf8').then(JSON.parse),
-      fs.readFile(path.join(process.cwd(), 'examples', 'wallet-policy.json'), 'utf8').then(JSON.parse),
+      fs.readFile(path.join(process.cwd(), 'examples', 'general-policy.json'), 'utf8').then(JSON.parse),
     ]);
     return new Response(renderRulesetBuilder(registry, policy), {
       headers: {
