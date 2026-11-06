@@ -33,6 +33,24 @@ const RUN_SCENARIOS = new Set(['safe', 'exploiter', 'block-limit', 'compromised'
 const EXPLOITER = '0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc';
 const BLOCK_LIMIT_SWAP = 600n * 10n ** 18n;
 const AGENT_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
+const TWO_TRANSACTION_DEMO = Object.freeze([
+  Object.freeze({
+    step: 1,
+    scenario: 'safe',
+    title: 'Legitimate swap',
+    expected: 'allow',
+    prompt: 'Swap 100 dUSD for at least 190 dETH to my wallet',
+    reason: 'The exact transaction satisfies policy, fresh signed protocol state, and both simulation traces.',
+  }),
+  Object.freeze({
+    step: 2,
+    scenario: 'hidden-call',
+    title: 'Compromised router',
+    expected: 'deny',
+    prompt: 'Swap 75 dUSD for at least 140 dETH to my wallet',
+    reason: 'The calldata looks valid, but simulation reveals a hidden internal call to an unauthorized contract.',
+  }),
+]);
 
 function artifactPath(contract) {
   return path.join(DEMO_ROOT, 'artifacts', 'DemoMarket.sol', `${contract}.json`);
@@ -499,6 +517,7 @@ export class WalletPolicyGateway {
       decision: run.decision,
       eventCount: run.events.length,
       transactionHash: run.transactionHash ?? null,
+      demo: run.demo ?? null,
     }));
   }
 
@@ -507,7 +526,7 @@ export class WalletPolicyGateway {
     return run ? publicRun(run) : null;
   }
 
-  createRun(prompt, { scenario = 'safe', source = 'bundled-agent', requestId = null, proposal = null } = {}) {
+  createRun(prompt, { scenario = 'safe', source = 'bundled-agent', requestId = null, proposal = null, demo = null } = {}) {
     if (!this.started) throw new Error('Keybound Gateway is not ready.');
     if (!RUN_SCENARIOS.has(scenario)) throw new Error(`Unknown demo scenario ${scenario}.`);
     if (source === 'agent-api') {
@@ -524,6 +543,7 @@ export class WalletPolicyGateway {
       scenario,
       source,
       requestId,
+      demo: demo == null ? null : jsonSafe(demo),
       submittedProposal: proposal == null ? null : normalizeAgentProposal(proposal),
       status: 'queued',
       decision: null,
@@ -548,6 +568,24 @@ export class WalletPolicyGateway {
     };
     this.executionTail = this.executionTail.then(execute, execute);
     return this.getRun(run.id);
+  }
+
+  createTwoTransactionDemo() {
+    if (!this.started) throw new Error('Keybound Gateway is not ready.');
+    const id = `demo_${Date.now().toString(36)}_${String(++this.runCounter).padStart(3, '0')}`;
+    const runs = TWO_TRANSACTION_DEMO.map((entry) => this.createRun(entry.prompt, {
+      scenario: entry.scenario,
+      source: 'guided-demo',
+      demo: {
+        id,
+        step: entry.step,
+        total: TWO_TRANSACTION_DEMO.length,
+        title: entry.title,
+        expected: entry.expected,
+        reason: entry.reason,
+      },
+    }));
+    return publicRun({ id, runs });
   }
 
   createAgentRun({ requestId, goal, proposal }) {
@@ -742,7 +780,20 @@ export class WalletPolicyGateway {
     const policyDenials = capturedReceipt.checks.filter((check) => check.status === 'deny' && !check.id.startsWith('simulation:'));
     this.addEvent(run, 'policy', policyDenials.length ? 'deny' : 'pass', policyDenials.length ? 'Policy or live-state vetoed' : 'Executable policy passed', `${capturedReceipt.checks.filter((check) => check.status === 'pass').length} checks passed; ${policyDenials.length} denied.`, { checks: capturedReceipt.checks.filter((check) => !check.id.startsWith('simulation:')) });
     if (capturedReceipt.simulation) {
-      this.addEvent(run, 'simulation', capturedReceipt.decision === 'allow' ? 'pass' : 'deny', capturedReceipt.decision === 'allow' ? 'Full simulation quorum matched' : 'Simulation vetoed the proposal', `${capturedReceipt.simulation.agreeingSources.length}/2 sources agreed on one effect fingerprint.`, capturedReceipt.simulation);
+      const simulationDenied = capturedReceipt.checks.some((check) => check.id.startsWith('simulation:') && check.status === 'deny');
+      const simulationFailure = capturedReceipt.simulation.sources
+        ?.flatMap((source) => source.failures ?? [])
+        .find(Boolean);
+      this.addEvent(
+        run,
+        'simulation',
+        simulationDenied ? 'deny' : 'pass',
+        simulationDenied ? 'Simulation exposed forbidden behavior' : 'Full simulation quorum matched',
+        simulationDenied
+          ? simulationFailure ?? 'The independent traces did not produce an all-pass quorum.'
+          : `${capturedReceipt.simulation.agreeingSources.length}/2 sources agreed on one effect fingerprint.`,
+        capturedReceipt.simulation,
+      );
     } else if (capturedReceipt.checks.some((check) => check.id.startsWith('simulation:'))) {
       this.addEvent(run, 'simulation', 'deny', 'Simulation failed closed', capturedReceipt.checks.find((check) => check.id.startsWith('simulation:') && check.status === 'deny')?.detail ?? 'No passing trace quorum.', { checks: capturedReceipt.checks.filter((check) => check.id.startsWith('simulation:')) });
     } else {
@@ -772,5 +823,6 @@ export class WalletPolicyGateway {
 }
 
 export const DEMO_SCENARIOS = Object.freeze([...RUN_SCENARIOS]);
+export const DEMO_STORY = TWO_TRANSACTION_DEMO;
 export const DEMO_CHAIN_ID = CHAIN_ID;
 export function formatDemoAmount(value) { return formatUnits(value, 18); }

@@ -31,6 +31,12 @@ The guard must live in the same trusted process as the wallet adapter or in a sm
 
 Canonical SHA-256 hashes bind each receipt to its policy and normalized transaction. These hashes support audit correlation; they are not signatures.
 
+### Policy authoring surface
+
+`/policy` may use an AI model to translate a user's prose into a constrained intermediate rule list. This authoring service is outside the authorization boundary: the model has no wallet, signer, active-policy write path, protocol-state key, or transaction API. It never supplies executable JSON directly. `src/policy-prompt.js` resolves public registry identities, compiles exact fields, rejects unsupported rules, and calls the same deterministic activation validator used by the CLI.
+
+The UI replaces its review graph only when that compilation succeeds. Even then, the result is merely a draft and must pass a separate controlled activation process. Model outage, refusal, malformed output, unresolved intent, unknown registry identity, or validator failure leaves the existing policy unchanged.
+
 ### Live protocol state
 
 The live-state layer is a second veto. A target can be policy-allowed and still be denied because its authenticated state is stale, missing, degraded, paused, or compromised. State must be signed by keys pinned in policy and checked at authorization time.
@@ -62,6 +68,8 @@ The source scanner, ABI decoder, registry, and HTML report help humans inventory
 | Input | Trusted? | Use |
 | --- | --- | --- |
 | Agent transaction proposal | No | Evaluated as hostile input |
+| Policy-authoring prompt | No | AI-assisted draft input only |
+| AI-translated canonical rules | No | Recompiled and deterministically validated; never activated directly |
 | Function name or UI label | No | Display only |
 | Raw calldata | No | Exact selector and word checks |
 | Executable policy | Yes, after controlled distribution | Authorization constraints |

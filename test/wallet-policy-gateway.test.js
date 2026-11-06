@@ -120,3 +120,32 @@ test('deduplicates agent retries by requestId before executing wallet work', asy
   assert.equal(executions, 1);
   await gateway.stop();
 });
+
+test('guided demo queues one allowed transaction followed by one security denial', async (t) => {
+  const runtimeDirectory = await temporaryRuntime(t);
+  const gateway = new WalletPolicyGateway({ runtimeDirectory });
+  gateway.started = true;
+  const executionOrder = [];
+  gateway.executeRun = async (run) => {
+    executionOrder.push(run.scenario);
+    run.status = 'complete';
+    run.decision = run.scenario === 'safe' ? 'allow' : 'deny';
+    run.transactionHash = run.decision === 'allow' ? '0xallowed' : null;
+    await gateway.persistRun(run);
+  };
+
+  const demo = gateway.createTwoTransactionDemo();
+  assert.match(demo.id, /^demo_/);
+  assert.equal(demo.runs.length, 2);
+  assert.deepEqual(demo.runs.map((run) => run.demo.step), [1, 2]);
+  assert.deepEqual(demo.runs.map((run) => run.scenario), ['safe', 'hidden-call']);
+  assert.deepEqual(demo.runs.map((run) => run.demo.expected), ['allow', 'deny']);
+  assert.ok(demo.runs.every((run) => run.source === 'guided-demo' && run.demo.id === demo.id));
+
+  const completed = await Promise.all(demo.runs.map((run) => gateway.waitForRun(run.id)));
+  assert.deepEqual(executionOrder, ['safe', 'hidden-call']);
+  assert.deepEqual(completed.map((run) => run.decision), ['allow', 'deny']);
+  assert.ok(completed[0].transactionHash);
+  assert.equal(completed[1].transactionHash, null);
+  await gateway.stop();
+});

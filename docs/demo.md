@@ -41,7 +41,7 @@ npm run dev
 # open http://127.0.0.1:3000/runs
 ```
 
-The command compiles and deploys the demo market to two distinct Anvil processes, starts the Gateway API, and serves the Next.js product. In the control room, a prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. Each run remains selectable with its full evidence trail. See [Live dual-Anvil demo](anvil-demo.md) for the architecture and non-interactive command.
+The command compiles and deploys the demo market to two distinct Anvil processes, starts the Gateway API, and serves the Next.js product. The primary control-room action queues two transactions from the same untrusted agent: a legitimate swap that passes every gate and is mined, followed by a normal-looking swap whose compromised router attempts a hidden internal call. Both full traces expose that unauthorized target, so the second proposal is denied before the wallet adapter is invoked. Both runs remain selectable side by side with their prompts, exact envelopes, live-state evidence, simulation traces, wallet outcomes, and audit receipts. Custom single-run controls still expose the paused-protocol and slippage cases. See [Live dual-Anvil demo](anvil-demo.md) for the architecture and non-interactive command.
 
 In another terminal, run the same flow through the external-agent API:
 
@@ -80,11 +80,11 @@ Judge-facing paths in the Next.js app:
 - `/runs` — agent control room and persistent history;
 - `/runs/:id` — complete evidence for a selected run;
 - `/report` — interactive call-surface report; and
-- `/policy` — visual wallet policy builder.
+- `/policy` — AI-assisted plain-language policy builder and visual advanced editor.
 
 See [Vercel deployment](deployment.md) for the import settings, public-access check, and the explicit boundary between the hosted UI and the later testnet transaction backend.
 
-The policy studio supports draggable blocks, explicit connections, pan, zoom, fit-to-view, a minimap, local persistence, import/export, and continuous structural checks. Exported JSON must still pass the authoritative validator before it can be activated:
+In Policy Studio, describe the wallet, expiry, allowed action, numeric caps, quorum requirements, and EIP-7702 posture, then click **Generate ruleset**. With `OPENAI_API_KEY` configured, AI translates the prose into constrained rules; deterministic code resolves exact registry addresses and validates the compiled policy. Click **Review generated blocks** to inspect or refine the result on the draggable, zoomable canvas. Exported JSON must still pass the authoritative validator before it can be activated:
 
 ```sh
 npx keybound policy validate path/to/exported-policy.json
