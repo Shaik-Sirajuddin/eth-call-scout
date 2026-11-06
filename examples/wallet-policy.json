@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "name": "Conservative mainnet agent",
+  "defaultAction": "deny",
+  "chains": [1],
+  "wallets": ["0x1111111111111111111111111111111111111111"],
+  "validUntil": "2030-01-01T00:00:00.000Z",
+  "invariants": {
+    "maxNativeValueWei": "10000000000000000",
+    "maxGas": "350000",
+    "maxFeePerGasWei": "100000000000",
+    "maxPriorityFeePerGasWei": "5000000000",
+    "requireCalldata": true,
+    "denyUnlimitedApproval": true
+  },
+  "contracts": [
+    {
+      "chainId": 1,
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "protocolId": "usdc",
+      "maxNativeValueWei": "0",
+      "methods": [
+        {
+          "selector": "0x095ea7b3",
+          "name": "approve(address,uint256)",
+          "constraints": [
+            {
+              "type": "address-in",
+              "argument": 0,
+              "addresses": ["0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"]
+            },
+            {
+              "type": "uint-max",
+              "argument": 1,
+              "value": "1000000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

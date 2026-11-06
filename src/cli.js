@@ -5,9 +5,11 @@ import { scanFiles } from './scanner.js';
 import { renderReport } from './report.js';
 import { decodeFindings } from './decode.js';
 import { applyRuleset, enrichFindings, loadRegistry, searchRegistry, syncRegistry } from './registry.js';
+import { auditPolicy, authorizeIntent, loadPolicy, sha256, validatePolicy } from './policy.js';
 
-const HELP = `eth-call-scout — find Ethereum calls in JavaScript and TypeScript\n\nUsage:\n  eth-call-scout <file-or-directory...> [options]\n  eth-call-scout registry <sync|list|search> ...\n\nOptions:\n  -o, --out <file>      Write the interactive HTML review report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode           Look up verified ABIs and decode raw calldata\n      --chain-id <id>    EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply ruleset exported from ruleset.html\n      --no-html          Skip HTML output\n  -h, --help            Show this help\n\nScans .js, .jsx, .mjs, .cjs, .ts, .tsx, .mts, and .cts files.\nFollows transitive JS/TS imports from file entry points, including installed packages.
-Directory scans skip common generated and dependency folders; declaration files are excluded.\n`;
+const HELP = `CallScout — deterministic wallet authorization for AI agents\n\nUsage:\n  callscout authorize <intent.json|-> --policy <policy.json> [--out <receipt.json>]\n  callscout policy <validate|audit> <policy.json>\n  callscout scan <file-or-directory...> [scan options]\n  callscout registry <sync|list|search> ...\n\nThe agent may propose transactions, but executable policy and live protocol state decide\nwhether the exact request reaches the wallet. All unsupported mutation methods deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply monitoring ruleset exported from ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner is a monitoring feature, not the wallet authorization boundary.\n`;
+
+const POLICY_HELP = `CallScout executable wallet policies:\n  eth-call-scout policy validate <policy.json>\n  eth-call-scout policy audit <policy.json>\n  eth-call-scout authorize <intent.json|-> --policy <policy.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction hash in the receipt; the wallet guard must forward those same transaction fields.\n`;
 
 const REGISTRY_HELP = `Registry commands:\n  eth-call-scout registry sync [all|tokens|protocols|volume|contracts]\n  eth-call-scout registry list [tokens|protocols|contracts|trackers|sources]\n  eth-call-scout registry search <query>\n\nLive sources are cached locally under .cache/eth-call-scout/registry.json.\n`;
 
@@ -36,9 +38,68 @@ async function runRegistry(args) {
   throw new Error(`Unknown registry command: ${action}\n${REGISTRY_HELP}`);
 }
 
+async function readJsonInput(file) {
+  if (file !== '-') return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+function writeJson(value, output) {
+  const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  if (!output) { process.stdout.write(serialized); return; }
+  const target = path.resolve(output);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, serialized, 'utf8');
+  process.stdout.write(`${target}\n`);
+}
+
+async function runPolicy(args) {
+  const action = args[0];
+  if (!action || action === '--help' || action === '-h') { process.stdout.write(POLICY_HELP); return; }
+  const file = args[1];
+  if (!file) throw new Error(`${action} requires a policy JSON file`);
+  const policy = await readJsonInput(file);
+  if (action === 'validate') {
+    const validation = validatePolicy(policy);
+    writeJson({ ...validation, policyHash: validation.valid ? sha256(policy) : null });
+    if (!validation.valid) process.exitCode = 1;
+    return;
+  }
+  if (action === 'audit') {
+    const audit = auditPolicy(policy);
+    writeJson(audit);
+    if (!audit.valid || audit.findings.some((finding) => finding.severity === 'high' || finding.severity === 'error')) process.exitCode = 1;
+    return;
+  }
+  throw new Error(`Unknown policy command: ${action}\n${POLICY_HELP}`);
+}
+
+async function runAuthorize(args) {
+  if (!args.length || args[0] === '--help' || args[0] === '-h') { process.stdout.write(POLICY_HELP); return; }
+  const intentPath = args[0];
+  let policyPath = null;
+  let output = null;
+  for (let index = 1; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--policy') { policyPath = args[++index]; if (!policyPath) throw new Error('--policy requires a path'); }
+    else if (arg === '--out') { output = args[++index]; if (!output) throw new Error('--out requires a path'); }
+    else throw new Error(`Unknown authorize option: ${arg}`);
+  }
+  if (!policyPath) throw new Error('authorize requires --policy <policy.json>');
+  const policy = loadPolicy(path.resolve(policyPath));
+  const intent = await readJsonInput(intentPath);
+  const receipt = authorizeIntent(policy, intent);
+  writeJson(receipt, output);
+  if (receipt.decision !== 'allow') process.exitCode = 2;
+}
+
 export async function runCli(argv) {
   try {
+    if (argv[0] === 'policy') { await runPolicy(argv.slice(1)); return; }
+    if (argv[0] === 'authorize') { await runAuthorize(argv.slice(1)); return; }
     if (argv[0] === 'registry') { runRegistry(argv.slice(1)).catch((error) => { process.stderr.write(`eth-call-scout: ${error.message}\n`); process.exitCode = 1; }); return; }
+    if (argv[0] === 'scan') argv = argv.slice(1);
     const paths = [];
     let html = 'eth-call-report.html';
     let json = null;
