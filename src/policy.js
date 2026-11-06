@@ -430,12 +430,12 @@ function serializableIntent(intent) {
   };
 }
 
-/** Apply one target's allowlist, native value, selector, approval, and ABI-word rules. */
+/** Apply one target's exact address, value, selector, approval, and ABI-word rules. */
 function evaluateTargetCall(policy, { chainId, to, data, value }, add, valueToTarget = value) {
   const contract = policy.contracts.find((entry) => entry.chainId === chainId && entry.address.toLowerCase() === to);
   add('target:allowlisted', Boolean(contract), `Target ${to} must match an exact contract entry on chain ${chainId}.`);
   if (!contract) return null;
-  if (contract.maxNativeValueWei != null) add('value:contract-limit', valueToTarget <= BigInt(contract.maxNativeValueWei), `Native value must not exceed this contract's ${contract.maxNativeValueWei} wei limit.`);
+  if (contract.maxNativeValueWei != null) add('value:contract-limit', valueToTarget <= BigInt(contract.maxNativeValueWei), `Native value to this target must not exceed ${contract.maxNativeValueWei} wei.`);
   if (data === '0x') {
     add('calldata:required', policy.invariants.requireCalldata !== true, 'Global policy requires calldata.');
     add('target:empty-calldata', contract.allowEmptyCalldata === true, 'Target must explicitly allow empty calldata.');
@@ -456,28 +456,33 @@ function evaluateTargetCall(policy, { chainId, to, data, value }, add, valueToTa
   return contract;
 }
 
-/**
- * Apply the top-level transaction rules to every call a delegated wallet makes itself.
- * Delegates encode batches in different ways, so these calls come from the EVM trace rather than
- * from decoding calldata. Read-only calls cannot change state and need only an allowed target.
- */
+/** Reapply policy and signed live-state checks to every trace call originating from the wallet. */
 export function evaluateWalletCalls(policy, chainId, calls, { protocolState = null, now = new Date(), minimumStateSequence = 0 } = {}) {
   const failures = [];
   const valueByTarget = new Map();
   for (const [index, call] of calls.entries()) {
-    if (call.type === 'STATICCALL') continue;
     const label = `Wallet call ${index} to ${call.to ?? '(none)'}`;
-    if (call.type !== 'CALL' || !call.to) {
+    if (!['CALL', 'STATICCALL'].includes(call.type) || !call.to) {
       failures.push(`${label}: only CALL and STATICCALL may originate from the wallet, saw ${call.type}.`);
       continue;
     }
     const value = BigInt(call.value);
+    if (call.type === 'STATICCALL' && value !== 0n) {
+      failures.push(`${label}: STATICCALL cannot carry native value.`);
+      continue;
+    }
     const valueToTarget = (valueByTarget.get(call.to) ?? 0n) + value;
     valueByTarget.set(call.to, valueToTarget);
     const add = (id, ok, detail) => { if (!ok) failures.push(`${label} failed ${id}: ${detail}`); return ok; };
     const contract = evaluateTargetCall(policy, { chainId, to: call.to, data: call.input, value }, add, valueToTarget);
     if (!contract || policy.protocolState?.required !== true) continue;
-    const state = evaluateProtocolState(protocolState, policy.protocolState, { protocolId: contract.protocolId, chainId, address: call.to, now, minimumSequence: minimumStateSequence });
+    const state = evaluateProtocolState(protocolState, policy.protocolState, {
+      protocolId: contract.protocolId,
+      chainId,
+      address: call.to,
+      now,
+      minimumSequence: minimumStateSequence,
+    });
     for (const check of state.checks) add(check.id, check.status === 'pass', check.detail);
   }
   return failures;

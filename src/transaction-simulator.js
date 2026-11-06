@@ -212,7 +212,16 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   failures.push(...assets.violations);
   return {
     failures,
-    metrics: { calls: aggregate.nodes.length, depth, nativeOutflow: nativeOutflow.toString(), gasEstimate: gasEstimate.toString(), ...state, outflows: assets.outflows, approvals: assets.approvals, walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })) },
+    metrics: {
+      calls: aggregate.nodes.length,
+      depth,
+      nativeOutflow: nativeOutflow.toString(),
+      gasEstimate: gasEstimate.toString(),
+      ...state,
+      outflows: assets.outflows,
+      approvals: assets.approvals,
+      walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })),
+    },
     fingerprint: sha256({ callResult: normalizedTrace.output, trace: normalizedTrace, stateDiff: diffTrace }),
   };
 }

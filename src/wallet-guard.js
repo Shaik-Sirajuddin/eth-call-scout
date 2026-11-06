@@ -124,7 +124,14 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         receipt = { ...receipt, decision: 'deny', checks: [...receipt.checks, { id: 'state:sequence-store', status: 'deny', detail: `Could not persist rollback protection: ${sequenceStoreError.message}` }] };
       }
       if (receipt.decision !== 'deny' && policy.simulation?.required) {
-        try { receipt = finalizeSimulation(receipt, await simulator(policy, exactIntent, { ...simulationOptions, protocolState: currentState, minimumStateSequence: highestStateSequence, now })); }
+        try {
+          receipt = finalizeSimulation(receipt, await simulator(policy, exactIntent, {
+            ...simulationOptions,
+            protocolState: currentState,
+            minimumStateSequence: highestStateSequence,
+            now,
+          }));
+        }
         catch (error) { receipt = failedSimulation(receipt, error); }
       }
       await onDecision(receipt);
