@@ -16,3 +16,21 @@
 .report-slide.active{display:block;opacity:1;transform:scale(1);z-index:1;pointer-events:auto}
 @media(max-width:650px){.carousel-stage{min-height:410px}.carousel-track{gap:10px}.report-slide{flex-basis:88%;opacity:.35}}
 @media(prefers-reduced-motion:reduce){.carousel-track,.report-slide{transition:none;will-change:auto}}
+
+/* Make repository references easy to recognize and tap. */
+.github-icon{display:block;width:17px;height:17px;fill:currentColor;flex:0 0 auto}
+.github-mark .github-icon{width:19px;height:19px}
+.preview-footer a{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:5px;background:#202720;color:#fff!important;font:600 10px var(--sans)}
+.preview-footer a:hover,.slide-pr-link:hover,.slide-foot a:hover{background:#405c2b;color:#fff!important}
+.slide-head .slide-pr-link{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #cfd4c8;border-radius:5px;background:#f3f5ef;color:#263025;font:700 10px var(--sans);white-space:nowrap}
+.slide-head .slide-pr-link b{font-size:12px}
+.slide-foot{min-height:48px;height:auto;gap:12px}
+.slide-foot>span{font-size:9px}
+.slide-foot>a{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;background:#202720;border-radius:5px;color:#fff!important;font:700 10px var(--sans);white-space:nowrap}
+.slide-foot>a .github-icon{width:15px;height:15px}
+.pr-links{gap:10px;flex-wrap:wrap}
+.pr-links>span{margin-right:4px}
+.pr-links a{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;background:#fffefa;border:1px solid #d1d4c8;border-radius:6px;color:#333b31;font:700 10px var(--sans);box-shadow:0 2px 0 #171b1808}
+.pr-links a .github-icon{width:15px;height:15px}
+.pr-links a:hover{background:#202720;border-color:#202720;color:#fff}
+@media(max-width:650px){.slide-head .slide-pr-link{padding:7px 8px;font-size:9px}.slide-foot{padding:7px 11px;min-height:50px}.slide-foot>span{font-size:8px}.slide-foot>a{padding:8px 9px;font-size:9px}.pr-links a{font-size:9px;padding:8px 9px}}
