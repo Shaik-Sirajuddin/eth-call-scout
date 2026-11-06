@@ -34,7 +34,7 @@ Version 1 has a mandatory secure activation profile: an executable policy must b
 
 ## Quick start
 
-Requirements: Node.js 22 or newer.
+Requirements: Node.js 22 or newer. The real local-chain demo also requires [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge` and `anvil`).
 
 ```sh
 npm ci
@@ -47,6 +47,9 @@ npx callscout policy audit examples/wallet-policy-live.json
 
 # Run the complete allow/deny scenario demo without a real wallet or RPC.
 npm run demo
+
+# Run real contracts and full traces against two independent Anvil nodes.
+npm run demo:anvil
 
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
@@ -71,7 +74,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/pr-review-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
+`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/pr-review-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil run API. See the [live demo runbook](docs/anvil-demo.md).
 
 ## Architecture
 

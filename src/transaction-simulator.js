@@ -207,7 +207,10 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
   if (state.storageWrites > config.maxStorageWrites) failures.push(`State diff has ${state.storageWrites} storage writes; maximum is ${config.maxStorageWrites}.`);
   if (state.deniedCodeChange) failures.push(`State diff contains ${state.unexpectedCodeChanges} unexpected code change(s).`);
   if (state.missingExpectedCodeChanges.length) failures.push(`State diff did not prove the expected EIP-7702 delegation change for ${state.missingExpectedCodeChanges.join(', ')}.`);
-  if (BigInt(state.walletBalanceDecrease) > BigInt(policy.invariants.maxNativeValueWei)) failures.push(`Wallet balance decrease ${state.walletBalanceDecrease} exceeds policy limit ${policy.invariants.maxNativeValueWei}.`);
+  const maximumFeePerGas = intent.gasPrice ?? intent.maxFeePerGas ?? 0n;
+  const maximumGasCost = (intent.gas ?? gasEstimate) * maximumFeePerGas;
+  const maximumWalletBalanceDecrease = BigInt(policy.invariants.maxNativeValueWei) + maximumGasCost;
+  if (BigInt(state.walletBalanceDecrease) > maximumWalletBalanceDecrease) failures.push(`Wallet balance decrease ${state.walletBalanceDecrease} exceeds bounded native value plus maximum gas cost ${maximumWalletBalanceDecrease}.`);
   const assets = analyzeAssets(aggregate.logs, intent.from, config.assetLimits, intent.chainId);
   failures.push(...assets.violations);
   return {
@@ -218,6 +221,8 @@ function analyzeTrace(policy, intent, callTrace, diffTrace, gasEstimate, stateCo
       nativeOutflow: nativeOutflow.toString(),
       gasEstimate: gasEstimate.toString(),
       ...state,
+      maximumGasCost: maximumGasCost.toString(),
+      maximumWalletBalanceDecrease: maximumWalletBalanceDecrease.toString(),
       outflows: assets.outflows,
       approvals: assets.approvals,
       walletCalls: walletCalls.map(({ type, to, value, input }) => ({ type, to, value, selector: input.length >= 10 ? input.slice(0, 10) : null })),
