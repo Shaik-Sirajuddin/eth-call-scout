@@ -51,6 +51,10 @@ npm run demo
 # Run real contracts and full traces against two independent Anvil nodes.
 npm run demo:anvil
 
+# Start the judge-facing console, API, contracts, and both Anvil nodes.
+npm run demo:serve
+# open http://127.0.0.1:4174/demo.html
+
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
 ```
@@ -62,6 +66,7 @@ An `allow` receipt covers only the normalized transaction hash and authenticated
 The deployed demo includes the responsive product site, a generated monitoring report, and two purpose-separated authoring tools:
 
 - [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
+- [Agent control room](https://shaik-sirajuddin.github.io/eth-call-scout/demo.html) — stored example evidence when deployed statically; live execution when run locally
 - [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
 - [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
 - [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
@@ -74,7 +79,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/pr-review-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil run API. See the [live demo runbook](docs/anvil-demo.md).
+`site:check` scans the example sources, applies `.secu`, and creates the control room, report, policy studio, and PR Review Agent ruleset under `dist/`. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate PR Review Agent editor changes only source-review mappings, blacklists, and risk terms. Run `npm run demo` for the fully offline mock flow or `npm run demo:serve` for the live dual-Anvil product at `http://127.0.0.1:4174/demo.html`. See the [live demo runbook](docs/anvil-demo.md).
 
 ## Architecture
 

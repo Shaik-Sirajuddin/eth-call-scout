@@ -21,11 +21,15 @@ The scenarios intentionally exercise different veto points:
 ## Commands
 
 ```sh
-npm install
-npm run demo:build
-npm run demo:anvil
+npm ci
+npm run demo:serve
+# open http://127.0.0.1:4174/demo.html
 ```
 
-`npm run demo:anvil` runs all four scenarios and exits after printing their receipts. `npm run demo:serve` starts the run API at `http://127.0.0.1:4174/api/health` and serves the product site. The live console is the next UI milestone built on this API.
+`npm run demo:serve` compiles the contracts, launches both Anvil nodes, deploys the deterministic market twice, starts the run API, and serves the judge console. Choose a scenario, edit the trade goal if desired, and click **Run guarded trade**. The console polls the run as it progresses and preserves the complete prompt, structured agent intent, exact transaction envelope, policy checks, signed protocol evidence, simulation result, wallet outcome, and audit-chain receipt. Press `Ctrl+C` once to stop the server and both child nodes.
+
+Use `npm run demo:anvil` for a non-interactive smoke test that executes all four scenarios and exits after printing their receipts. The health endpoint is `http://127.0.0.1:4174/api/health`.
+
+The deployed static page intentionally shows a yellow **EXAMPLE EVIDENCE** badge because Vercel or GitHub Pages does not run local Anvil. Only the locally served page shows the green **LIVE DUAL-ANVIL** badge and can execute fresh requests.
 
 The local chain uses Foundry's public development mnemonic and must never hold real assets. EIP-7702 remains explicitly denied by this demo policy.

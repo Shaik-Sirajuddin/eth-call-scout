@@ -37,10 +37,10 @@ For the judge-facing flow, run the real local chain instead of the mock scenario
 
 ```sh
 npm run demo:serve
-# verify http://127.0.0.1:4174/api/health
+# open http://127.0.0.1:4174/demo.html
 ```
 
-The command compiles and deploys the demo market to two distinct Anvil processes, starts the run API, and serves the product. A prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. See [Live dual-Anvil demo](anvil-demo.md) for the full architecture and non-interactive command.
+The command compiles and deploys the demo market to two distinct Anvil processes, starts the run API, and serves the product. In the control room, a prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. Each run remains selectable with its full nine-stage evidence trail. See [Live dual-Anvil demo](anvil-demo.md) for the full architecture and non-interactive command.
 
 ## Test the security boundary
 
@@ -69,6 +69,7 @@ Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separ
 
 Public judge-ready pages:
 
+- [Agent control room](https://shaik-sirajuddin.github.io/eth-call-scout/demo.html)
 - [Example interactive report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
 - [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
 - [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
