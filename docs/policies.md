@@ -93,7 +93,7 @@ To let a delegated wallet send batches, also list the wallet as a contract with 
 }
 ```
 
-The batch selector needs no ABI constraints, because every call inside the batch is checked against its own contract entry using the simulated call tree. See [Batches from a delegated wallet](transaction-simulation.md#batches-from-a-delegated-wallet).
+Every external call inside the batch is checked against its own contract entry and signed protocol state using the simulated call tree. Version 1 cannot constrain dynamic batch bytes directly, so the delegate implementation and permitted batch selector remain security-critical: pin reviewed delegate code, keep the selector narrow, and use conservative state-write limits. See [Batches from a delegated wallet](transaction-simulation.md#batches-from-a-delegated-wallet).
 
 Enabling `allowAuthorizationList` alone locks the wallet after it upgrades, because later transactions come from a delegated wallet. Audit reports this as `eip7702-wallet-lockout`.
 

@@ -60,12 +60,14 @@ CallScout does not decode batch formats, because each delegate has its own. It r
 - This covers nested self-calls, so a batch cannot reach a wallet function such as `addOwner` unless policy lists that selector.
 - Native value is summed per target across the batch before the contract limit is applied.
 - `DELEGATECALL` and `CALLCODE` from the wallet deny, because they run other code with the wallet's authority. Delegates that are proxies are therefore not supported yet.
-- `STATICCALL` from the wallet cannot change state and needs only an allowed target.
+- `STATICCALL` from the wallet cannot change state, but still requires an exact contract entry, allowed selector/calldata, and operational signed protocol state. Read access to a compromised protocol is not silently exempted.
 - `internalTargets` does not permit a call sent by the wallet. That call needs a full contract entry.
 
 Each receipt lists these calls under `simulation.metrics.walletCalls`.
 
 `wallet_sendCalls` stays denied. With that API the wallet chooses the final transaction, so CallScout cannot simulate the exact transaction it would forward.
+
+The same trace rules apply when a type-4 transaction installs a delegate and invokes its batch path immediately; safety is not deferred until a later transaction.
 
 ## Security boundary and limitations
 

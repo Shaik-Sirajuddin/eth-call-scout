@@ -45,7 +45,7 @@ The provider keeps the highest authenticated state sequence and can persist it t
 
 ### Transaction simulator
 
-`src/transaction-simulator.js` is a mandatory final gate, not an LLM tool. It binds the outer nonce with `eth_getTransactionCount(..., "pending")`, then runs the exact transaction with `eth_call`, `eth_estimateGas`, `debug_traceCall` call tracing with logs, and `debug_traceCall` pre/post state diffing. It rejects nonce disagreement, unapproved internal targets or call types, reverts, excessive depth, gas, writes, native outflow, token transfers or approvals, unexpected code changes, trace disagreement, and insufficient quorum.
+`src/transaction-simulator.js` is a mandatory final gate, not an LLM tool. It binds the outer nonce with `eth_getTransactionCount(..., "pending")`, then runs the exact transaction with `eth_call`, `eth_estimateGas`, `debug_traceCall` call tracing with logs, and `debug_traceCall` pre/post state diffing. It rejects nonce disagreement, unapproved internal targets or call types, reverts, excessive depth, gas, writes, native outflow, token transfers or approvals, unexpected code changes, trace disagreement, and insufficient quorum. When EIP-7702 gives the wallet executable code, each wallet-originated trace call is re-evaluated against contract policy and signed live state.
 
 The simulator reads the sender's current code before tracing. EIP-7702 authorization lists and already-delegated EOAs are default-deny. When explicitly enabled, authorization signature, authority, chain, nonce, delegate identity, runtime code hash, and the exact delegation code change are checked before the ordinary full-trace rules apply.
 

@@ -25,7 +25,7 @@ const token = new Interface(['function approve(address,uint256)', 'function bala
 const account = new Interface(['function addOwner(address)']);
 const goodApprove = token.encodeFunctionData('approve', [SPENDER, 1_000_000_000n]);
 const batchTx = { ...intent, to: WALLET, data: `${EXECUTE}${'00'.repeat(64)}` };
-const stateKeys = crypto.generateKeyPairSync('ed25519');
+const stateKeys = [crypto.generateKeyPairSync('ed25519'), crypto.generateKeyPairSync('ed25519')];
 
 function signedState({ usdcStatus = 'operational' } = {}) {
   const at = NOW.toISOString();
@@ -37,7 +37,11 @@ function signedState({ usdcStatus = 'operational' } = {}) {
     expiresAt: '2026-12-01T00:05:00.000Z',
     protocols: [observation('usdc', usdcStatus, [USDC]), observation('agent-wallet', 'operational', [WALLET]), observation('vault', 'operational', [VAULT])],
   };
-  return addProtocolStateSignature({ version: 1, payload, signatures: [] }, signProtocolState(payload, { keyId: 'test', privateKey: stateKeys.privateKey }));
+  let bundle = { version: 1, payload, signatures: [] };
+  stateKeys.forEach((keys, index) => {
+    bundle = addProtocolStateSignature(bundle, signProtocolState(payload, { keyId: `test-${index}`, privateKey: keys.privateKey }));
+  });
+  return bundle;
 }
 
 function batchPolicy({ requireCalldata = true } = {}) {
@@ -45,8 +49,8 @@ function batchPolicy({ requireCalldata = true } = {}) {
   policy.protocolState = {
     required: true,
     maxAgeSeconds: 300,
-    threshold: 1,
-    trustedKeys: [{ id: 'test', algorithm: 'ed25519', publicKey: stateKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }],
+    threshold: 2,
+    trustedKeys: stateKeys.map((keys, index) => ({ id: `test-${index}`, algorithm: 'ed25519', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') })),
   };
   policy.simulation.eip7702 = {
     allowAuthorizationList: false,
@@ -55,6 +59,7 @@ function batchPolicy({ requireCalldata = true } = {}) {
     delegates: [{ chainId: 1, address: DELEGATE, codeHash: keccak256(DELEGATE_CODE) }],
   };
   policy.invariants.requireCalldata = requireCalldata;
+  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)' });
   policy.contracts.push(
     { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
     { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', allowEmptyCalldata: true },
@@ -71,6 +76,7 @@ function fakeChain(frames) {
     const results = {
       eth_chainId: () => '0x1',
       eth_blockNumber: () => '0x100',
+      eth_getTransactionCount: () => '0x7',
       eth_getCode: () => (request.params[0].toLowerCase() === DELEGATE ? DELEGATE_CODE : `0xef0100${DELEGATE.slice(2)}`),
       eth_call: () => '0x',
       eth_estimateGas: () => '0x30d40',
