@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 const scenarios = [
   { value: 'safe', title: 'Expected swap', detail: 'Every gate passes and the wallet signs', verdict: 'ALLOW' },
@@ -57,8 +56,15 @@ function statusClass(value) {
   return ['deny', 'error', 'running', 'queued', 'skip'].includes(value) ? value : '';
 }
 
+function syncRunLocation(id) {
+  if (typeof window === 'undefined' || !id) return;
+  const target = `/runs#run=${encodeURIComponent(id)}`;
+  if (`${window.location.pathname}${window.location.hash}` !== target) {
+    window.history.replaceState(window.history.state, '', target);
+  }
+}
+
 export default function RunExplorer({ initialRunId = null }) {
-  const router = useRouter();
   const [health, setHealth] = useState(null);
   const [runs, setRuns] = useState([]);
   const [activeId, setActiveId] = useState(initialRunId);
@@ -109,7 +115,7 @@ export default function RunExplorer({ initialRunId = null }) {
   const selectRun = (id) => {
     setActiveId(id);
     setActiveDemoId(runs.find((run) => run.id === id)?.demo?.id ?? null);
-    router.replace(`/runs/${encodeURIComponent(id)}`, { scroll: false });
+    syncRunLocation(id);
   };
 
   const runGuidedDemo = async () => {
@@ -122,7 +128,7 @@ export default function RunExplorer({ initialRunId = null }) {
       setRuns((current) => [...demo.runs].reverse().concat(current));
       setActiveRun(first);
       setActiveId(first.id);
-      router.push(`/runs/${encodeURIComponent(first.id)}`, { scroll: false });
+      syncRunLocation(first.id);
       await refresh();
     } catch (cause) {
       setError(cause.message);
@@ -143,7 +149,7 @@ export default function RunExplorer({ initialRunId = null }) {
       });
       setActiveRun(run);
       setActiveId(run.id);
-      router.push(`/runs/${encodeURIComponent(run.id)}`, { scroll: false });
+      syncRunLocation(run.id);
       await refresh();
     } catch (cause) {
       setError(cause.message);
