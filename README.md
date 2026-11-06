@@ -285,7 +285,7 @@ This is an ETHGlobal prototype under active security hardening. Use test wallets
 
 ## Secu pull request review
 
-The repository root `.secu` file is the version 1 JSON ruleset for source review. Its `scanPaths` field selects the files to compare; the current configuration targets `examples/`. On each pull request, the **Secu contract call review** workflow runs the Rust parser against the base and proposed commits on GitHub-hosted runners, then publishes a Markdown artifact with the risk score, summary, parsed call changes, protocols added or removed, and function signatures added or removed. The report compares static source findings and does not claim that separate calls execute in the same on-chain transaction.
+The repository root `.secu` file is the version 1 JSON ruleset for source review. Its `scanPaths` field selects the files to compare; the current configuration targets `examples/`. On each pull request, the **Secu contract call review** workflow reads and validates `.secu` from the PR base revision, then runs the base revision's Rust parser and diff generator against both the base and proposed source. This keeps a PR from changing the rules or analyzer used to review itself. It publishes a Markdown diff with a risk score, a decision tag (`READY TO APPROVE`, `MAINTAINER REVIEW REQUIRED`, or `BLOCKED · BLACKLISTED / HIGH RISK`), summary, parsed call changes, protocols, and function signatures.
 
 The scanner job has read-only repository permissions. A separate workflow, triggered only after the scan workflow completes, reads the text artifact and posts it as a pull request comment review using the repository token. It does not check out or execute pull request code. Actions are pinned to full commit SHAs.
 
