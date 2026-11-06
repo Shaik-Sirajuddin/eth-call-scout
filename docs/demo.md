@@ -5,7 +5,7 @@ The demo exercises deterministic policy, threshold-signed fresh protocol state, 
 ## Setup
 
 ```sh
-git clone https://github.com/Shaik-Sirajuddin/eth-call-scout.git
+git clone https://github.com/x0rc1ph3r/eth-call-scout.git
 cd eth-call-scout
 npm ci
 ```
@@ -67,12 +67,14 @@ Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separ
 
 ## Monitoring demo
 
-Public judge-ready pages:
+Judge-facing paths on the public Vercel production domain:
 
-- [Agent control room](https://shaik-sirajuddin.github.io/eth-call-scout/demo.html)
-- [Example interactive report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
-- [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
-- [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
+- `/demo.html` — agent control room
+- `/report.html` — example interactive report
+- `/ruleset.html` — visual wallet policy builder
+- `/pr-review-ruleset.html` — PR Review Agent ruleset
+
+See [Vercel deployment](deployment.md) for the exact import settings and the deployment-protection check required before sharing the URL.
 
 To generate and serve the same pages locally:
 

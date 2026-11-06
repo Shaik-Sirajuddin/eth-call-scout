@@ -63,13 +63,15 @@ An `allow` receipt covers only the normalized transaction hash and authenticated
 
 ## Web demo
 
-The deployed demo includes the responsive product site, a generated monitoring report, and two purpose-separated authoring tools:
+The Vercel deployment contains the responsive product site, the agent control room, a generated monitoring report, and two purpose-separated authoring tools. After assigning a public production domain, these paths are the judge-facing links:
 
-- [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
-- [Agent control room](https://shaik-sirajuddin.github.io/eth-call-scout/demo.html) — stored example evidence when deployed statically; live execution when run locally
-- [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
-- [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
-- [PR Review Agent ruleset](https://shaik-sirajuddin.github.io/eth-call-scout/pr-review-ruleset.html)
+- `/` — CallScout product site
+- `/demo.html` — stored example evidence when hosted; live execution when run locally
+- `/report.html` — interactive example call report
+- `/ruleset.html` — visual wallet policy builder
+- `/pr-review-ruleset.html` — PR Review Agent ruleset
+
+The exact dashboard values and the required public-access check are in [Vercel deployment](docs/deployment.md). The checked-in `vercel.json` sets the framework to Other, build command to `npm run site:build`, and output directory to `dist`; leave Vercel's Root Directory at the repository default (`.`).
 
 Build and serve the same pages locally:
 
