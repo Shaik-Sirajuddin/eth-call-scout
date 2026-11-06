@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CallScout is a deterministic wallet authorization and live protocol defense layer for AI agents.">
+  <meta name="theme-color" content="#07110f">
+  <title>CallScout — AI proposes. Policy decides. Wallet signs.</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header" data-header>
+    <a class="brand" href="#top" aria-label="CallScout home">
+      <svg class="brand-mark" viewBox="0 0 36 36" role="img" aria-hidden="true">
+        <path d="M18 2.5 31 7.7v9.5c0 8.1-5.4 13.5-13 16.3-7.6-2.8-13-8.2-13-16.3V7.7L18 2.5Z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M11 18h4l2-6 3 12 2-6h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>CallScout</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+      <span class="sr-only">Toggle navigation</span>
+      <span></span><span></span>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav>
+      <a href="#how-it-works">How it works</a>
+      <a href="#decision-lab">Decision lab</a>
+      <a href="#security">Security</a>
+      <a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/tree/main/docs">Docs</a>
+      <a class="nav-github" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero section" id="top">
+      <div class="hero-copy reveal">
+        <div class="eyebrow"><span class="pulse-dot"></span> Deterministic wallet security for AI agents</div>
+        <h1>Let agents act.<br><em>Keep wallets sovereign.</em></h1>
+        <p class="hero-lede">CallScout lets AI propose transactions without giving it unrestricted wallet authority. Executable policy, signed live protocol state, and full EVM simulation must all agree before the wallet ever sees a request.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#decision-lab">Inspect a decision <span aria-hidden="true">↓</span></a>
+          <a class="button button-ghost" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">View source <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="hero-proof" aria-label="Product properties">
+          <span>No LLM in the allow path</span>
+          <span>Fail-closed by default</span>
+          <span>Every allow is receipted</span>
+        </div>
+      </div>
+
+      <div class="hero-console reveal" aria-label="Illustrative authorization receipt">
+        <div class="console-glow" aria-hidden="true"></div>
+        <div class="console-bar">
+          <div class="console-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span>authorization / receipt_0187</span>
+          <span class="console-live">LIVE</span>
+        </div>
+        <div class="console-body">
+          <div class="tx-line">
+            <span class="tx-label">PROPOSED</span>
+            <span class="tx-method">approve(address,uint256)</span>
+            <span class="tx-value">1,000 USDC</span>
+          </div>
+          <div class="gate-stack">
+            <div class="gate-row">
+              <span class="gate-index">01</span>
+              <span class="gate-name">Executable policy</span>
+              <span class="gate-detail">selector + spender + ceiling</span>
+              <span class="gate-status pass">PASS</span>
+            </div>
+            <div class="gate-row">
+              <span class="gate-index">02</span>
+              <span class="gate-name">Live protocol state</span>
+              <span class="gate-detail">2/2 signed sources · fresh</span>
+              <span class="gate-status pass">PASS</span>
+            </div>
+            <div class="gate-row">
+              <span class="gate-index">03</span>
+              <span class="gate-name">Full transaction trace</span>
+              <span class="gate-detail">2/2 effect fingerprints</span>
+              <span class="gate-status pass">PASS</span>
+            </div>
+            <div class="gate-row final-gate">
+              <span class="gate-index">04</span>
+              <span class="gate-name">Wallet boundary</span>
+              <span class="gate-detail">exact request preserved</span>
+              <span class="gate-status allow">ALLOW</span>
+            </div>
+          </div>
+          <div class="receipt-hash"><span>policy</span> 8e4f…c291 <span>trace</span> 0d7a…e810</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manifesto" aria-label="CallScout principle">
+      <p>AI proposes.</p><span aria-hidden="true">→</span><p>Policy decides.</p><span aria-hidden="true">→</span><p>Wallet signs.</p>
+    </section>
+
+    <section class="section trust-section" id="how-it-works">
+      <div class="section-heading reveal">
+        <div class="eyebrow">The trust boundary</div>
+        <h2>The model never becomes the security system.</h2>
+        <p>The agent can plan, read public chain state, and produce a transaction proposal. It cannot alter policy, certify protocol health, bypass simulation, sign arbitrary messages, or touch the underlying provider.</p>
+      </div>
+
+      <div class="boundary-map reveal" aria-label="Transaction authorization architecture">
+        <div class="boundary-lane untrusted-lane">
+          <span class="lane-label">UNTRUSTED</span>
+          <div class="map-node agent-node">
+            <span class="node-icon">AI</span>
+            <div><strong>Agent runtime</strong><small>Goal → transaction proposal</small></div>
+          </div>
+        </div>
+        <div class="boundary-arrow" aria-hidden="true"><span></span><b>exact JSON request</b></div>
+        <div class="boundary-lane trusted-lane">
+          <span class="lane-label">DETERMINISTIC BOUNDARY</span>
+          <div class="map-pipeline">
+            <div class="map-node"><span class="node-number">01</span><div><strong>Policy engine</strong><small>Exact targets, methods, values, fees</small></div></div>
+            <div class="map-connector" aria-hidden="true"></div>
+            <div class="map-node"><span class="node-number">02</span><div><strong>Live state veto</strong><small>Threshold signed, fresh, rollback-safe</small></div></div>
+            <div class="map-connector" aria-hidden="true"></div>
+            <div class="map-node"><span class="node-number">03</span><div><strong>Simulation quorum</strong><small>Calls, logs, gas, state diff, assets</small></div></div>
+            <div class="map-connector" aria-hidden="true"></div>
+            <div class="map-node wallet-node"><span class="node-icon">W</span><div><strong>Wallet provider</strong><small>Reached only by an all-pass receipt</small></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section lab-section" id="decision-lab">
+      <div class="section-heading reveal">
+        <div class="eyebrow">Interactive decision lab</div>
+        <h2>One proposal. Four independent reasons to say no.</h2>
+        <p>Switch scenarios to see where the deterministic path stops. This is an illustrative local receipt viewer; the repository demo exercises the real implementation.</p>
+      </div>
+
+      <div class="lab-shell reveal">
+        <div class="scenario-list" role="tablist" aria-label="Authorization scenarios">
+          <button type="button" role="tab" aria-selected="true" data-scenario="safe">
+            <span>01</span><strong>Bounded approval</strong><small>Healthy + expected effects</small>
+          </button>
+          <button type="button" role="tab" aria-selected="false" data-scenario="compromised">
+            <span>02</span><strong>Protocol changed</strong><small>Whitelisted, but compromised</small>
+          </button>
+          <button type="button" role="tab" aria-selected="false" data-scenario="internal">
+            <span>03</span><strong>Hidden internal call</strong><small>Simulation reveals new target</small>
+          </button>
+          <button type="button" role="tab" aria-selected="false" data-scenario="delegation">
+            <span>04</span><strong>Unsafe 7702 delegate</strong><small>Runtime hash does not match</small>
+          </button>
+        </div>
+
+        <div class="receipt-view" role="tabpanel" aria-live="polite">
+          <div class="receipt-topline">
+            <span>DECISION RECEIPT</span>
+            <span data-receipt-time>BLOCK 23,804,912</span>
+          </div>
+          <div class="receipt-decision" data-receipt-decision>
+            <span class="decision-icon">✓</span>
+            <div><small>FINAL DECISION</small><strong>ALLOW</strong></div>
+          </div>
+          <div class="receipt-checks" data-receipt-checks></div>
+          <div class="receipt-evidence">
+            <div><span>POLICY</span><code data-policy-hash>8e4f01…c291</code></div>
+            <div><span>STATE</span><code data-state-hash>11ad90…7bc2</code></div>
+            <div><span>TRACE</span><code data-trace-hash>0d7ac2…e810</code></div>
+          </div>
+          <p class="receipt-explanation" data-receipt-explanation>Every deterministic check passed. The exact copied request may reach the wallet.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section layers-section" id="security">
+      <div class="section-heading reveal">
+        <div class="eyebrow">Defense in depth</div>
+        <h2>Each layer can veto. None can grant alone.</h2>
+      </div>
+      <div class="layer-grid">
+        <article class="layer-card reveal">
+          <div class="layer-meta"><span>01</span><span>LOCAL · DETERMINISTIC</span></div>
+          <h3>Executable rules, not prompt promises.</h3>
+          <p>Strict JSON schemas bind wallet, chain, contract, selector, ABI words, value, gas, fees, expiry, and approvals. Unknown fields and unsupported shapes deny.</p>
+          <div class="mini-code" aria-label="Policy example"><code><i>defaultAction</i>: <b>"deny"</b><br><i>selector</i>: <b>"0x095ea7b3"</b><br><i>maxApproval</i>: <b>"1000000000"</b></code></div>
+        </article>
+        <article class="layer-card reveal">
+          <div class="layer-meta"><span>02</span><span>LIVE · AUTHENTICATED</span></div>
+          <h3>Whitelist does not mean healthy.</h3>
+          <p>Independent RPCs verify runtime bytecode, storage, and read-call invariants. Threshold-signed state is checked for freshness, exact target binding, and rollback.</p>
+          <div class="status-orbit" aria-label="Protocol status operational"><span></span><strong>OPERATIONAL</strong><small>2 / 2 quorum · 42s old</small></div>
+        </article>
+        <article class="layer-card reveal">
+          <div class="layer-meta"><span>03</span><span>RUNTIME · QUORUM</span></div>
+          <h3>Simulate effects, not intent.</h3>
+          <p>Trace-capable nodes must agree on the full call tree, logs, gas, native outflow, asset changes, storage writes, and code effects of the exact transaction.</p>
+          <div class="trace-viz" aria-hidden="true"><span class="trace-root">EOA</span><i></i><span>Router</span><i></i><span>USDC</span><b>2/2 MATCH</b></div>
+        </article>
+        <article class="layer-card reveal">
+          <div class="layer-meta"><span>04</span><span>BOUNDARY · AUDITED</span></div>
+          <h3>Expose less wallet, keep more control.</h3>
+          <p>The agent receives a guarded provider—not a signer. Raw signing, typed data, raw transactions, chain mutation, permission changes, and unsupported batches are blocked.</p>
+          <div class="blocked-methods"><span>personal_sign</span><span>sendRawTransaction</span><span>wallet_sendCalls</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section eip-section">
+      <div class="eip-panel reveal">
+        <div class="eip-copy">
+          <div class="eyebrow">EIP-7702 without blind trust</div>
+          <h2>Persistent delegation gets a higher bar.</h2>
+          <p>7702 is off by default. When explicitly enabled, CallScout recovers the authorization signer, binds wallet, chain, and next nonce, verifies the delegate’s live runtime code hash, rejects delegation chains, and requires the state diff to prove the exact code change.</p>
+          <p class="eip-note">Simulation catches malicious behavior in this transaction. Code identity protects against behavior that could emerge later under different callers or state.</p>
+          <a class="text-link" href="https://github.com/Shaik-Sirajuddin/eth-call-scout/blob/main/docs/transaction-simulation.md">Read the 7702 security model <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="delegation-card" aria-label="EIP-7702 verification sequence">
+          <div class="delegation-head"><span>SET_CODE / TYPE 0x04</span><span class="locked">OPT-IN</span></div>
+          <ol>
+            <li><span>01</span><div><strong>Recover authority</strong><small>signer == guarded wallet</small></div><b>✓</b></li>
+            <li><span>02</span><div><strong>Bind chain + nonce</strong><small>chain 1 · pending nonce + 1</small></div><b>✓</b></li>
+            <li><span>03</span><div><strong>Verify delegate code</strong><small>address + keccak256(runtime)</small></div><b>✓</b></li>
+            <li><span>04</span><div><strong>Simulate full effects</strong><small>trace + logs + state diff</small></div><b>✓</b></li>
+          </ol>
+          <div class="delegation-result"><span>DELEGATION</span><strong>VERIFIED</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section open-section">
+      <div class="open-copy reveal">
+        <div class="eyebrow">Open source · inspect every decision</div>
+        <h2>Run the complete trust path locally.</h2>
+        <p>The offline demo uses mock wallets and RPCs: one safe transaction is forwarded, five hostile or stale scenarios stop before the wallet, and all six receipts form a verified hash chain.</p>
+        <div class="open-links">
+          <a class="button button-primary" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">Explore the repository <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="https://github.com/Shaik-Sirajuddin/eth-call-scout#architecture">Read the architecture <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+      <div class="terminal reveal">
+        <div class="terminal-bar"><span></span><span></span><span></span><b>callscout — zsh</b></div>
+        <pre><code><span class="prompt">$</span> npm ci
+<span class="prompt">$</span> npm run verify
+
+<span class="muted"># deterministic policy</span>         <span class="ok">PASS</span>
+<span class="muted"># signed live protocol state</span>  <span class="ok">PASS</span>
+<span class="muted"># full transaction simulation</span> <span class="ok">PASS</span>
+<span class="muted"># 50 security tests</span>           <span class="ok">PASS</span>
+<span class="muted"># forwarded transactions</span>       <span class="number">1 / 6</span></code></pre>
+        <button class="copy-command" type="button" data-copy="npm ci && npm run verify"><span>Copy command</span><b aria-hidden="true">⌘C</b></button>
+      </div>
+    </section>
+
+    <section class="closing-section">
+      <div class="closing-grid" aria-hidden="true"></div>
+      <div class="closing-copy reveal">
+        <div class="eyebrow">The least-authority wallet layer</div>
+        <h2>Give agents capability.<br><em>Not custody.</em></h2>
+        <p>Build agent workflows where every wallet action is bounded, live-state aware, fully simulated, and auditable.</p>
+        <a class="button button-light" href="https://github.com/Shaik-Sirajuddin/eth-call-scout">Start with CallScout <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2.5 31 7.7v9.5c0 8.1-5.4 13.5-13 16.3-7.6-2.8-13-8.2-13-16.3V7.7L18 2.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 18h4l2-6 3 12 2-6h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>CallScout</span>
+    </a>
+    <p>Deterministic wallet authorization and live protocol defense for AI agents.</p>
+    <div class="footer-links"><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/tree/main/docs">Docs</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout/blob/main/SECURITY.md">Security</a><a href="https://github.com/Shaik-Sirajuddin/eth-call-scout">GitHub</a></div>
+    <span class="footer-note">ETHGlobal prototype · test networks recommended</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "includeDefaults": true,
+  "scanPaths": ["examples"],
+  "excludeAddresses": [],
+  "excludeProtocolIds": [],
+  "blacklistAddresses": [],
+  "knownAddresses": [],
+  "trustedFunctions": [
+    "getreservesdata",
+    "exactinputsingle",
+    "swapexacttokensfortokens"
+  ],
+  "highSlippageBps": 500,
+  "tokens": [],
+  "protocols": [],
+  "contracts": []
+}

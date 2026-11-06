@@ -19,9 +19,11 @@ function response(idValue, result) {
 
 function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat(20)}`, delegateCode = '0x6001600055', currentNonce = '0x7', rpcChainId = '0x1', traceFrom = null, unauthorizedInternalCall = false, outputByHost = {} } = {}) {
   const methods = [];
+  const transactions = [];
   const fetchImpl = async (url, options) => {
     const request = JSON.parse(options.body);
     methods.push(request.method);
+    if (['eth_call', 'eth_estimateGas', 'debug_traceCall'].includes(request.method)) transactions.push(request.params[0]);
     if (request.method === 'eth_chainId') return response(request.id, rpcChainId);
     if (request.method === 'eth_blockNumber') return response(request.id, '0x100');
     if (request.method === 'eth_getCode') {
@@ -68,7 +70,7 @@ function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat
     }
     throw new Error(`Unexpected RPC method ${request.method}`);
   };
-  return { fetchImpl, methods };
+  return { fetchImpl, methods, transactions };
 }
 
 test('allows only when a quorum agrees on one passing full trace and state diff', async () => {
@@ -79,6 +81,7 @@ test('allows only when a quorum agrees on one passing full trace and state diff'
   assert.equal(result.summary.metrics.calls, 1);
   assert.equal(result.summary.metrics.storageWrites, 1);
   assert.equal(result.checks.find((check) => check.id === 'eip7702:security').status, 'pass');
+  assert.ok(fake.transactions.every((transaction) => transaction.nonce === '0x7' && Array.isArray(transaction.accessList)));
 });
 
 test('denies an unauthorized internal call observed by the simulation quorum', async () => {
@@ -136,6 +139,14 @@ test('denies a trace whose root does not match the exact proposed transaction', 
   const result = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fake.fetchImpl });
   assert.equal(result.valid, false);
   assert.ok(result.summary.sources.every((source) => source.failures.some((failure) => failure.includes('Trace root sender'))));
+});
+
+test('denies when simulation sources do not agree with the exact outer nonce', async () => {
+  const fake = simulationFetch({ currentNonce: '0x8' });
+  const result = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fake.fetchImpl });
+  assert.equal(result.valid, false);
+  assert.ok(result.summary.sources.every((source) => source.failures.some((failure) => failure.includes('does not match pending account nonce'))));
+  assert.equal(fake.methods.includes('eth_call'), false);
 });
 
 test('fully simulates an opted-in EIP-7702 authorization after signature, nonce, and code-hash checks', async () => {

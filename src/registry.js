@@ -117,6 +117,12 @@ export function applyRuleset(registry, ruleset = {}) {
     tokens: dedupeTokens(tokens),
     protocols,
     contracts: [...new Map(contracts.map((x) => [`${x.chainId ?? 1}:${x.address.toLowerCase()}`, { chainId: 1, ...x }])).values()],
+    riskPolicy: {
+      blacklistAddresses: [...new Set((ruleset.blacklistAddresses ?? []).filter((x) => ADDRESS.test(String(x))).map((x) => x.toLowerCase()))],
+      knownAddresses: [...new Set((ruleset.knownAddresses ?? []).filter((x) => ADDRESS.test(String(x))).map((x) => x.toLowerCase()))],
+      trustedFunctions: [...new Set((ruleset.trustedFunctions ?? []).map((x) => String(x).trim().toLowerCase()).filter(Boolean))],
+      highSlippageBps: Number.isFinite(Number(ruleset.highSlippageBps)) ? Math.max(1, Number(ruleset.highSlippageBps)) : 500,
+    },
   };
 }
 
@@ -177,15 +183,36 @@ export function enrichFindings(findings, registry) {
   const tokenMap = new Map(registry.tokens.map((x) => [`${x.chainId}:${x.address.toLowerCase()}`, x]));
   const contractMap = new Map((registry.contracts ?? []).map((x) => [`${x.chainId}:${x.address.toLowerCase()}`, x]));
   const protocolMap = new Map(registry.protocols.filter((x) => x.address).map((x) => [`1:${x.address.toLowerCase()}`, x]));
+  const blacklist = new Set((registry.riskPolicy?.blacklistAddresses ?? []).map((x) => x.toLowerCase()));
+  const knownAddresses = new Set((registry.riskPolicy?.knownAddresses ?? []).map((x) => x.toLowerCase()));
+  for (const item of [...registry.tokens, ...(registry.contracts ?? []), ...registry.protocols]) if (ADDRESS.test(String(item.address ?? ''))) knownAddresses.add(item.address.toLowerCase());
   return findings.map((f) => {
-    const involvedAddresses = addressesIn([f.address, f.parameters, f.transaction?.to]).map((address) => {
+    const involvedAddresses = addressesIn([f.address, f.parameters, f.transaction?.to, f.transaction?.from]).map((address) => {
       const key = `1:${address.toLowerCase()}`;
       const token = tokenMap.get(key);
       const contract = contractMap.get(key);
       const protocol = contract ? registry.protocols.find((x) => x.id === contract.protocolId) : protocolMap.get(key);
-      return { address, known: Boolean(token || contract || protocol), kind: token ? 'token' : contract || protocol ? 'protocol' : 'unmapped' };
+      const isBlacklisted = blacklist.has(address.toLowerCase());
+      const known = knownAddresses.has(address.toLowerCase()) || Boolean(token || contract || protocol);
+      return { address, known, blacklisted: isBlacklisted, kind: token ? 'token' : contract || protocol ? 'protocol' : 'unmapped', name: token?.name ?? contract?.name ?? protocol?.name ?? null, symbol: token?.symbol ?? null, logo: token?.logoURI ?? protocol?.logo ?? null, risk: isBlacklisted ? 'high' : known ? 'low' : 'low-mid' };
     });
-    if (!f.address) return { ...f, involvedAddresses };
+    const staticSource = f.source === 'runtime' ? 'runtime' : 'static';
+    const riskFlags = [...(f.riskFlags ?? [])];
+    const actionName = String(f.functionName ?? '').toLowerCase();
+    const threshold = registry.riskPolicy?.highSlippageBps ?? 500;
+    const functionKnown = (registry.riskPolicy?.trustedFunctions ?? []).includes(actionName);
+    if (/swap|exactinput|exactoutput/.test(actionName)) {
+      const slippageValues = (value, key = '') => {
+        if (Array.isArray(value)) return value.flatMap((item) => slippageValues(item, key));
+        if (value && typeof value === 'object') return Object.entries(value).flatMap(([childKey, item]) => slippageValues(item, childKey));
+        if (!/slippage|tolerance/i.test(key)) return [];
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? [numeric] : [];
+      };
+      const values = slippageValues(f.parameters);
+      if (values.some((value) => value > threshold || (value > 0 && value < 1 && value * 10_000 > threshold))) riskFlags.push({ kind: 'high-slippage', severity: 'mid', detail: `Configured slippage exceeds ${threshold} bps.` });
+    }
+    if (!f.address) return { ...f, source: staticSource, functionKnown, riskFlags, involvedAddresses };
     const token = tokenMap.get(`1:${f.address.toLowerCase()}`);
     const contract = contractMap.get(`1:${f.address.toLowerCase()}`);
     const protocol = contract ? registry.protocols.find((x) => x.id === contract.protocolId) : protocolMap.get(`1:${f.address.toLowerCase()}`);
@@ -195,7 +222,7 @@ export function enrichFindings(findings, registry) {
     } : token ? { type: 'token', name: token.name, symbol: token.symbol, logo: token.logoURI } : protocol ? {
       type: 'protocol contract', name: protocol.name, category: protocol.category, logo: protocol.logo, contractName: protocol.name,
     } : null;
-    return { ...f, registryMatch, involvedAddresses };
+    return { ...f, source: staticSource, functionKnown, registryMatch, riskFlags, involvedAddresses };
   });
 }
 

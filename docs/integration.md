@@ -31,19 +31,19 @@ agentTools.register('ethereum', guardedProvider);
 1. Do not pass `walletProvider`, a signer, a private key, a seed phrase, or a wallet session object to the model runtime.
 2. Do not expose filesystem or environment access that lets the agent recover wallet secrets or replace the active policy.
 3. Put the guard immediately next to the wallet boundary. A preflight check in a separate tool is insufficient because the eventual transaction can differ.
-4. Preserve the exact request object evaluated by the guard. Do not let another component rewrite calldata, target, value, fees, or chain after authorization.
+4. Supply explicit `chainId` and pending `nonce` fields, then preserve the exact request object evaluated by the guard. Do not let another component rewrite calldata, target, value, nonce, access list, gas, fees, type, or chain after authorization.
 5. Store receipts somewhere the agent cannot modify or delete.
 6. Keep native wallet confirmation enabled for high-risk policies. CallScout is compatible with human approval and multisig flows.
 7. Use short-lived policies and low value/approval ceilings for unattended operation.
 8. Protect the persistent state-sequence store from agent writes and deletion.
-9. Configure independent trace-capable simulation RPCs through the environment variables named by policy. Do not reuse one URL under multiple source IDs.
+9. Configure at least two independent trace-capable simulation RPCs with quorum of at least two through the environment variables named by policy. Do not reuse one URL under multiple source IDs.
 10. Keep EIP-7702 disabled unless the integration can maintain a reviewed delegate allowlist and pinned runtime code hashes.
 
 ## RPC surface
 
 The guard exposes common read-only Ethereum methods. It supports one mutation path: `eth_sendTransaction` after policy authorization, authenticated live-state verification, and full transaction simulation.
 
-Legacy/type-0 and EIP-1559/type-2 requests are supported. Type-4 EIP-7702 requests are default-deny and require explicit policy opt-in plus signature, chain, nonce, delegate code-hash, and state-diff checks. A delegated wallet can send batches through a self-call; every call it sends is checked against policy using the simulated call tree. Type-1, type-3 blob, and all other transaction envelopes deny until explicitly implemented. Every supported transaction that could be forwarded must reach simulation quorum; an earlier deterministic denial stops without wallet access.
+Legacy/type-0 and EIP-1559/type-2 requests are supported. Every request must include an explicit chain ID and outer nonce; every simulation source must report that nonce as pending. Type-2 access lists are strictly parsed, bounded, normalized, and simulated unchanged. Type-4 EIP-7702 requests are default-deny and require explicit policy opt-in plus signature, chain, outer/authorization nonce binding, delegate code-hash, and state-diff checks. A delegated wallet can send batches through a self-call; every wallet-originated call is checked against exact contract policy and signed live state from the simulated call tree. Type-1, type-3 blob, and all other transaction envelopes deny until explicitly implemented. Every supported transaction that could be forwarded must reach simulation quorum; an earlier deterministic denial stops without wallet access.
 
 It denies raw signing, message signing, typed-data signing, raw transaction submission, wallet permissions, chain switching/addition, and unsupported batch APIs. Supporting a new mutation method requires a purpose-built parser and policy evaluator; adding it to an allowlist is not enough.
 

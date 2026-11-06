@@ -10,20 +10,21 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 - malicious content returned by a website, protocol, tool, or RPC response;
 - a transaction proposal with deceptive labels but hostile calldata;
 - stale protocol metadata after an incident or emergency pause;
-- a compromised single live-state publisher when a signature threshold is configured;
+- a compromised single live-state publisher, which cannot meet the mandatory two-signature threshold;
 - replay of an old authorization receipt or old protocol-state snapshot; and
 - configuration mistakes such as wildcard-like permissions, unbounded approvals, missing expiries, or policies not bound to a wallet.
 
 ## Security invariants
 
 - The policy default is always deny.
-- Authorization uses chain, target, selector, calldata, value, gas, and fee fields—not natural-language descriptions.
+- Authorization uses chain, outer nonce, type, access list, target, selector, calldata, value, gas, and fee fields—not natural-language descriptions.
 - Unknown chains, targets, selectors, and RPC mutation methods deny.
 - Invalid or expired policies deny.
 - A denied request is never forwarded.
 - Unlimited ERC-20 approvals are blocked by the secure profile.
 - Approval spender and amount limits can be enforced from ABI words.
-- The active wallet chain is obtained independently from the transaction proposal.
+- The active wallet chain is obtained independently and must exactly match the explicit transaction chain.
+- Every simulation source must report the explicit outer nonce as the wallet's pending account nonce.
 - Read access does not imply signing access.
 - Live protocol state is a veto and can never turn a policy denial into an allow.
 - Receipt hashes identify the exact normalized policy and transaction evaluated.
@@ -59,7 +60,7 @@ No automated system can guarantee a protocol is uncompromised. CallScout reduces
 
 ## Fail-closed behavior
 
-Every executable policy requires authenticated live state and full transaction simulation. Production policies should also require bounded expiry, wallet binding, and method constraints. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, simulation disagreement, unsupported tracer output, or unsupported transaction forms deny.
+Every executable policy requires wallet binding, an expiry, an explicit gas cap, authenticated live state with at least two keys and signatures, and full transaction simulation with at least two sources and a quorum of two. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, simulation disagreement, unsupported tracer output, or unsupported transaction forms deny.
 
 ## Reporting vulnerabilities
 

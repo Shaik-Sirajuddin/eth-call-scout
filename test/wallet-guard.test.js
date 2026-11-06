@@ -7,12 +7,12 @@ import { createGuardedProvider, WalletGuardError } from '../src/wallet-guard.js'
 
 const policy = JSON.parse(fs.readFileSync(new URL('../examples/wallet-policy.json', import.meta.url), 'utf8'));
 const intent = JSON.parse(fs.readFileSync(new URL('../examples/transaction-intent.json', import.meta.url), 'utf8'));
-const stateKeys = crypto.generateKeyPairSync('ed25519');
+const stateKeys = [crypto.generateKeyPairSync('ed25519'), crypto.generateKeyPairSync('ed25519')];
 policy.protocolState = {
   required: true,
   maxAgeSeconds: 300,
-  threshold: 1,
-  trustedKeys: [{ id: 'test', algorithm: 'ed25519', publicKey: stateKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }],
+  threshold: 2,
+  trustedKeys: stateKeys.map((keys, index) => ({ id: `test-${index}`, algorithm: 'ed25519', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') })),
 };
 const statePayload = {
   version: 1,
@@ -21,7 +21,8 @@ const statePayload = {
   expiresAt: '2026-12-01T00:05:00.000Z',
   protocols: [{ id: 'usdc', chainId: 1, status: 'operational', observedAt: '2026-12-01T00:00:00.000Z', contracts: [intent.to] }],
 };
-const protocolState = addProtocolStateSignature({ version: 1, payload: statePayload, signatures: [] }, signProtocolState(statePayload, { keyId: 'test', privateKey: stateKeys.privateKey }));
+let protocolState = { version: 1, payload: statePayload, signatures: [] };
+stateKeys.forEach((keys, index) => { protocolState = addProtocolStateSignature(protocolState, signProtocolState(statePayload, { keyId: `test-${index}`, privateKey: keys.privateKey })); });
 const simulator = async () => ({
   valid: true,
   checks: [{ id: 'simulation:consensus', status: 'pass', detail: 'Test simulation quorum passed.' }],
@@ -82,6 +83,22 @@ test('never forwards when mandatory full simulation denies', async () => {
   await assert.rejects(
     guard.request({ method: 'eth_sendTransaction', params: [intent] }),
     (error) => error instanceof WalletGuardError && error.receipt.checks.some((check) => check.id === 'simulation:policy' && check.status === 'deny'),
+  );
+  assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
+});
+
+test('denies when the exact transaction chain differs from the active wallet chain', async () => {
+  const provider = mockProvider();
+  provider.request = async function request(call) {
+    this.requests.push(structuredClone(call));
+    if (call.method === 'eth_chainId') return '0x2';
+    if (call.method === 'eth_sendTransaction') return '0xunexpected';
+    return 'read-result';
+  };
+  const guard = createGuardedProvider({ provider, policy, protocolState, simulator, now: new Date('2026-12-01T00:00:00.000Z') });
+  await assert.rejects(
+    guard.request({ method: 'eth_sendTransaction', params: [intent] }),
+    (error) => error instanceof WalletGuardError && error.receipt.checks.some((check) => check.id === 'wallet:active-chain' && check.status === 'deny'),
   );
   assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
 });

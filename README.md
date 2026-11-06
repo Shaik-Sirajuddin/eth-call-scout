@@ -22,13 +22,15 @@ Markdown instructions and system prompts are advisory. They can be ignored, misr
 The guarded provider:
 
 - forwards a fixed set of read-only RPC methods;
-- evaluates the exact `eth_sendTransaction` fields immediately before forwarding;
+- evaluates the exact `eth_sendTransaction` envelope—including explicit chain, outer nonce, access list, gas, fees, calldata, target, and value—immediately before forwarding;
 - requires full call, trace, log, and state-diff simulation after policy and live-state checks;
 - denies raw signing, typed-data signing, opaque raw transactions, wallet permission changes, chain switching, and unsupported batch methods;
 - forwards a transaction only when every deterministic check passes; and
 - emits a receipt containing policy and transaction hashes for audit.
 
 Missing data, invalid policies, unknown targets, unknown selectors, malformed calldata, and failed checks deny by default.
+
+Version 1 has a mandatory secure activation profile: an executable policy must be wallet-bound, expiring, gas-capped, protected by at least two live-state keys with a threshold of two, and configured with at least two simulation sources and a quorum of two. Drafts that do not yet satisfy activation can still be inspected with `callscout policy audit`, but they cannot authorize a wallet.
 
 ## Quick start
 
@@ -50,7 +52,19 @@ npm run demo
 npm run verify
 ```
 
-An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; CallScout never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by CallScout is the request forwarded to the wallet.
+
+## Landing page
+
+The responsive product site is buildless and lives in `site/`:
+
+```sh
+npm run site:check
+npm run site:serve
+# open http://127.0.0.1:4173
+```
+
+Its interactive decision lab is an illustrative presentation of the real receipt pipeline. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
 
 ## Architecture
 
@@ -185,19 +199,19 @@ Never expose the underlying wallet provider, signer, seed phrase, private key, s
 
 ## Full transaction simulation
 
-Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, trace disagreement, missing quorum, or malformed output deny.
+Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout requires the proposed outer nonce to match each source's pending account nonce, then evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff using the same access list and envelope fields. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, nonce disagreement, trace disagreement, missing quorum, or malformed output deny.
 
 EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. Delegated wallets can send batches through a self-call, and every call inside a batch must pass the same policy and live-state rules as a top-level transaction. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
 
 ## Live protocol veto
 
-Policies can require a fresh protocol-state bundle signed by a threshold of pinned Ed25519 keys. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
+Policies require a fresh protocol-state bundle signed by at least two pinned Ed25519 keys with a threshold of at least two. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
 
 Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
 
 ## Deterministic on-chain monitors
 
-CallScout can collect protocol observations from multiple independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. A quorum of matching sources produces `operational`; a quorum of deterministic mismatches produces `compromised`; disagreement or outages produce `degraded`.
+CallScout collects protocol observations from at least two independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. The secure monitor profile requires a quorum of at least two: matching sources produce `operational`, deterministic mismatches produce `compromised`, and disagreement or outages produce `degraded`.
 
 ```sh
 export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
@@ -270,3 +284,11 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 ## Project status
 
 This is an ETHGlobal prototype under active security hardening. Use test wallets and test networks while evaluating it. A production deployment requires an independent security review of the policy engine, state-signing operations, wallet adapter, and release pipeline.
+
+## Secu pull request review
+
+The repository root `.secu` file is the version 1 JSON ruleset for source review. Its `scanPaths` field selects the files to compare; the current configuration targets `examples/`. On each pull request, the **Secu contract call review** workflow runs the Rust parser against the base and proposed commits on GitHub-hosted runners, then publishes a Markdown artifact with the risk score, summary, parsed call changes, protocols added or removed, and function signatures added or removed. The report compares static source findings and does not claim that separate calls execute in the same on-chain transaction.
+
+The scanner job has read-only repository permissions. A separate workflow, triggered only after the scan workflow completes, reads the text artifact and posts it as a pull request comment review using the repository token. It does not check out or execute pull request code. Actions are pinned to full commit SHAs.
+
+To change the review scope, edit `scanPaths` in `.secu`; add blacklist/known addresses or registry mappings there to tune risk labels. The scanner compiles from `parser-rs/` via `npm run build:parser`; the JavaScript CLI and report renderer remain in `src/`.
