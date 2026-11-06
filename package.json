@@ -16,7 +16,10 @@
     "demo": "node ./scripts/demo-scenarios.js",
     "site:check": "node --check ./site/app.js && node ./scripts/check-site.js",
     "site:serve": "node ./scripts/serve-site.js",
-    "verify": "npm run check && npm test && npm run demo"
+    "verify": "npm run check && npm test && npm run demo",
+    "report:diff": "node scripts/diff-reports.js",
+    "build:parser": "cargo build --release --manifest-path parser-rs/Cargo.toml",
+    "prescan": "npm run build:parser"
   },
   "dependencies": {
     "ethers": "^6.17.0",
