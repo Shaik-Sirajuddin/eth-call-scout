@@ -1,6 +1,22 @@
 # Executable policy reference
 
-Wallet policies are machine-enforced JSON, not prompts. The runtime validator in `src/policy.js` is authoritative; `schema/wallet-policy.schema.json` supports editors and review tooling.
+Wallet policies are machine-enforced JSON, not prompts. A prompt can be used to author an untrusted draft, but it never becomes an enforcement instruction by itself. The runtime validator in `src/policy.js` is authoritative; `schema/wallet-policy.schema.json` supports editors and review tooling.
+
+## Plain-language authoring
+
+Policy Studio at `/policy` accepts a natural-language description and produces a reviewable policy graph. When `OPENAI_API_KEY` is configured, a server-side model translates prose into a deliberately small canonical rule language using Structured Outputs. It does not return executable policy JSON directly. Deterministic code then:
+
+1. rejects unresolved, broad, unlimited, or security-bypass requirements;
+2. resolves token, protocol, and spender identities against the bundled registry;
+3. converts decimal token and fee amounts without floating-point arithmetic;
+4. compiles exact wallet, chain, expiry, target, selector, argument, quorum, and EIP-7702 fields; and
+5. runs `validatePolicy(..., { activation: true })` before the draft can replace the editor graph.
+
+If AI is not configured, the endpoint accepts only the same canonical rule grammar and identifies the result as `deterministic-fallback`. The block editor remains available under **Edit generated blocks** for exact review and manual refinement.
+
+AI output, the browser graph, and registry labels are all untrusted authoring inputs. The endpoint cannot activate a policy, access a signer, or submit a transaction. Keep policy activation under a separate authenticated operator workflow and review the exact JSON or policy hash before activation.
+
+The supported canonical rules include exact wallet/chain binding, ISO expiry, registry-backed token approval caps, exact contract selectors, native value/gas/fee ceilings, live-state and simulation quorums, EIP-7702 denial, and code-hash-pinned EIP-7702 opt-in. Unsupported requirements fail closed instead of being silently omitted.
 
 ## Top-level fields
 

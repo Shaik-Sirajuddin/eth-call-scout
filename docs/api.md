@@ -8,6 +8,24 @@ Default local origin: `http://127.0.0.1:3000`
 
 All responses are JSON except the product pages. API responses set `Cache-Control: no-store`.
 
+## Policy-authoring endpoint
+
+### `POST /api/policy/compile-prompt`
+
+This user-facing Policy Studio endpoint converts a description into an untrusted executable-policy draft. It is not part of the AI agent's wallet capability and cannot activate policy or submit transactions.
+
+```json
+{
+  "prompt": "Let Uniswap approve at most 1,000 USDC from wallet 0x... on Ethereum until 2030-01-01. Keep 7702 disabled."
+}
+```
+
+The server accepts at most 4,000 prompt characters. With `OPENAI_API_KEY` configured, it uses server-side AI Structured Outputs to translate the description into canonical rules. The key is never sent to the browser. Deterministic code then resolves registry addresses, converts amounts, rejects unsupported or broad permissions, builds the exact policy, and applies the full activation validator.
+
+A valid response returns `200` with `authoringMode: "ai-assisted"`, the translation trace, recognized deterministic clauses, warnings, and the exact `policy`. A rejected draft returns `422` with clause-level errors. Without an API key, the endpoint uses `authoringMode: "deterministic-fallback"` and accepts only canonical rule phrases. AI-provider or structured-output failure returns `502` and no policy is changed.
+
+The response does not mean the policy is active. The operator must review the generated graph/JSON and use a separate controlled activation workflow.
+
 After starting the local app, exercise the complete external-agent contract without a signer:
 
 ```bash

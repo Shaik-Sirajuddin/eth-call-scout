@@ -79,11 +79,11 @@ Judge-facing paths in the Next.js app:
 - `/runs` — agent control room and persistent history;
 - `/runs/:id` — complete evidence for a selected run;
 - `/report` — interactive call-surface report; and
-- `/policy` — visual wallet policy builder.
+- `/policy` — AI-assisted plain-language policy builder and visual advanced editor.
 
 See [Vercel deployment](deployment.md) for the import settings, public-access check, and the explicit boundary between the hosted UI and the later testnet transaction backend.
 
-The policy studio supports draggable blocks, explicit connections, pan, zoom, fit-to-view, a minimap, local persistence, import/export, and continuous structural checks. Exported JSON must still pass the authoritative validator before it can be activated:
+In Policy Studio, describe the wallet, expiry, allowed action, numeric caps, quorum requirements, and EIP-7702 posture, then click **Generate ruleset**. With `OPENAI_API_KEY` configured, AI translates the prose into constrained rules; deterministic code resolves exact registry addresses and validates the compiled policy. Click **Review generated blocks** to inspect or refine the result on the draggable, zoomable canvas. Exported JSON must still pass the authoritative validator before it can be activated:
 
 ```sh
 npx keybound policy validate path/to/exported-policy.json

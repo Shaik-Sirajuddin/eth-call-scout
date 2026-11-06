@@ -16,6 +16,12 @@ test('visual policy builder exposes the complete local authoring workflow', () =
 
   for (const marker of [
     'id="canvas"',
+    'id="policyPrompt"',
+    'id="compilePrompt"',
+    'id="promptMode"',
+    'id="blocksMode"',
+    '/api/policy/compile-prompt',
+    'AI suggests; deterministic code decides',
     'id="zoomIn"',
     'id="zoomOut"',
     'id="fitView"',
