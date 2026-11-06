@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderRulesetBuilder, renderScanRulesetBuilder } from '../src/ruleset-page.js';
+import { renderReviewRulesetBuilder, renderRulesetBuilder } from '../src/ruleset-page.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const registry = JSON.parse(fs.readFileSync(path.join(root, 'data', 'registry.static.json'), 'utf8'));
@@ -12,9 +12,9 @@ fs.writeFileSync(target, html, 'utf8');
 const servedCopy = path.join(root, 'reports', 'ruleset.html');
 fs.mkdirSync(path.dirname(servedCopy), { recursive: true });
 fs.writeFileSync(servedCopy, html, 'utf8');
-const scannerTarget = path.join(root, 'scanner-ruleset.html');
-const scannerHtml = renderScanRulesetBuilder(registry);
-fs.writeFileSync(scannerTarget, scannerHtml, 'utf8');
-const scannerServedCopy = path.join(root, 'reports', 'scanner-ruleset.html');
-fs.writeFileSync(scannerServedCopy, scannerHtml, 'utf8');
-process.stdout.write(`Policy builder: ${target}\nServed copy: ${servedCopy}\nScanner terms: ${scannerTarget}\nScanner served copy: ${scannerServedCopy}\n`);
+const reviewTarget = path.join(root, 'pr-review-ruleset.html');
+const reviewHtml = renderReviewRulesetBuilder(registry);
+fs.writeFileSync(reviewTarget, reviewHtml, 'utf8');
+const reviewServedCopy = path.join(root, 'reports', 'pr-review-ruleset.html');
+fs.writeFileSync(reviewServedCopy, reviewHtml, 'utf8');
+process.stdout.write(`Policy builder: ${target}\nServed copy: ${servedCopy}\nPR Review Agent ruleset: ${reviewTarget}\nReview served copy: ${reviewServedCopy}\n`);
