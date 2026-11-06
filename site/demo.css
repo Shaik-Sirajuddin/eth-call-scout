@@ -121,11 +121,11 @@ textarea { width: 100%; min-height: 100px; padding: 17px; resize: vertical; bord
 .engine-strip strong { min-width: 0; color: var(--paper); font-size: var(--type-small); }
 
 .runs-layout { min-height: 720px; display: grid; grid-template-columns: 330px minmax(0,1fr); border: 1px solid var(--line-strong); background: var(--panel); }
-.run-rail { min-width: 0; border-right: 1px solid var(--line); background: #0d100c; }
+.run-rail { position: sticky; top: 0; align-self: start; min-width: 0; height: 100vh; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: #0d100c; }
 .rail-heading { min-height: 88px; padding: 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .rail-heading h2 { margin: 4px 0 0; font-size: 22px; letter-spacing: -.03em; }
 .run-count { min-width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line-strong); color: var(--paper); font: 700 var(--type-label) var(--mono); font-variant-numeric: tabular-nums; }
-.run-list { max-height: 840px; overflow-y: auto; }
+.run-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .run-item { width: 100%; min-height: 124px; padding: 16px 18px; display: grid; gap: 10px; border: 0; border-bottom: 1px solid var(--line); color: inherit; text-align: left; background: transparent; cursor: pointer; }
 .run-item:hover { background: var(--panel); }
 .run-item.active { background: var(--panel-2); box-shadow: inset 3px 0 var(--signal); }
@@ -227,8 +227,8 @@ textarea { width: 100%; min-height: 100px; padding: 17px; resize: vertical; bord
   .engine-strip > div:nth-child(2) { border-right: 0; }
   .engine-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .runs-layout { grid-template-columns: 1fr; }
-  .run-rail { border: 0; border-bottom: 1px solid var(--line); }
-  .run-list { max-height: 390px; }
+  .run-rail { position: static; height: auto; border: 0; border-bottom: 1px solid var(--line); }
+  .run-list { flex: none; max-height: 390px; overflow-y: auto; }
   .metric-grid, .evidence-grid { grid-template-columns: 1fr 1fr; }
   .demo-result { grid-template-columns: 1fr; }
 }
