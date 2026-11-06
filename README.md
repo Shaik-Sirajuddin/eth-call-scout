@@ -52,6 +52,18 @@ npm run verify
 
 An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
 
+## Landing page
+
+The responsive product site is buildless and lives in `site/`:
+
+```sh
+npm run site:check
+npm run site:serve
+# open http://127.0.0.1:4173
+```
+
+Its interactive decision lab is an illustrative presentation of the real receipt pipeline. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
+
 ## Architecture
 
 ```text
