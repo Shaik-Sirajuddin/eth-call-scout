@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://callscout.dev/schema/wallet-policy.schema.json",
+  "title": "CallScout executable wallet policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "defaultAction", "chains", "invariants", "contracts"],
+  "properties": {
+    "version": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "defaultAction": { "const": "deny" },
+    "chains": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } },
+    "wallets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/address" } },
+    "validUntil": { "type": "string", "format": "date-time" },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxNativeValueWei"],
+      "properties": {
+        "maxNativeValueWei": { "$ref": "#/$defs/uint" },
+        "maxGas": { "$ref": "#/$defs/uint" },
+        "maxFeePerGasWei": { "$ref": "#/$defs/uint" },
+        "maxPriorityFeePerGasWei": { "$ref": "#/$defs/uint" },
+        "requireCalldata": { "type": "boolean" },
+        "denyUnlimitedApproval": { "const": true }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chainId", "address"],
+        "properties": {
+          "chainId": { "type": "integer", "minimum": 1 },
+          "address": { "$ref": "#/$defs/address" },
+          "protocolId": { "type": "string", "minLength": 1 },
+          "maxNativeValueWei": { "$ref": "#/$defs/uint" },
+          "allowEmptyCalldata": { "type": "boolean" },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector"],
+              "properties": {
+                "selector": { "type": "string", "pattern": "^0x[0-9a-fA-F]{8}$" },
+                "name": { "type": "string" },
+                "constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "argument"],
+                    "properties": {
+                      "type": { "enum": ["address-in", "uint-max", "uint-min", "uint-equals", "bytes32-equals"] },
+                      "argument": { "type": "integer", "minimum": 0, "maximum": 63 },
+                      "addresses": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/address" } },
+                      "value": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "address": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "uint": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" }
+  }
+}
