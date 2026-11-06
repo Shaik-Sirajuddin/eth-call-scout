@@ -44,3 +44,7 @@ npx callscout registry search aave
 The HTML report groups calls by source function and line order. This is not proof that calls execute together or in that order. Its exposure score measures mapped versus unknown addresses; it is not a vulnerability or protocol-safety score.
 
 Use findings to narrow policy review. Never automatically convert every detected call into an allow rule.
+
+Static source discovery is distinct from [deterministic protocol monitoring](protocol-monitoring.md), which checks live bytecode, storage, and view-call invariants through an RPC quorum and produces data for signed protocol-state attestations.
+
+Both monitoring systems are also distinct from [full transaction simulation](transaction-simulation.md). Static discovery helps author policy, protocol monitoring determines whether an allowlisted deployment is healthy now, and transaction simulation evaluates the exact proposed state-changing transaction. None can silently grant permission on behalf of the others.

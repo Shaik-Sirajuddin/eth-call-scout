@@ -10,9 +10,10 @@ CallScout is a least-authority bridge between an untrusted AI agent and a wallet
 4. The policy engine normalizes the exact transaction fields and validates the policy.
 5. Deterministic checks evaluate wallet, chain, target, selector, value, fees, expiry, and ABI-word constraints.
 6. The live-state verifier evaluates an authenticated, fresh protocol-health snapshot bound to the target.
-7. Any missing or failed check produces `deny`. Only an all-pass receipt permits forwarding.
-8. The copied request that was evaluated is forwarded to the underlying wallet.
-9. The receipt is written to an audit sink chosen by the integrator.
+7. The simulator sends the same normalized transaction to independent trace-capable RPC endpoints and evaluates call results, gas, full call trees and logs, state diffs, asset effects, and EIP-7702 state.
+8. A quorum must agree on one passing trace fingerprint. Any policy-violation quorum, missing pass quorum, lag, malformed output, or RPC failure that prevents quorum produces `deny`.
+9. Only an all-pass receipt permits the copied request that was evaluated to reach the underlying wallet.
+10. The receipt, including simulation fingerprint and source summary, is written to an audit sink chosen by the integrator.
 
 The agent never receives the underlying provider. This prevents it from bypassing the guard with `personal_sign`, typed-data signing, `eth_sendRawTransaction`, chain changes, wallet permission changes, or unsupported batch APIs.
 
@@ -36,6 +37,22 @@ The live-state layer is a second veto. A target can be policy-allowed and still 
 
 The state layer cannot generically discover every exploit. Protocol-specific monitors and independent incident publishers improve coverage, while the wallet gate remains fail-closed when required state is unavailable.
 
+The provider keeps the highest authenticated state sequence and can persist it through a trusted sequence store. A signed unsafe status advances this floor, preventing replay of an older operational snapshot. Persistence failures deny before wallet forwarding.
+
+### Protocol monitor
+
+`src/protocol-monitor.js` checks reviewed runtime bytecode hashes, storage slots, and view-call results through independent RPC sources. Duplicate endpoints and lagging nodes are excluded. Matching quorum produces an operational observation; mismatch quorum produces compromised; disagreement or source failure produces degraded. The collector has no signing key.
+
+### Transaction simulator
+
+`src/transaction-simulator.js` is a mandatory final gate, not an LLM tool. It runs the exact transaction with `eth_call`, `eth_estimateGas`, `debug_traceCall` call tracing with logs, and `debug_traceCall` pre/post state diffing. It rejects unapproved internal targets or call types, reverts, excessive depth, gas, writes, native outflow, token transfers or approvals, unexpected code changes, trace disagreement, and insufficient quorum.
+
+The simulator reads the sender's current code before tracing. EIP-7702 authorization lists and already-delegated EOAs are default-deny. When explicitly enabled, authorization signature, authority, chain, nonce, delegate identity, runtime code hash, and the exact delegation code change are checked before the ordinary full-trace rules apply.
+
+### Audit log
+
+`src/audit-log.js` writes single-writer, hash-chained JSONL receipts. This makes modification and chain breaks evident when a trusted head is retained. It is not immutable storage and should be protected or anchored externally.
+
 ### Monitoring plane
 
 The source scanner, ABI decoder, registry, and HTML report help humans inventory interactions and author policies. They are outside the authorization path. Scanner misses must not create wallet permissions, and registry matches must not imply safety.
@@ -50,8 +67,9 @@ The source scanner, ABI decoder, registry, and HTML report help humans inventory
 | Executable policy | Yes, after controlled distribution | Authorization constraints |
 | Registry metadata | No for authorization | Monitoring labels only |
 | Signed live-state payload | Conditionally | Trusted only after signature, threshold, freshness, and target checks |
+| Simulation RPC output | No | Accepted only through structural checks, policy analysis, block-lag limits, and quorum consensus |
 | Underlying wallet provider | Yes | Receives only allowed requests |
 
 ## Deployment recommendation
 
-For a serious deployment, run the guard as a small service or wallet plugin with no model runtime dependencies. Pin policy and live-state trust roots through a reviewed release process. Send immutable receipts to storage the agent cannot edit. Keep policy authoring and policy activation separate, ideally with human confirmation or multisig approval.
+For a serious deployment, run the guard as a small service or wallet plugin with no model runtime dependencies. Use independent trace-capable RPC providers, pin policy and live-state trust roots through a reviewed release process, and protect EIP-7702 delegate approvals as security-critical configuration. Send immutable receipts to storage the agent cannot edit. Keep policy authoring and policy activation separate, ideally with human confirmation or multisig approval.

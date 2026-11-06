@@ -6,11 +6,12 @@ AI agents are useful planners, but they should not be wallet security boundaries
 
 > **AI proposes. Policy decides. Wallet signs.**
 
-CallScout combines three layers:
+CallScout combines four layers:
 
 1. **Executable wallet policy** — exact chains, wallets, contracts, selectors, value and fee ceilings, expiries, and ABI-word constraints.
 2. **Authenticated protocol state** — fresh, signed protocol health can veto a whitelisted target when it is degraded, paused, compromised, stale, or unknown.
-3. **Monitoring and evidence** — static call discovery, registry mapping, calldata decoding, interactive reports, and policy-bound authorization receipts.
+3. **Full transaction simulation** — independent trace-capable RPCs must agree on call effects, logs, gas, state writes, code changes, and asset movement before forwarding.
+4. **Monitoring and evidence** — static call discovery, registry mapping, calldata decoding, interactive reports, and policy-bound authorization receipts.
 
 The call scanner in this repository is one monitoring feature. It does not authorize wallet access and is not the root of trust.
 
@@ -22,6 +23,7 @@ The guarded provider:
 
 - forwards a fixed set of read-only RPC methods;
 - evaluates the exact `eth_sendTransaction` fields immediately before forwarding;
+- requires full call, trace, log, and state-diff simulation after policy and live-state checks;
 - denies raw signing, typed-data signing, opaque raw transactions, wallet permission changes, chain switching, and unsupported batch methods;
 - forwards a transaction only when every deterministic check passes; and
 - emits a receipt containing policy and transaction hashes for audit.
@@ -38,18 +40,17 @@ npm ci
 # Validate the executable policy structure.
 npx callscout policy validate examples/wallet-policy.json
 
-# Audit structurally valid but overly broad permissions.
-npx callscout policy audit examples/wallet-policy.json
+# Audit a threshold-protected live-state policy.
+npx callscout policy audit examples/wallet-policy-live.json
 
-# Evaluate one exact transaction without contacting a wallet.
-npx callscout authorize examples/transaction-intent.json \
-  --policy examples/wallet-policy.json
+# Run the complete allow/deny scenario demo without a real wallet or RPC.
+npm run demo
 
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
 ```
 
-An `allow` receipt covers only the normalized transaction hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
 
 ## Architecture
 
@@ -64,6 +65,9 @@ User goal -> AI agent -> tx proposal -> guarded EIP-1193 provider
                   + invariant checks                  + freshness checks
                          |                                     |
                          +---------------+---------------------+
+                                         |
+                           multi-RPC full transaction simulation
+                           + call trace + logs + state diff
                                          |
                                   allow / deny receipt
                                          |
@@ -86,9 +90,44 @@ Policies use exact values rather than natural-language intent. The version 1 sch
   "chains": [1],
   "wallets": ["0x1111111111111111111111111111111111111111"],
   "validUntil": "2030-01-01T00:00:00.000Z",
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "threshold": 2,
+    "trustedKeys": [
+      { "id": "operations", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" },
+      { "id": "security", "algorithm": "ed25519", "publicKey": "<base64 SPKI DER>" }
+    ]
+  },
+  "simulation": {
+    "required": true,
+    "blockTag": "pending",
+    "quorum": 2,
+    "maxBlockSkew": 5,
+    "maxGasEstimate": "350000",
+    "maxCallDepth": 8,
+    "maxInternalCalls": 64,
+    "maxStateAccounts": 128,
+    "maxStorageWrites": 256,
+    "denyCodeChanges": true,
+    "eip7702": {
+      "allowAuthorizationList": false,
+      "allowDelegatedWallet": false,
+      "maxAuthorizations": 1,
+      "delegates": []
+    },
+    "allowedCallTypes": ["CALL", "STATICCALL", "DELEGATECALL"],
+    "internalTargets": [],
+    "assetLimits": [],
+    "sources": [
+      { "id": "sim-a", "env": "CALLSCOUT_SIM_PRIMARY" },
+      { "id": "sim-b", "env": "CALLSCOUT_SIM_SECONDARY" }
+    ]
+  },
   "invariants": {
     "maxNativeValueWei": "10000000000000000",
     "maxGas": "350000",
+    "maxGasPriceWei": "100000000000",
     "maxFeePerGasWei": "100000000000",
     "maxPriorityFeePerGasWei": "5000000000",
     "requireCalldata": true,
@@ -125,11 +164,17 @@ The gate reads the selector and static ABI words directly from calldata. A label
 
 ```js
 import { createGuardedProvider } from './src/wallet-guard.js';
+import { createFileSequenceStore, createLiveStateSource } from './src/protocol-state.js';
 import policy from './agent-policy.json' with { type: 'json' };
 
 const agentProvider = createGuardedProvider({
   provider: walletProvider,
   policy,
+  stateSource: createLiveStateSource({
+    url: 'https://state.example/callscout.json',
+    cachePath: '.cache/callscout/live-state.json',
+  }),
+  stateSequenceStore: createFileSequenceStore('/trusted/callscout/state-sequence.json'),
   onDecision: (receipt) => appendToAuditLog(receipt),
 });
 
@@ -137,6 +182,37 @@ const agentProvider = createGuardedProvider({
 ```
 
 Never expose the underlying wallet provider, signer, seed phrase, private key, session key, or raw-signing API to the agent. Integration requirements are in [Wallet integration](docs/integration.md).
+
+## Full transaction simulation
+
+Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, trace disagreement, missing quorum, or malformed output deny.
+
+EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
+
+## Live protocol veto
+
+Policies can require a fresh protocol-state bundle signed by a threshold of pinned Ed25519 keys. The verifier checks signatures, issue and expiry times, maximum age, rollback sequence, protocol and chain identity, exact contract binding, and operational status. `degraded`, `paused`, `compromised`, `unknown`, missing, stale, and unauthenticated state all deny.
+
+Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
+
+## Deterministic on-chain monitors
+
+CallScout can collect protocol observations from multiple independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. A quorum of matching sources produces `operational`; a quorum of deterministic mismatches produces `compromised`; disagreement or outages produce `degraded`.
+
+```sh
+export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
+export CALLSCOUT_RPC_SECONDARY='https://second-rpc.example'
+
+callscout state collect protocol-monitor.json \
+  --sequence 42 \
+  --out state-payload.json
+```
+
+Collection remains separate from signing so RPC-facing monitor processes never need state-signing private keys. See [Protocol monitoring](docs/protocol-monitoring.md).
+
+## Tamper-evident decisions
+
+Authorization receipts can be written to a single-writer, hash-chained JSONL log and verified with `callscout audit verify`. Protect or externally anchor the chain head; hash chaining detects tampering but is not immutable storage by itself. See [Authorization audit log](docs/audit-log.md).
 
 ## Monitoring: static call discovery
 
@@ -173,7 +249,7 @@ CallScout reduces the authority given to an AI agent; it does not make arbitrary
 - selectors can collide, so target address and chain are always part of the decision;
 - static ABI-word constraints do not decode dynamic tuples or arrays;
 - a compromised wallet implementation, host process, policy distribution path, or trusted live-state signer remains in the trusted computing base; and
-- simulation and monitoring are evidence, not authorization.
+- simulation cannot predict behavior under every future state, caller, block, or transaction ordering; persistent delegates and protocol contracts still require reviewed identity and conservative limits.
 
 Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include private keys, seed phrases, production RPC credentials, or exploitable wallet details in public issues.
 
@@ -182,6 +258,10 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Architecture and trust boundaries](docs/architecture.md)
 - [Security and threat model](docs/security-model.md)
 - [Policy reference](docs/policies.md)
+- [Authenticated live protocol state](docs/protocol-state.md)
+- [Deterministic protocol monitoring](docs/protocol-monitoring.md)
+- [Full transaction simulation and EIP-7702](docs/transaction-simulation.md)
+- [Authorization audit log](docs/audit-log.md)
 - [Wallet integration](docs/integration.md)
 - [Monitoring and scanner](docs/monitoring.md)
 - [Demo runbook](docs/demo.md)

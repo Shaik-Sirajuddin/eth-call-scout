@@ -27,6 +27,10 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 - Read access does not imply signing access.
 - Live protocol state is a veto and can never turn a policy denial into an allow.
 - Receipt hashes identify the exact normalized policy and transaction evaluated.
+- Every forwardable transaction requires a quorum-agreed call trace, event log set, gas estimate, and pre/post state diff.
+- Simulation RPC data is untrusted; endpoint duplication, excessive lag, malformed traces, and missing consensus deny.
+- EIP-7702 is default-deny. Opt-in requires the guarded wallet's authorization signature, exact chain and next nonce, and a code-hash-pinned delegate.
+- An existing delegated EOA is detected from its delegation designator and denied unless separately enabled with the same delegate-code checks.
 
 ## Trusted computing base
 
@@ -38,12 +42,15 @@ The current trusted computing base includes:
 - the wallet implementation and its provider transport;
 - configured live-state signing keys and the process that protects their private keys; and
 - any audit storage relied upon for incident reconstruction.
+- trace-capable simulation clients and their EVM implementation, subject to the configured independent-source quorum.
 
 The model runtime, prompt, source scanner, registry, function labels, report UI, and unsigned network data are not trusted for authorization.
 
 ## Known limitations
 
-Version 1 constraints inspect static 32-byte ABI words. They do not interpret dynamic arrays, dynamic bytes, nested tuples, contract-internal calls, or runtime slippage. Complex protocols should expose purpose-built policy adapters or transaction simulations whose outputs are independently bound and verified.
+Version 1 pre-simulation constraints inspect static 32-byte ABI words. They do not semantically decode dynamic arrays, dynamic bytes, or nested tuples. The mandatory EVM trace observes the resulting internal calls, logs, and state changes, but protocol-specific economic meaning such as oracle manipulation, sandwich risk, or acceptable dynamic slippage still requires explicit invariants and bounded calldata.
+
+Simulation proves behavior only for the sampled chain state and exact transaction. It cannot prove that persistent EIP-7702 delegate code or an allowlisted protocol will behave safely for every future caller, calldata value, storage state, block, reordering, or upgrade. This is why 7702 delegates require pinned runtime code in addition to simulation, and why live protocol monitoring remains an independent veto.
 
 An allowlisted upgradeable proxy can change behavior without changing its address. Live-state monitors should track implementation slots, code hashes, pause state, oracle health, and protocol-specific incident signals where applicable.
 
@@ -51,7 +58,7 @@ No automated system can guarantee a protocol is uncompromised. CallScout reduces
 
 ## Fail-closed behavior
 
-Production policies should require bounded expiry, wallet binding, method constraints, and authenticated live state. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, or unsupported transaction forms must deny.
+Every executable policy requires authenticated live state and full transaction simulation. Production policies should also require bounded expiry, wallet binding, and method constraints. Network errors, stale snapshots, invalid signatures, threshold failures, state that does not name the exact contract, rollback-store failures, simulation disagreement, unsupported tracer output, or unsupported transaction forms deny.
 
 ## Reporting vulnerabilities
 

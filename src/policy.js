@@ -1,11 +1,16 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { verifyAuthorization } from 'ethers';
+import { canonicalJson, sha256 } from './canonical.js';
+import { evaluateProtocolState } from './protocol-state.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SELECTOR = /^0x[a-fA-F0-9]{8}$/;
 const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
 const DECIMAL_UINT = /^(?:0|[1-9][0-9]*)$/;
 const MAX_UINT256 = (1n << 256n) - 1n;
+const MAX_UINT64 = (1n << 64n) - 1n;
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 function issue(code, path, message, severity = 'error') {
   return { code, path, message, severity };
@@ -20,6 +25,122 @@ function isPlainObject(value) {
 function rejectUnknown(object, allowed, path, errors) {
   if (!isPlainObject(object)) return;
   for (const key of Object.keys(object)) if (!allowed.has(key)) errors.push(issue('unknown-field', `${path}.${key}`, 'Unknown fields are rejected because they may look enforced while being ignored.'));
+}
+
+function validateProtocolStateConfig(config, errors) {
+  const path = '$.protocolState';
+  if (!isPlainObject(config)) { errors.push(issue('invalid-state-policy', path, 'protocolState must be an object.')); return; }
+  rejectUnknown(config, new Set(['required', 'maxAgeSeconds', 'maxClockSkewSeconds', 'minimumSequence', 'threshold', 'trustedKeys']), path, errors);
+  if (config.required !== true) errors.push(issue('state-not-required', `${path}.required`, 'Configured protocol state must be required.'));
+  if (!Number.isSafeInteger(config.maxAgeSeconds) || config.maxAgeSeconds < 1 || config.maxAgeSeconds > 86400) errors.push(issue('invalid-state-age', `${path}.maxAgeSeconds`, 'maxAgeSeconds must be an integer from 1 to 86400.'));
+  if (config.maxClockSkewSeconds != null && (!Number.isSafeInteger(config.maxClockSkewSeconds) || config.maxClockSkewSeconds < 0 || config.maxClockSkewSeconds > 300)) errors.push(issue('invalid-clock-skew', `${path}.maxClockSkewSeconds`, 'maxClockSkewSeconds must be an integer from 0 to 300.'));
+  if (config.minimumSequence != null && (!Number.isSafeInteger(config.minimumSequence) || config.minimumSequence < 0)) errors.push(issue('invalid-minimum-sequence', `${path}.minimumSequence`, 'minimumSequence must be a non-negative safe integer.'));
+  if (!Array.isArray(config.trustedKeys) || !config.trustedKeys.length) errors.push(issue('missing-state-keys', `${path}.trustedKeys`, 'At least one pinned state-signing key is required.'));
+  else {
+    const ids = new Set();
+    config.trustedKeys.forEach((key, index) => {
+      const keyPath = `${path}.trustedKeys[${index}]`;
+      if (!isPlainObject(key)) { errors.push(issue('invalid-state-key', keyPath, 'Trusted key must be an object.')); return; }
+      rejectUnknown(key, new Set(['id', 'algorithm', 'publicKey']), keyPath, errors);
+      if (typeof key.id !== 'string' || !key.id.trim()) errors.push(issue('invalid-state-key-id', `${keyPath}.id`, 'Trusted key requires an ID.'));
+      if (ids.has(key.id)) errors.push(issue('duplicate-state-key', keyPath, 'Trusted key IDs must be unique.'));
+      ids.add(key.id);
+      if (key.algorithm !== 'ed25519') errors.push(issue('invalid-state-algorithm', `${keyPath}.algorithm`, 'Only Ed25519 state keys are supported.'));
+      if (typeof key.publicKey !== 'string' || key.publicKey.length < 40 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(key.publicKey)) errors.push(issue('invalid-state-public-key', `${keyPath}.publicKey`, 'publicKey must be base64 SPKI DER.'));
+      else {
+        try {
+          const publicKey = crypto.createPublicKey({ key: Buffer.from(key.publicKey, 'base64'), format: 'der', type: 'spki' });
+          if (publicKey.asymmetricKeyType !== 'ed25519') throw new Error('wrong key type');
+        } catch { errors.push(issue('invalid-state-public-key', `${keyPath}.publicKey`, 'publicKey must decode to an Ed25519 SPKI key.')); }
+      }
+    });
+  }
+  if (!Number.isSafeInteger(config.threshold) || config.threshold < 1 || (Array.isArray(config.trustedKeys) && config.threshold > config.trustedKeys.length)) errors.push(issue('invalid-state-threshold', `${path}.threshold`, 'threshold must be between 1 and the number of trusted keys.'));
+}
+
+function validateSimulationConfig(config, errors) {
+  const path = '$.simulation';
+  if (!isPlainObject(config)) { errors.push(issue('invalid-simulation-policy', path, 'simulation must be an object.')); return; }
+  rejectUnknown(config, new Set(['required', 'blockTag', 'timeoutMs', 'quorum', 'maxBlockSkew', 'maxGasEstimate', 'maxCallDepth', 'maxInternalCalls', 'maxStateAccounts', 'maxStorageWrites', 'denyCodeChanges', 'allowedCallTypes', 'internalTargets', 'assetLimits', 'eip7702', 'sources']), path, errors);
+  if (config.required !== true) errors.push(issue('simulation-not-required', `${path}.required`, 'Full transaction simulation must be required.'));
+  if (!['latest', 'pending'].includes(config.blockTag)) errors.push(issue('invalid-simulation-block', `${path}.blockTag`, 'blockTag must be latest or pending.'));
+  if (config.timeoutMs != null && (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1000 || config.timeoutMs > 30000)) errors.push(issue('invalid-simulation-timeout', `${path}.timeoutMs`, 'timeoutMs must be between 1000 and 30000.'));
+  if (!Number.isSafeInteger(config.maxBlockSkew) || config.maxBlockSkew < 0 || config.maxBlockSkew > 100) errors.push(issue('invalid-simulation-block-skew', `${path}.maxBlockSkew`, 'maxBlockSkew must be an integer from 0 to 100.'));
+  parseUint(config.maxGasEstimate, `${path}.maxGasEstimate`, errors, { optional: false });
+  for (const [field, maximum] of [['maxCallDepth', 64], ['maxInternalCalls', 2000], ['maxStateAccounts', 5000], ['maxStorageWrites', 10000]]) {
+    if (!Number.isSafeInteger(config[field]) || config[field] < 1 || config[field] > maximum) errors.push(issue('invalid-simulation-limit', `${path}.${field}`, `${field} must be an integer from 1 to ${maximum}.`));
+  }
+  if (config.denyCodeChanges !== true) errors.push(issue('unsafe-code-change-setting', `${path}.denyCodeChanges`, 'The secure simulation profile must deny code changes.'));
+  const supportedTypes = new Set(['CALL', 'STATICCALL', 'DELEGATECALL', 'CALLCODE']);
+  if (!Array.isArray(config.allowedCallTypes) || !config.allowedCallTypes.length) errors.push(issue('missing-call-types', `${path}.allowedCallTypes`, 'At least one allowed call type is required.'));
+  else config.allowedCallTypes.forEach((type, index) => { if (!supportedTypes.has(type)) errors.push(issue('invalid-call-type', `${path}.allowedCallTypes[${index}]`, `Unsupported call type ${type}.`)); });
+  if (!Array.isArray(config.internalTargets)) errors.push(issue('invalid-internal-targets', `${path}.internalTargets`, 'internalTargets must be an array.'));
+  else config.internalTargets.forEach((target, index) => {
+    const at = `${path}.internalTargets[${index}]`;
+    if (!isPlainObject(target)) { errors.push(issue('invalid-internal-target', at, 'Internal target must be an object.')); return; }
+    rejectUnknown(target, new Set(['chainId', 'address']), at, errors);
+    if (!Number.isSafeInteger(target.chainId) || target.chainId < 1) errors.push(issue('invalid-chain', `${at}.chainId`, 'chainId must be a positive safe integer.'));
+    if (!ADDRESS.test(String(target.address ?? ''))) errors.push(issue('invalid-address', `${at}.address`, 'Expected a 20-byte address.'));
+  });
+  if (!Array.isArray(config.assetLimits)) errors.push(issue('invalid-asset-limits', `${path}.assetLimits`, 'assetLimits must be an array.'));
+  else {
+    const tokens = new Set();
+    config.assetLimits.forEach((limit, index) => {
+      const at = `${path}.assetLimits[${index}]`;
+      if (!isPlainObject(limit)) { errors.push(issue('invalid-asset-limit', at, 'Asset limit must be an object.')); return; }
+      rejectUnknown(limit, new Set(['chainId', 'token', 'maxOutflow', 'maxApproval', 'allowedRecipients', 'allowedSpenders']), at, errors);
+      if (!Number.isSafeInteger(limit.chainId) || limit.chainId < 1) errors.push(issue('invalid-chain', `${at}.chainId`, 'chainId must be a positive safe integer.'));
+      if (!ADDRESS.test(String(limit.token ?? ''))) errors.push(issue('invalid-address', `${at}.token`, 'Asset limit requires an exact token address.'));
+      const token = `${limit.chainId}:${String(limit.token).toLowerCase()}`;
+      if (tokens.has(token)) errors.push(issue('duplicate-asset-limit', at, 'Each token may have only one asset limit.'));
+      tokens.add(token);
+      parseUint(limit.maxOutflow, `${at}.maxOutflow`, errors, { optional: false });
+      parseUint(limit.maxApproval, `${at}.maxApproval`, errors, { optional: false });
+      for (const field of ['allowedRecipients', 'allowedSpenders']) {
+        if (!Array.isArray(limit[field])) errors.push(issue('invalid-address-list', `${at}.${field}`, `${field} must be an array.`));
+        else limit[field].forEach((address, addressIndex) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `${at}.${field}[${addressIndex}]`, 'Expected a 20-byte address.')); });
+      }
+    });
+  }
+  const eip7702 = config.eip7702;
+  const eipPath = `${path}.eip7702`;
+  if (!isPlainObject(eip7702)) errors.push(issue('missing-eip7702-policy', eipPath, 'simulation.eip7702 must explicitly define the delegated-EOA boundary.'));
+  else {
+    rejectUnknown(eip7702, new Set(['allowAuthorizationList', 'allowDelegatedWallet', 'maxAuthorizations', 'delegates']), eipPath, errors);
+    if (typeof eip7702.allowAuthorizationList !== 'boolean') errors.push(issue('invalid-eip7702-setting', `${eipPath}.allowAuthorizationList`, 'allowAuthorizationList must be boolean.'));
+    if (typeof eip7702.allowDelegatedWallet !== 'boolean') errors.push(issue('invalid-eip7702-setting', `${eipPath}.allowDelegatedWallet`, 'allowDelegatedWallet must be boolean.'));
+    if (eip7702.maxAuthorizations !== 1) errors.push(issue('invalid-eip7702-count', `${eipPath}.maxAuthorizations`, 'The secure EIP-7702 profile supports exactly one authorization per transaction.'));
+    if (!Array.isArray(eip7702.delegates)) errors.push(issue('invalid-eip7702-delegates', `${eipPath}.delegates`, 'delegates must be an array.'));
+    else {
+      const delegates = new Set();
+      eip7702.delegates.forEach((delegate, index) => {
+        const at = `${eipPath}.delegates[${index}]`;
+        if (!isPlainObject(delegate)) { errors.push(issue('invalid-eip7702-delegate', at, 'Delegate must be an object.')); return; }
+        rejectUnknown(delegate, new Set(['chainId', 'address', 'codeHash']), at, errors);
+        if (!Number.isSafeInteger(delegate.chainId) || delegate.chainId < 1) errors.push(issue('invalid-chain', `${at}.chainId`, 'chainId must be a positive safe integer.'));
+        if (!ADDRESS.test(String(delegate.address ?? '')) || String(delegate.address).toLowerCase() === ZERO_ADDRESS) errors.push(issue('invalid-eip7702-delegate', `${at}.address`, 'Delegate requires an exact non-zero address.'));
+        const address = `${delegate.chainId}:${String(delegate.address ?? '').toLowerCase()}`;
+        if (delegates.has(address)) errors.push(issue('duplicate-eip7702-delegate', at, 'Delegate addresses must be unique.'));
+        delegates.add(address);
+        if (!/^0x[a-fA-F0-9]{64}$/.test(String(delegate.codeHash ?? ''))) errors.push(issue('invalid-eip7702-code-hash', `${at}.codeHash`, 'Delegate requires an exact 32-byte runtime code hash.'));
+      });
+      if ((eip7702.allowAuthorizationList || eip7702.allowDelegatedWallet) && eip7702.delegates.length === 0) errors.push(issue('missing-eip7702-delegates', `${eipPath}.delegates`, 'Opting into EIP-7702 requires at least one code-hash-pinned delegate.'));
+    }
+  }
+  if (!Array.isArray(config.sources) || !config.sources.length) errors.push(issue('missing-simulation-sources', `${path}.sources`, 'At least one trace-capable simulation source is required.'));
+  else {
+    const ids = new Set();
+    config.sources.forEach((source, index) => {
+      const at = `${path}.sources[${index}]`;
+      if (!isPlainObject(source)) { errors.push(issue('invalid-simulation-source', at, 'Simulation source must be an object.')); return; }
+      rejectUnknown(source, new Set(['id', 'env']), at, errors);
+      if (typeof source.id !== 'string' || !source.id.trim()) errors.push(issue('invalid-simulation-source-id', `${at}.id`, 'Simulation source requires an ID.'));
+      if (ids.has(source.id)) errors.push(issue('duplicate-simulation-source', at, 'Simulation source IDs must be unique.'));
+      ids.add(source.id);
+      if (typeof source.env !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(source.env)) errors.push(issue('invalid-simulation-source-env', `${at}.env`, 'env must name an uppercase environment variable.'));
+    });
+  }
+  if (!Number.isSafeInteger(config.quorum) || config.quorum < 1 || (Array.isArray(config.sources) && config.quorum > config.sources.length)) errors.push(issue('invalid-simulation-quorum', `${path}.quorum`, 'quorum must be between 1 and the number of simulation sources.'));
 }
 
 function parseUint(value, path, errors, { optional = true } = {}) {
@@ -53,7 +174,7 @@ function validateConstraint(constraint, path, errors) {
 export function validatePolicy(policy) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
-  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts']), '$', errors);
+  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState', 'simulation']), '$', errors);
   if (policy.version !== 1) errors.push(issue('unsupported-version', '$.version', 'Wallet policy version must be 1.'));
   if (typeof policy.name !== 'string' || !policy.name.trim()) errors.push(issue('missing-name', '$.name', 'Policy requires a non-empty name.'));
   if (policy.defaultAction !== 'deny') errors.push(issue('unsafe-default', '$.defaultAction', 'defaultAction must be "deny". Allow-by-default policies are not supported.'));
@@ -64,12 +185,17 @@ export function validatePolicy(policy) {
     else policy.wallets.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.wallets[${index}]`, 'Expected a 20-byte 0x address.')); });
   }
   if (policy.validUntil != null && (typeof policy.validUntil !== 'string' || !Number.isFinite(Date.parse(policy.validUntil)))) errors.push(issue('invalid-expiry', '$.validUntil', 'validUntil must be an ISO-8601 timestamp.'));
+  if (policy.protocolState == null) errors.push(issue('missing-state-policy', '$.protocolState', 'Executable wallet policies must require authenticated live protocol state.'));
+  else validateProtocolStateConfig(policy.protocolState, errors);
+  if (policy.simulation == null) errors.push(issue('missing-simulation-policy', '$.simulation', 'Executable wallet policies must require full transaction simulation.'));
+  else validateSimulationConfig(policy.simulation, errors);
 
   if (!isPlainObject(policy.invariants)) errors.push(issue('missing-invariants', '$.invariants', 'Policy requires an invariants object.'));
   else {
-    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxGas', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
+    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
     parseUint(policy.invariants.maxNativeValueWei, '$.invariants.maxNativeValueWei', errors, { optional: false });
     parseUint(policy.invariants.maxGas, '$.invariants.maxGas', errors);
+    parseUint(policy.invariants.maxGasPriceWei, '$.invariants.maxGasPriceWei', errors);
     parseUint(policy.invariants.maxFeePerGasWei, '$.invariants.maxFeePerGasWei', errors);
     parseUint(policy.invariants.maxPriorityFeePerGasWei, '$.invariants.maxPriorityFeePerGasWei', errors);
     if (policy.invariants.requireCalldata != null && typeof policy.invariants.requireCalldata !== 'boolean') errors.push(issue('invalid-invariant', '$.invariants.requireCalldata', 'requireCalldata must be boolean.'));
@@ -85,6 +211,7 @@ export function validatePolicy(policy) {
       rejectUnknown(contract, new Set(['chainId', 'address', 'protocolId', 'maxNativeValueWei', 'allowEmptyCalldata', 'methods']), path, errors);
       if (!Number.isSafeInteger(contract.chainId) || contract.chainId < 1) errors.push(issue('invalid-chain', `${path}.chainId`, 'Contract chainId must be a positive safe integer.'));
       if (!ADDRESS.test(String(contract.address ?? ''))) errors.push(issue('invalid-address', `${path}.address`, 'Contract requires an exact 20-byte address.'));
+      if (policy.protocolState?.required === true && (typeof contract.protocolId !== 'string' || !contract.protocolId.trim())) errors.push(issue('missing-protocol-binding', `${path}.protocolId`, 'Live-state policies require every contract to name its protocolId.'));
       const key = `${contract.chainId}:${String(contract.address).toLowerCase()}`;
       if (contracts.has(key)) errors.push(issue('duplicate-contract', path, 'Each chain/address pair may appear only once.'));
       contracts.add(key);
@@ -111,14 +238,7 @@ export function validatePolicy(policy) {
   return { valid: errors.length === 0, errors };
 }
 
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (isPlainObject(value)) return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-  return value;
-}
-
-export function canonicalJson(value) { return JSON.stringify(canonicalize(value)); }
-export function sha256(value) { return crypto.createHash('sha256').update(canonicalJson(value)).digest('hex'); }
+export { canonicalJson, sha256 };
 
 export function loadPolicy(file) {
   const policy = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -148,10 +268,36 @@ function normalizeQuantity(value, path, errors, { required = false, fallback = n
   catch { errors.push(issue('invalid-quantity', path, 'Quantity could not be parsed.')); return null; }
 }
 
+function normalizeAuthorization(raw, index, errors) {
+  const path = `$.authorizationList[${index}]`;
+  if (!isPlainObject(raw)) { errors.push(issue('invalid-eip7702-authorization', path, 'Authorization must be an object.')); return null; }
+  rejectUnknown(raw, new Set(['chainId', 'address', 'nonce', 'yParity', 'r', 's']), path, errors);
+  if (!ADDRESS.test(String(raw.address ?? ''))) errors.push(issue('invalid-address', `${path}.address`, 'Authorization requires an exact delegate address.'));
+  const chainId = normalizeQuantity(raw.chainId, `${path}.chainId`, errors, { required: true });
+  const nonce = normalizeQuantity(raw.nonce, `${path}.nonce`, errors, { required: true });
+  const yParity = normalizeQuantity(raw.yParity, `${path}.yParity`, errors, { required: true });
+  const r = normalizeQuantity(raw.r, `${path}.r`, errors, { required: true });
+  const s = normalizeQuantity(raw.s, `${path}.s`, errors, { required: true });
+  if (chainId != null && chainId > MAX_UINT256) errors.push(issue('invalid-eip7702-chain', `${path}.chainId`, 'Authorization chainId must fit uint256.'));
+  if (nonce != null && nonce >= MAX_UINT64) errors.push(issue('invalid-eip7702-nonce', `${path}.nonce`, 'Authorization nonce must be less than 2^64 - 1.'));
+  if (yParity != null && yParity !== 0n && yParity !== 1n) errors.push(issue('invalid-eip7702-signature', `${path}.yParity`, 'Authorization yParity must be 0 or 1.'));
+  if (r != null && (r < 1n || r > MAX_UINT256)) errors.push(issue('invalid-eip7702-signature', `${path}.r`, 'Authorization r must be a non-zero uint256.'));
+  if (s != null && (s < 1n || s > MAX_UINT256)) errors.push(issue('invalid-eip7702-signature', `${path}.s`, 'Authorization s must be a non-zero uint256.'));
+  if (!ADDRESS.test(String(raw.address ?? '')) || [chainId, nonce, yParity, r, s].some((value) => value == null)) return null;
+  return {
+    chainId,
+    address: raw.address.toLowerCase(),
+    nonce,
+    yParity,
+    r: `0x${r.toString(16).padStart(64, '0')}`,
+    s: `0x${s.toString(16).padStart(64, '0')}`,
+  };
+}
+
 export function normalizeIntent(intent) {
   const errors = [];
   if (!isPlainObject(intent)) return { valid: false, errors: [issue('invalid-intent', '$', 'Transaction intent must be an object.')], intent: null };
-  rejectUnknown(intent, new Set(['chainId', 'from', 'to', 'data', 'value', 'gas', 'gasLimit', 'maxFeePerGas', 'maxPriorityFeePerGas']), '$', errors);
+  rejectUnknown(intent, new Set(['chainId', 'from', 'to', 'data', 'value', 'gas', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas', 'type', 'authorizationList']), '$', errors);
   let chainId = intent.chainId;
   if (typeof chainId === 'string' && (/^0x[0-9a-fA-F]+$/.test(chainId) || DECIMAL_UINT.test(chainId))) chainId = Number(BigInt(chainId));
   if (!Number.isSafeInteger(chainId) || chainId < 1) errors.push(issue('invalid-chain', '$.chainId', 'Intent requires a positive chain ID.'));
@@ -162,8 +308,16 @@ export function normalizeIntent(intent) {
   const value = normalizeQuantity(intent.value, '$.value', errors, { fallback: 0n });
   if (intent.gas != null && intent.gasLimit != null && String(intent.gas) !== String(intent.gasLimit)) errors.push(issue('conflicting-gas', '$.gasLimit', 'gas and gasLimit must not disagree.'));
   const gas = normalizeQuantity(intent.gas ?? intent.gasLimit, '$.gas', errors);
+  const gasPrice = normalizeQuantity(intent.gasPrice, '$.gasPrice', errors);
   const maxFeePerGas = normalizeQuantity(intent.maxFeePerGas, '$.maxFeePerGas', errors);
   const maxPriorityFeePerGas = normalizeQuantity(intent.maxPriorityFeePerGas, '$.maxPriorityFeePerGas', errors);
+  if (gasPrice != null && (maxFeePerGas != null || maxPriorityFeePerGas != null)) errors.push(issue('conflicting-fee-model', '$.gasPrice', 'Legacy gasPrice cannot be combined with EIP-1559 fee fields.'));
+  const type = normalizeQuantity(intent.type, '$.type', errors);
+  let authorizationList = null;
+  if (intent.authorizationList != null) {
+    if (!Array.isArray(intent.authorizationList)) errors.push(issue('invalid-eip7702-authorization-list', '$.authorizationList', 'authorizationList must be an array.'));
+    else authorizationList = intent.authorizationList.map((authorization, index) => normalizeAuthorization(authorization, index, errors));
+  }
   const normalized = errors.length ? null : {
     chainId,
     from: intent.from.toLowerCase(),
@@ -171,8 +325,11 @@ export function normalizeIntent(intent) {
     data: data.toLowerCase(),
     value,
     gas,
+    gasPrice,
     maxFeePerGas,
     maxPriorityFeePerGas,
+    type,
+    authorizationList,
   };
   return { valid: errors.length === 0, errors, intent: normalized };
 }
@@ -203,13 +360,23 @@ function serializableIntent(intent) {
   return {
     chainId: intent.chainId, from: intent.from, to: intent.to, data: intent.data,
     value: intent.value.toString(), gas: intent.gas?.toString() ?? null,
+    gasPrice: intent.gasPrice?.toString() ?? null,
     maxFeePerGas: intent.maxFeePerGas?.toString() ?? null,
     maxPriorityFeePerGas: intent.maxPriorityFeePerGas?.toString() ?? null,
+    type: intent.type?.toString() ?? null,
+    authorizationList: intent.authorizationList?.map((authorization) => ({
+      chainId: authorization.chainId.toString(),
+      address: authorization.address,
+      nonce: authorization.nonce.toString(),
+      yParity: authorization.yParity.toString(),
+      r: authorization.r,
+      s: authorization.s,
+    })) ?? null,
   };
 }
 
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
-export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
+export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0 } = {}) {
   const evaluatedAt = new Date(now).toISOString();
   const policyValidation = validatePolicy(policy);
   const policyHash = policyValidation.valid ? sha256(policy) : null;
@@ -217,12 +384,12 @@ export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
   const add = (id, ok, detail) => { checks.push({ id, status: ok ? 'pass' : 'deny', detail }); return ok; };
   if (!policyValidation.valid) {
     policyValidation.errors.forEach((error) => add(`policy:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, protocolState: null, checks };
   }
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) {
     normalized.errors.forEach((error) => add(`intent:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, protocolState: null, checks };
   }
   const intent = normalized.intent;
   const summary = { ...serializableIntent(intent), selector: intent.data.length >= 10 ? intent.data.slice(0, 10) : null };
@@ -231,13 +398,41 @@ export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
   if (policy.validUntil) add('policy:not-expired', Date.parse(policy.validUntil) > new Date(now).getTime(), `Policy expires at ${policy.validUntil}.`);
   add('chain:allowed', policy.chains.includes(intent.chainId), `Chain ${intent.chainId} must be allowlisted.`);
   if (policy.wallets?.length) add('wallet:allowed', policy.wallets.some((x) => x.toLowerCase() === intent.from), `Wallet ${intent.from} must be allowlisted.`);
+  const usesEip7702 = intent.type === 4n || intent.authorizationList != null;
+  add('transaction:type', intent.type == null || intent.type === 0n || intent.type === 2n || intent.type === 4n, 'Only omitted, legacy type 0, EIP-1559 type 2, and guarded EIP-7702 type 4 envelopes are supported.');
+  const legacyFees = intent.gasPrice != null;
+  const eip1559Fees = intent.maxFeePerGas != null && intent.maxPriorityFeePerGas != null;
+  add('transaction:fee-model', legacyFees !== eip1559Fees && (intent.type !== 0n || legacyFees) && (intent.type !== 2n && intent.type !== 4n || eip1559Fees), 'Transaction must contain exactly one fee model matching its explicit envelope type.');
+  if (!usesEip7702) add('eip7702:request', true, 'Transaction does not request an EIP-7702 delegation change.');
+  else {
+    const eip7702 = policy.simulation.eip7702;
+    add('eip7702:envelope', intent.type === 4n && Array.isArray(intent.authorizationList) && intent.authorizationList.length > 0, 'EIP-7702 requires an explicit type-4 envelope and a non-empty authorization list.');
+    add('eip7702:policy-enabled', eip7702.allowAuthorizationList === true, 'Policy must explicitly allow EIP-7702 authorization lists.');
+    add('eip7702:authorization-count', Array.isArray(intent.authorizationList) && intent.authorizationList.length <= eip7702.maxAuthorizations, `Authorization list must contain at most ${eip7702.maxAuthorizations} entry.`);
+    for (const [index, authorization] of (intent.authorizationList ?? []).entries()) {
+      const delegate = eip7702.delegates.find((entry) => entry.chainId === intent.chainId && entry.address.toLowerCase() === authorization.address);
+      add(`eip7702:${index}:chain`, authorization.chainId === BigInt(intent.chainId), `Authorization chain ${authorization.chainId} must exactly equal transaction chain ${intent.chainId}; chain 0 is not accepted.`);
+      add(`eip7702:${index}:delegate`, Boolean(delegate), `Delegate ${authorization.address} must be address- and code-hash-pinned by policy.`);
+      let authority = null;
+      try {
+        authority = verifyAuthorization(
+          { address: authorization.address, chainId: authorization.chainId, nonce: authorization.nonce },
+          { yParity: authorization.yParity, r: authorization.r, s: authorization.s },
+        ).toLowerCase();
+      } catch { /* Invalid signatures fail the next check. */ }
+      add(`eip7702:${index}:authority`, authority === intent.from, `Authorization signer ${authority ?? '(invalid)'} must be the guarded wallet ${intent.from}.`);
+    }
+  }
 
   const invariants = policy.invariants;
   const maxValue = BigInt(invariants.maxNativeValueWei);
   add('value:global-limit', intent.value <= maxValue, `Native value ${intent.value} must not exceed ${maxValue} wei.`);
   if (invariants.maxGas != null) add('gas:limit', intent.gas != null && intent.gas <= BigInt(invariants.maxGas), `Gas must be present and at most ${invariants.maxGas}.`);
-  if (invariants.maxFeePerGasWei != null) add('fee:max', intent.maxFeePerGas != null && intent.maxFeePerGas <= BigInt(invariants.maxFeePerGasWei), `maxFeePerGas must be present and at most ${invariants.maxFeePerGasWei}.`);
-  if (invariants.maxPriorityFeePerGasWei != null) add('fee:priority', intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `maxPriorityFeePerGas must be present and at most ${invariants.maxPriorityFeePerGasWei}.`);
+  if (legacyFees) add('fee:legacy-max', invariants.maxGasPriceWei != null && intent.gasPrice <= BigInt(invariants.maxGasPriceWei), `Legacy gasPrice requires maxGasPriceWei and must not exceed ${invariants.maxGasPriceWei ?? '(missing)'}.`);
+  else {
+    if (invariants.maxFeePerGasWei != null) add('fee:max', intent.maxFeePerGas != null && intent.maxFeePerGas <= BigInt(invariants.maxFeePerGasWei), `maxFeePerGas must be present and at most ${invariants.maxFeePerGasWei}.`);
+    if (invariants.maxPriorityFeePerGasWei != null) add('fee:priority', intent.maxPriorityFeePerGas != null && intent.maxPriorityFeePerGas <= BigInt(invariants.maxPriorityFeePerGasWei), `maxPriorityFeePerGas must be present and at most ${invariants.maxPriorityFeePerGasWei}.`);
+  }
 
   const contract = policy.contracts.find((entry) => entry.chainId === intent.chainId && entry.address.toLowerCase() === intent.to);
   add('target:allowlisted', Boolean(contract), `Target ${intent.to} must match an exact contract entry on chain ${intent.chainId}.`);
@@ -261,8 +456,20 @@ export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
       }
     }
   }
-  const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'allow';
-  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, checks };
+  let stateSummary = null;
+  if (policy.protocolState?.required === true) {
+    const stateResult = evaluateProtocolState(protocolState, policy.protocolState, {
+      protocolId: contract?.protocolId ?? null,
+      chainId: intent.chainId,
+      address: intent.to,
+      now,
+      minimumSequence: minimumStateSequence,
+    });
+    checks.push(...stateResult.checks);
+    stateSummary = stateResult.summary;
+  }
+  const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'simulate';
+  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, protocolState: stateSummary, simulation: null, checks };
 }
 
 /** Find structurally valid but broad rules that deserve human review before activation. */
