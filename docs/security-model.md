@@ -34,6 +34,10 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 - An existing delegated EOA is detected from its delegation designator and denied unless separately enabled with the same delegate-code checks.
 - Every `CALL` and `STATICCALL` sent by the wallet, including calls inside a batch, must pass exact contract, selector, calldata, value, and signed live-state rules. The wallet may not originate `DELEGATECALL` or `CALLCODE`.
 
+## Gas limits
+
+Every allowed function has a gas ceiling, checked on the transaction gas limit, the estimate, and the trace. The transaction gas limit is enforced by the chain itself, even if execution later differs from simulation. A measured gas rule is trusted only while the contract still matches the code version it was measured on.
+
 ## Trusted computing base
 
 The current trusted computing base includes:
@@ -49,6 +53,8 @@ The current trusted computing base includes:
 The model runtime, prompt, source scanner, registry, function labels, report UI, and unsigned network data are not trusted for authorization.
 
 ## Known limitations
+
+Gas limits apply per transaction. A compromised agent can still send many allowed transactions, each within its limit, so unattended use needs a running gas budget, which does not exist yet. Limits are also ceilings: waste below a function's limit is not detected.
 
 Version 1 pre-simulation constraints inspect static 32-byte ABI words. They do not semantically decode dynamic arrays, dynamic bytes, or nested tuples. The mandatory EVM trace observes the resulting internal calls, logs, and state changes, but protocol-specific economic meaning such as oracle manipulation, sandwich risk, or acceptable dynamic slippage still requires explicit invariants and bounded calldata.
 

@@ -24,6 +24,8 @@ Use Node.js 22 or newer. Do not commit `.env`, cache files, generated reports, w
 - Transaction-simulator changes must test the complete trace and state-diff path, pass/violation quorum, disagreement, lag, reverts, malformed data, and denied-request non-forwarding.
 - EIP-7702 changes must preserve default denial and test authorization recovery, authority/chain/nonce binding, delegate code-hash checks, existing delegation, expected code changes, malicious internal effects, and calls hidden inside delegated-wallet batches.
 
+- Gas limit changes must keep every allowed function capped, keep outdated rules from denying honest calls, and test the transaction gas limit, the estimate, and the traced gas. Regenerate `data/gas-limits.json` with `npm run gas:sync`; do not edit its numbers by hand.
+
 ## Pull requests
 
 Explain the threat addressed, security invariants changed, compatibility impact, and verification performed. Keep generated artifacts synchronized with their source. Changes to policy schemas or receipt formats require a versioning note.

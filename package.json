@@ -11,9 +11,10 @@
   "scripts": {
     "scan": "node ./bin/eth-call-scout.js",
     "ruleset:build": "node ./scripts/build-ruleset-page.js",
-    "check": "node --check src/audit-log.js && node --check src/canonical.js && node --check src/cli.js && node --check src/decode.js && node --check src/policy.js && node --check src/project.js && node --check src/protocol-monitor.js && node --check src/protocol-state.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/transaction-simulator.js && node --check src/wallet-guard.js && node --check scripts/demo-scenarios.js && node --check scripts/check-site.js && node --check scripts/serve-site.js && node --check bin/eth-call-scout.js && npm run site:check",
+    "check": "node --check src/audit-log.js && node --check src/canonical.js && node --check src/cli.js && node --check src/code-version.js && node --check src/decode.js && node --check src/gas-limits.js && node --check scripts/build-gas-limits.js && node --check src/policy.js && node --check src/project.js && node --check src/protocol-monitor.js && node --check src/protocol-state.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/transaction-simulator.js && node --check src/wallet-guard.js && node --check scripts/demo-scenarios.js && node --check scripts/check-site.js && node --check scripts/serve-site.js && node --check bin/eth-call-scout.js && npm run site:check",
     "test": "node --test",
     "demo": "node ./scripts/demo-scenarios.js",
+    "gas:sync": "node ./scripts/build-gas-limits.js",
     "site:check": "node --check ./site/app.js && node ./scripts/check-site.js",
     "site:serve": "node ./scripts/serve-site.js",
     "verify": "npm run check && npm test && npm run demo",

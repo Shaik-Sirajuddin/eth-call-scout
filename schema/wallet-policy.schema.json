@@ -148,6 +148,7 @@
           "address": { "$ref": "#/$defs/address" },
           "protocolId": { "type": "string", "minLength": 1 },
           "maxNativeValueWei": { "$ref": "#/$defs/uint" },
+          "maxGas": { "$ref": "#/$defs/uint" },
           "allowEmptyCalldata": { "type": "boolean" },
           "methods": {
             "type": "array",
@@ -158,6 +159,7 @@
               "properties": {
                 "selector": { "type": "string", "pattern": "^0x[0-9a-fA-F]{8}$" },
                 "name": { "type": "string" },
+                "maxGas": { "$ref": "#/$defs/uint" },
                 "constraints": {
                   "type": "array",
                   "items": {

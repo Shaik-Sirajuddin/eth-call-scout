@@ -59,10 +59,10 @@ function batchPolicy({ requireCalldata = true } = {}) {
     delegates: [{ chainId: 1, address: DELEGATE, codeHash: keccak256(DELEGATE_CODE) }],
   };
   policy.invariants.requireCalldata = requireCalldata;
-  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)' });
+  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)', maxGas: '100000' });
   policy.contracts.push(
-    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
-    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', allowEmptyCalldata: true },
+    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', maxGas: '500000', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
+    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', maxGas: '100000', allowEmptyCalldata: true },
   );
   return policy;
 }
@@ -79,7 +79,7 @@ function fakeChain(frames) {
       eth_getTransactionCount: () => '0x7',
       eth_getCode: () => (request.params[0].toLowerCase() === DELEGATE ? DELEGATE_CODE : `0xef0100${DELEGATE.slice(2)}`),
       eth_call: () => '0x',
-      eth_estimateGas: () => '0x30d40',
+      eth_estimateGas: () => '0xea60',
       debug_traceCall: () => {
         if (request.params[2].tracer === 'prestateTracer') return { pre: {}, post: {} };
         const tx = request.params[0];

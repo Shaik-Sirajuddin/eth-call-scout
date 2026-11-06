@@ -31,7 +31,7 @@ agentTools.register('ethereum', guardedProvider);
 1. Do not pass `walletProvider`, a signer, a private key, a seed phrase, or a wallet session object to the model runtime.
 2. Do not expose filesystem or environment access that lets the agent recover wallet secrets or replace the active policy.
 3. Put the guard immediately next to the wallet boundary. A preflight check in a separate tool is insufficient because the eventual transaction can differ.
-4. Supply explicit `chainId` and pending `nonce` fields, then preserve the exact request object evaluated by the guard. Do not let another component rewrite calldata, target, value, nonce, access list, gas, fees, type, or chain after authorization.
+4. Supply explicit `chainId` and pending `nonce` fields, send the gas limit as a hex `gas` field within the function's [gas limit](policies.md#function-gas-limits), then preserve the exact request object evaluated by the guard. Do not let another component rewrite calldata, target, value, nonce, access list, gas, fees, type, or chain after authorization.
 5. Store receipts somewhere the agent cannot modify or delete.
 6. Keep native wallet confirmation enabled for high-risk policies. CallScout is compatible with human approval and multisig flows.
 7. Use short-lived policies and low value/approval ceilings for unattended operation.
