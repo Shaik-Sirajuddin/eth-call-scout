@@ -17,7 +17,13 @@ Wallet policies are machine-enforced JSON, not prompts. The runtime validator in
 | `invariants` | Yes | Global transaction ceilings |
 | `contracts` | Yes | Exact chain/address/method allowlist |
 
-All integer limits are unsigned base-10 strings. This avoids JSON number precision loss. Transaction intents may supply standard hexadecimal RPC quantities.
+All integer policy limits are unsigned base-10 strings. This avoids JSON number precision loss. Transaction intents may supply standard hexadecimal RPC quantities.
+
+## Exact transaction envelope
+
+Every intent requires an explicit `chainId` and outer `nonce`, plus target, sender, calldata/value, gas, and exactly one supported fee model. The wallet's active chain must equal the intent chain, and the simulation quorum must observe the same pending nonce before execution. This prevents a wallet or adapter from filling security-relevant envelope fields after authorization.
+
+EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`. Entries require exact addresses and 32-byte storage keys; duplicate addresses/keys, unknown entry fields, more than 256 addresses, or more than 4096 keys deny. Legacy/type-0 access lists deny. The normalized access list is included in the receipt hash and sent unchanged to every simulation source.
 
 ## Global invariants
 

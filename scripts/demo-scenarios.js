@@ -58,6 +58,7 @@ async function simulationRpc(_url, options) {
   let result;
   if (request.method === 'eth_chainId') result = '0x1';
   else if (request.method === 'eth_blockNumber') result = '0x16b23f0';
+  else if (request.method === 'eth_getTransactionCount') result = intent.nonce;
   else if (request.method === 'eth_getCode') result = '0x';
   else if (request.method === 'eth_call') result = '0x';
   else if (request.method === 'eth_estimateGas') result = '0x30d40';

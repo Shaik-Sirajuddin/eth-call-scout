@@ -17,13 +17,14 @@ An AI agent may read public wallet and chain state and propose a narrow set of t
 ## Security invariants
 
 - The policy default is always deny.
-- Authorization uses chain, target, selector, calldata, value, gas, and fee fields—not natural-language descriptions.
+- Authorization uses chain, outer nonce, type, access list, target, selector, calldata, value, gas, and fee fields—not natural-language descriptions.
 - Unknown chains, targets, selectors, and RPC mutation methods deny.
 - Invalid or expired policies deny.
 - A denied request is never forwarded.
 - Unlimited ERC-20 approvals are blocked by the secure profile.
 - Approval spender and amount limits can be enforced from ABI words.
-- The active wallet chain is obtained independently from the transaction proposal.
+- The active wallet chain is obtained independently and must exactly match the explicit transaction chain.
+- Every simulation source must report the explicit outer nonce as the wallet's pending account nonce.
 - Read access does not imply signing access.
 - Live protocol state is a veto and can never turn a policy denial into an allow.
 - Receipt hashes identify the exact normalized policy and transaction evaluated.

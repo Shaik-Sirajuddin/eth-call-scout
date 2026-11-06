@@ -22,7 +22,9 @@ function rpcTransaction(intent) {
     ...(intent.gasPrice != null ? { gasPrice: quantity(intent.gasPrice) } : {}),
     ...(intent.maxFeePerGas != null ? { maxFeePerGas: quantity(intent.maxFeePerGas) } : {}),
     ...(intent.maxPriorityFeePerGas != null ? { maxPriorityFeePerGas: quantity(intent.maxPriorityFeePerGas) } : {}),
+    nonce: quantity(intent.nonce),
     ...(intent.type != null ? { type: quantity(intent.type) } : {}),
+    ...(intent.accessList != null ? { accessList: intent.accessList } : {}),
     ...(intent.authorizationList != null ? {
       authorizationList: intent.authorizationList.map((authorization) => ({
         chainId: quantity(authorization.chainId),
@@ -245,10 +247,9 @@ async function inspectEip7702(policy, intent, senderCode, source, fetchImpl, tim
   }
   if (intent.authorizationList != null) {
     if (!config.allowAuthorizationList) failures.push('EIP-7702 authorization lists are disabled by policy.');
-    const currentNonce = BigInt(await rpc(source.url, 'eth_getTransactionCount', [intent.from, policy.simulation.blockTag], { fetchImpl, timeoutMs }));
     for (const authorization of intent.authorizationList) {
-      const expectedNonce = currentNonce + 1n;
-      if (authorization.nonce !== expectedNonce) failures.push(`EIP-7702 authorization nonce ${authorization.nonce} must equal sender nonce plus one (${expectedNonce}).`);
+      const expectedNonce = intent.nonce + 1n;
+      if (authorization.nonce !== expectedNonce) failures.push(`EIP-7702 authorization nonce ${authorization.nonce} must equal the exact outer transaction nonce plus one (${expectedNonce}).`);
       const inspected = await inspectDelegate(policy, authorization.address, intent.chainId, source, fetchImpl, timeoutMs, cache);
       delegates.push(inspected);
       if (!inspected.valid) failures.push(inspected.failure);
@@ -264,6 +265,18 @@ async function simulateSource(policy, intent, source, fetchImpl) {
   const rpcChainId = BigInt(await rpc(source.url, 'eth_chainId', [], { fetchImpl, timeoutMs }));
   if (rpcChainId !== BigInt(intent.chainId)) throw new Error(`Simulation source chain ${rpcChainId} does not match transaction chain ${intent.chainId}.`);
   const blockNumber = BigInt(await rpc(source.url, 'eth_blockNumber', [], { fetchImpl, timeoutMs }));
+  const pendingNonce = BigInt(await rpc(source.url, 'eth_getTransactionCount', [intent.from, 'pending'], { fetchImpl, timeoutMs }));
+  if (pendingNonce !== intent.nonce) {
+    return {
+      sourceId: source.id,
+      blockNumber,
+      kind: 'violation',
+      failures: [`Transaction nonce ${intent.nonce} does not match pending account nonce ${pendingNonce}.`],
+      fingerprint: sha256({ intentNonce: intent.nonce.toString(), pendingNonce: pendingNonce.toString() }),
+      metrics: { pendingNonce: pendingNonce.toString(), calls: 0, depth: 0 },
+      eip7702Violation: false,
+    };
+  }
   const senderCode = String(await rpc(source.url, 'eth_getCode', [intent.from, config.blockTag], { fetchImpl, timeoutMs })).toLowerCase();
   if (!HEX_DATA.test(senderCode)) throw new Error('eth_getCode returned malformed sender code.');
   const eip7702 = await inspectEip7702(policy, intent, senderCode, source, fetchImpl, timeoutMs);

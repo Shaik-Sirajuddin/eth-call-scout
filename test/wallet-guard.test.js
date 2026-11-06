@@ -86,6 +86,22 @@ test('never forwards when mandatory full simulation denies', async () => {
   assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
 });
 
+test('denies when the exact transaction chain differs from the active wallet chain', async () => {
+  const provider = mockProvider();
+  provider.request = async function request(call) {
+    this.requests.push(structuredClone(call));
+    if (call.method === 'eth_chainId') return '0x2';
+    if (call.method === 'eth_sendTransaction') return '0xunexpected';
+    return 'read-result';
+  };
+  const guard = createGuardedProvider({ provider, policy, protocolState, simulator, now: new Date('2026-12-01T00:00:00.000Z') });
+  await assert.rejects(
+    guard.request({ method: 'eth_sendTransaction', params: [intent] }),
+    (error) => error instanceof WalletGuardError && error.receipt.checks.some((check) => check.id === 'wallet:active-chain' && check.status === 'deny'),
+  );
+  assert.deepEqual(provider.requests, [{ method: 'eth_chainId', params: [] }]);
+});
+
 test('blocks opaque signing and wallet mutation methods', async () => {
   const provider = mockProvider();
   const guard = createGuardedProvider({ provider, policy });
