@@ -1,7 +1,12 @@
 node_modules/
 parser-rs/target/
+demo/artifacts/
+demo/cache/
+demo/runtime/
 reports/
 dist/
+pr-review-ruleset.html
+scanner-ruleset.html
 .cache/
 .env
 .env.*

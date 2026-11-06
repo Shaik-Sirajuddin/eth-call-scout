@@ -31,6 +31,17 @@ The final summary must report `forwardedTransactions: 1`. Every denied scenario 
 
 No signing key is written to disk and no network transaction is sent.
 
+## Live dual-Anvil transaction demo
+
+For the judge-facing flow, run the real local chain instead of the mock scenario harness:
+
+```sh
+npm run demo:serve
+# verify http://127.0.0.1:4174/api/health
+```
+
+The command compiles and deploys the demo market to two distinct Anvil processes, starts the run API, and serves the product. A prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. See [Live dual-Anvil demo](anvil-demo.md) for the full architecture and non-interactive command.
+
 ## Test the security boundary
 
 ```sh
