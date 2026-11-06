@@ -38,9 +38,12 @@ export class WalletGuardError extends Error {
  * exact eth_sendTransaction after deterministic policy authorization. Raw signing,
  * chain mutation, permissions, and opaque/batched wallet calls are denied.
  */
-export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, onDecision = () => {}, now } = {}) {
+export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, protocolState = null, stateSource = null, stateSequenceStore = null, onDecision = () => {}, now } = {}) {
   if (!provider || typeof provider.request !== 'function') throw new TypeError('provider.request is required');
   if (!policy) throw new TypeError('wallet policy is required');
+  if (stateSource != null && typeof stateSource !== 'function') throw new TypeError('stateSource must be a function');
+  if (stateSequenceStore != null && (typeof stateSequenceStore.read !== 'function' || typeof stateSequenceStore.write !== 'function')) throw new TypeError('stateSequenceStore requires read and write functions');
+  let highestStateSequence = policy.protocolState?.minimumSequence ?? 0;
   return Object.freeze({
     async request(request) {
       let safeRequest;
@@ -65,7 +68,32 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         await onDecision(receipt);
         throw new WalletGuardError('Wallet guard could not establish the active chain.', receipt);
       }
-      const receipt = await authorize(policy, { ...transaction, chainId: transaction?.chainId ?? chainId }, { now });
+      let currentState = protocolState;
+      if (stateSource) {
+        try { currentState = await stateSource(); }
+        catch { currentState = null; }
+      }
+      let sequenceStoreError = null;
+      if (stateSequenceStore) {
+        try { highestStateSequence = Math.max(highestStateSequence, await stateSequenceStore.read()); }
+        catch (error) { sequenceStoreError = error; }
+      }
+      let receipt = await authorize(policy, { ...transaction, chainId: transaction?.chainId ?? chainId }, {
+        now,
+        protocolState: currentState,
+        minimumStateSequence: highestStateSequence,
+      });
+      if (receipt.protocolState?.authenticated && Number.isSafeInteger(receipt.protocolState.sequence)) {
+        const nextSequence = Math.max(highestStateSequence, receipt.protocolState.sequence);
+        if (stateSequenceStore && !sequenceStoreError) {
+          try { await stateSequenceStore.write(nextSequence); }
+          catch (error) { sequenceStoreError = error; }
+        }
+        highestStateSequence = nextSequence;
+      }
+      if (sequenceStoreError && policy.protocolState?.required) {
+        receipt = { ...receipt, decision: 'deny', checks: [...receipt.checks, { id: 'state:sequence-store', status: 'deny', detail: `Could not persist rollback protection: ${sequenceStoreError.message}` }] };
+      }
       await onDecision(receipt);
       if (receipt.decision !== 'allow') throw new WalletGuardError('Wallet guard denied the transaction.', receipt);
       return provider.request(safeRequest);

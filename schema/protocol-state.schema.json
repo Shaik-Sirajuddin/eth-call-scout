@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://callscout.dev/schema/protocol-state.schema.json",
+  "title": "CallScout signed protocol-state bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "payload", "signatures"],
+  "properties": {
+    "version": { "const": 1 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sequence", "issuedAt", "expiresAt", "protocols"],
+      "properties": {
+        "version": { "const": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "protocols": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "chainId", "status", "observedAt", "contracts"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "chainId": { "type": "integer", "minimum": 1 },
+              "status": { "enum": ["operational", "degraded", "paused", "compromised", "unknown"] },
+              "observedAt": { "type": "string", "format": "date-time" },
+              "contracts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/address" } },
+              "blockNumber": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+              "reason": { "type": "string" },
+              "evidence": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyId", "algorithm", "value"],
+        "properties": {
+          "keyId": { "type": "string", "minLength": 1 },
+          "algorithm": { "const": "ed25519" },
+          "value": { "type": "string", "contentEncoding": "base64" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "address": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" }
+  }
+}

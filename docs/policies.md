@@ -12,6 +12,7 @@ Wallet policies are machine-enforced JSON, not prompts. The runtime validator in
 | `chains` | Yes | Exact allowed numeric chain IDs |
 | `wallets` | Recommended | Exact allowed sender addresses |
 | `validUntil` | Recommended | ISO-8601 expiry checked at authorization time |
+| `protocolState` | Yes | Signature threshold, freshness, and rollback trust policy |
 | `invariants` | Yes | Global transaction ceilings |
 | `contracts` | Yes | Exact chain/address/method allowlist |
 
@@ -56,6 +57,8 @@ npx callscout authorize intent.json --policy policy.json --out receipt.json
 Validation rejects non-executable or unsafe policy structures. Audit highlights broad but valid permissions, such as missing wallet binding, missing expiry, unconstrained methods, or approval rules without spender and amount constraints.
 
 Authorization exit codes are `0` for allow, `2` for deny, and `1` for command/configuration errors.
+
+Policies that require live state must pin at least one Ed25519 public key, configure a valid threshold, and assign `protocolId` to every allowed contract. The audit command reports missing live state as high severity. See [Authenticated protocol state](protocol-state.md).
 
 ## Policy operations
 

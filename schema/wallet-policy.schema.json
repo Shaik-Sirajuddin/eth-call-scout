@@ -4,7 +4,7 @@
   "title": "CallScout executable wallet policy",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "name", "defaultAction", "chains", "invariants", "contracts"],
+  "required": ["version", "name", "defaultAction", "chains", "protocolState", "invariants", "contracts"],
   "properties": {
     "version": { "const": 1 },
     "name": { "type": "string", "minLength": 1 },
@@ -12,6 +12,32 @@
     "chains": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } },
     "wallets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/address" } },
     "validUntil": { "type": "string", "format": "date-time" },
+    "protocolState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "maxAgeSeconds", "threshold", "trustedKeys"],
+      "properties": {
+        "required": { "const": true },
+        "maxAgeSeconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "maxClockSkewSeconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+        "minimumSequence": { "type": "integer", "minimum": 0 },
+        "threshold": { "type": "integer", "minimum": 1 },
+        "trustedKeys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "algorithm", "publicKey"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "algorithm": { "const": "ed25519" },
+              "publicKey": { "type": "string", "contentEncoding": "base64" }
+            }
+          }
+        }
+      }
+    },
     "invariants": {
       "type": "object",
       "additionalProperties": false,

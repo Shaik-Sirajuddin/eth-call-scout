@@ -5,11 +5,17 @@ The guarded provider must be the agent's only path to wallet authority.
 ```js
 import fs from 'node:fs';
 import { createGuardedProvider } from '../src/wallet-guard.js';
+import { createFileSequenceStore, createLiveStateSource } from '../src/protocol-state.js';
 
 const policy = JSON.parse(fs.readFileSync('wallet-policy.json', 'utf8'));
 const guardedProvider = createGuardedProvider({
   provider: walletProvider,
   policy,
+  stateSource: createLiveStateSource({
+    url: 'https://state.example/callscout.json',
+    cachePath: '/trusted/cache/callscout-state.json',
+  }),
+  stateSequenceStore: createFileSequenceStore('/trusted/callscout-sequence.json'),
   onDecision: async (receipt) => {
     await auditStore.append(receipt);
   },
@@ -27,6 +33,7 @@ agentTools.register('ethereum', guardedProvider);
 5. Store receipts somewhere the agent cannot modify or delete.
 6. Keep native wallet confirmation enabled for high-risk policies. CallScout is compatible with human approval and multisig flows.
 7. Use short-lived policies and low value/approval ceilings for unattended operation.
+8. Protect the persistent state-sequence store from agent writes and deletion.
 
 ## RPC surface
 

@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { canonicalJson, sha256 } from './canonical.js';
+import { evaluateProtocolState } from './protocol-state.js';
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SELECTOR = /^0x[a-fA-F0-9]{8}$/;
@@ -20,6 +22,37 @@ function isPlainObject(value) {
 function rejectUnknown(object, allowed, path, errors) {
   if (!isPlainObject(object)) return;
   for (const key of Object.keys(object)) if (!allowed.has(key)) errors.push(issue('unknown-field', `${path}.${key}`, 'Unknown fields are rejected because they may look enforced while being ignored.'));
+}
+
+function validateProtocolStateConfig(config, errors) {
+  const path = '$.protocolState';
+  if (!isPlainObject(config)) { errors.push(issue('invalid-state-policy', path, 'protocolState must be an object.')); return; }
+  rejectUnknown(config, new Set(['required', 'maxAgeSeconds', 'maxClockSkewSeconds', 'minimumSequence', 'threshold', 'trustedKeys']), path, errors);
+  if (config.required !== true) errors.push(issue('state-not-required', `${path}.required`, 'Configured protocol state must be required.'));
+  if (!Number.isSafeInteger(config.maxAgeSeconds) || config.maxAgeSeconds < 1 || config.maxAgeSeconds > 86400) errors.push(issue('invalid-state-age', `${path}.maxAgeSeconds`, 'maxAgeSeconds must be an integer from 1 to 86400.'));
+  if (config.maxClockSkewSeconds != null && (!Number.isSafeInteger(config.maxClockSkewSeconds) || config.maxClockSkewSeconds < 0 || config.maxClockSkewSeconds > 300)) errors.push(issue('invalid-clock-skew', `${path}.maxClockSkewSeconds`, 'maxClockSkewSeconds must be an integer from 0 to 300.'));
+  if (config.minimumSequence != null && (!Number.isSafeInteger(config.minimumSequence) || config.minimumSequence < 0)) errors.push(issue('invalid-minimum-sequence', `${path}.minimumSequence`, 'minimumSequence must be a non-negative safe integer.'));
+  if (!Array.isArray(config.trustedKeys) || !config.trustedKeys.length) errors.push(issue('missing-state-keys', `${path}.trustedKeys`, 'At least one pinned state-signing key is required.'));
+  else {
+    const ids = new Set();
+    config.trustedKeys.forEach((key, index) => {
+      const keyPath = `${path}.trustedKeys[${index}]`;
+      if (!isPlainObject(key)) { errors.push(issue('invalid-state-key', keyPath, 'Trusted key must be an object.')); return; }
+      rejectUnknown(key, new Set(['id', 'algorithm', 'publicKey']), keyPath, errors);
+      if (typeof key.id !== 'string' || !key.id.trim()) errors.push(issue('invalid-state-key-id', `${keyPath}.id`, 'Trusted key requires an ID.'));
+      if (ids.has(key.id)) errors.push(issue('duplicate-state-key', keyPath, 'Trusted key IDs must be unique.'));
+      ids.add(key.id);
+      if (key.algorithm !== 'ed25519') errors.push(issue('invalid-state-algorithm', `${keyPath}.algorithm`, 'Only Ed25519 state keys are supported.'));
+      if (typeof key.publicKey !== 'string' || key.publicKey.length < 40 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(key.publicKey)) errors.push(issue('invalid-state-public-key', `${keyPath}.publicKey`, 'publicKey must be base64 SPKI DER.'));
+      else {
+        try {
+          const publicKey = crypto.createPublicKey({ key: Buffer.from(key.publicKey, 'base64'), format: 'der', type: 'spki' });
+          if (publicKey.asymmetricKeyType !== 'ed25519') throw new Error('wrong key type');
+        } catch { errors.push(issue('invalid-state-public-key', `${keyPath}.publicKey`, 'publicKey must decode to an Ed25519 SPKI key.')); }
+      }
+    });
+  }
+  if (!Number.isSafeInteger(config.threshold) || config.threshold < 1 || (Array.isArray(config.trustedKeys) && config.threshold > config.trustedKeys.length)) errors.push(issue('invalid-state-threshold', `${path}.threshold`, 'threshold must be between 1 and the number of trusted keys.'));
 }
 
 function parseUint(value, path, errors, { optional = true } = {}) {
@@ -53,7 +86,7 @@ function validateConstraint(constraint, path, errors) {
 export function validatePolicy(policy) {
   const errors = [];
   if (!isPlainObject(policy)) return { valid: false, errors: [issue('invalid-policy', '$', 'Policy must be a JSON object.')] };
-  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts']), '$', errors);
+  rejectUnknown(policy, new Set(['version', 'name', 'defaultAction', 'chains', 'wallets', 'validUntil', 'invariants', 'contracts', 'protocolState']), '$', errors);
   if (policy.version !== 1) errors.push(issue('unsupported-version', '$.version', 'Wallet policy version must be 1.'));
   if (typeof policy.name !== 'string' || !policy.name.trim()) errors.push(issue('missing-name', '$.name', 'Policy requires a non-empty name.'));
   if (policy.defaultAction !== 'deny') errors.push(issue('unsafe-default', '$.defaultAction', 'defaultAction must be "deny". Allow-by-default policies are not supported.'));
@@ -64,6 +97,8 @@ export function validatePolicy(policy) {
     else policy.wallets.forEach((address, index) => { if (!ADDRESS.test(String(address))) errors.push(issue('invalid-address', `$.wallets[${index}]`, 'Expected a 20-byte 0x address.')); });
   }
   if (policy.validUntil != null && (typeof policy.validUntil !== 'string' || !Number.isFinite(Date.parse(policy.validUntil)))) errors.push(issue('invalid-expiry', '$.validUntil', 'validUntil must be an ISO-8601 timestamp.'));
+  if (policy.protocolState == null) errors.push(issue('missing-state-policy', '$.protocolState', 'Executable wallet policies must require authenticated live protocol state.'));
+  else validateProtocolStateConfig(policy.protocolState, errors);
 
   if (!isPlainObject(policy.invariants)) errors.push(issue('missing-invariants', '$.invariants', 'Policy requires an invariants object.'));
   else {
@@ -85,6 +120,7 @@ export function validatePolicy(policy) {
       rejectUnknown(contract, new Set(['chainId', 'address', 'protocolId', 'maxNativeValueWei', 'allowEmptyCalldata', 'methods']), path, errors);
       if (!Number.isSafeInteger(contract.chainId) || contract.chainId < 1) errors.push(issue('invalid-chain', `${path}.chainId`, 'Contract chainId must be a positive safe integer.'));
       if (!ADDRESS.test(String(contract.address ?? ''))) errors.push(issue('invalid-address', `${path}.address`, 'Contract requires an exact 20-byte address.'));
+      if (policy.protocolState?.required === true && (typeof contract.protocolId !== 'string' || !contract.protocolId.trim())) errors.push(issue('missing-protocol-binding', `${path}.protocolId`, 'Live-state policies require every contract to name its protocolId.'));
       const key = `${contract.chainId}:${String(contract.address).toLowerCase()}`;
       if (contracts.has(key)) errors.push(issue('duplicate-contract', path, 'Each chain/address pair may appear only once.'));
       contracts.add(key);
@@ -111,14 +147,7 @@ export function validatePolicy(policy) {
   return { valid: errors.length === 0, errors };
 }
 
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (isPlainObject(value)) return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-  return value;
-}
-
-export function canonicalJson(value) { return JSON.stringify(canonicalize(value)); }
-export function sha256(value) { return crypto.createHash('sha256').update(canonicalJson(value)).digest('hex'); }
+export { canonicalJson, sha256 };
 
 export function loadPolicy(file) {
   const policy = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -209,7 +238,7 @@ function serializableIntent(intent) {
 }
 
 /** Deterministically authorize the exact transaction that will be forwarded to the wallet. */
-export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
+export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolState = null, minimumStateSequence = 0 } = {}) {
   const evaluatedAt = new Date(now).toISOString();
   const policyValidation = validatePolicy(policy);
   const policyHash = policyValidation.valid ? sha256(policy) : null;
@@ -217,12 +246,12 @@ export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
   const add = (id, ok, detail) => { checks.push({ id, status: ok ? 'pass' : 'deny', detail }); return ok; };
   if (!policyValidation.valid) {
     policyValidation.errors.forEach((error) => add(`policy:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy?.name ?? null, hash: policyHash }, intent: null, protocolState: null, checks };
   }
   const normalized = normalizeIntent(rawIntent);
   if (!normalized.valid) {
     normalized.errors.forEach((error) => add(`intent:${error.code}`, false, `${error.path}: ${error.message}`));
-    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, checks };
+    return { version: 1, decision: 'deny', evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: null, protocolState: null, checks };
   }
   const intent = normalized.intent;
   const summary = { ...serializableIntent(intent), selector: intent.data.length >= 10 ? intent.data.slice(0, 10) : null };
@@ -261,8 +290,20 @@ export function authorizeIntent(policy, rawIntent, { now = new Date() } = {}) {
       }
     }
   }
+  let stateSummary = null;
+  if (policy.protocolState?.required === true) {
+    const stateResult = evaluateProtocolState(protocolState, policy.protocolState, {
+      protocolId: contract?.protocolId ?? null,
+      chainId: intent.chainId,
+      address: intent.to,
+      now,
+      minimumSequence: minimumStateSequence,
+    });
+    checks.push(...stateResult.checks);
+    stateSummary = stateResult.summary;
+  }
   const decision = checks.some((check) => check.status === 'deny') ? 'deny' : 'allow';
-  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, checks };
+  return { version: 1, decision, evaluatedAt, policy: { name: policy.name, hash: policyHash }, intent: receiptIntent, protocolState: stateSummary, checks };
 }
 
 /** Find structurally valid but broad rules that deserve human review before activation. */

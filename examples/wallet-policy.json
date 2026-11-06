@@ -5,6 +5,25 @@
   "chains": [1],
   "wallets": ["0x1111111111111111111111111111111111111111"],
   "validUntil": "2030-01-01T00:00:00.000Z",
+  "protocolState": {
+    "required": true,
+    "maxAgeSeconds": 300,
+    "maxClockSkewSeconds": 15,
+    "minimumSequence": 1,
+    "threshold": 2,
+    "trustedKeys": [
+      {
+        "id": "demo-operations",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAggr+2Q9zdj11F+msBRF2HXBnaSj5jBwadKnGkCEp450="
+      },
+      {
+        "id": "demo-security",
+        "algorithm": "ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAGYPQAi+KlxPvtvHMuS7FFpeqK5nXIjDeuVjalSMFbyY="
+      }
+    ]
+  },
   "invariants": {
     "maxNativeValueWei": "10000000000000000",
     "maxGas": "350000",

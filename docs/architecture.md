@@ -36,6 +36,8 @@ The live-state layer is a second veto. A target can be policy-allowed and still 
 
 The state layer cannot generically discover every exploit. Protocol-specific monitors and independent incident publishers improve coverage, while the wallet gate remains fail-closed when required state is unavailable.
 
+The provider keeps the highest authenticated state sequence and can persist it through a trusted sequence store. A signed unsafe status advances this floor, preventing replay of an older operational snapshot. Persistence failures deny before wallet forwarding.
+
 ### Monitoring plane
 
 The source scanner, ABI decoder, registry, and HTML report help humans inventory interactions and author policies. They are outside the authorization path. Scanner misses must not create wallet permissions, and registry matches must not imply safety.
