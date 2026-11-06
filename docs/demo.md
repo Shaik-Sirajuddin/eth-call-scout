@@ -10,35 +10,25 @@ cd eth-call-scout
 npm ci
 ```
 
-## Full authorization path
+## End-to-end decision scenarios
 
 ```sh
-npm run demo:live
+npm run demo
 ```
 
-The script creates two ephemeral Ed25519 signers, issues a five-minute protocol-state bundle, requires both signatures, evaluates a capped USDC approval, and forwards it to a mock wallet. The output contains an `allow` decision, canonical policy, intent, and state hashes, verified signer IDs, and every individual check.
+The demo uses two independent simulated RPC endpoints, deterministic bytecode/storage/view-call monitoring, two ephemeral Ed25519 signers, a mandatory signature threshold, executable wallet policy, a guarded mock wallet, rollback tracking, and a hash-chained audit log.
+
+It runs five scenarios:
+
+1. healthy protocol plus bounded approval — allowed and forwarded;
+2. whitelisted contract with changed runtime bytecode — denied by live state;
+3. healthy protocol with an unapproved spender — denied by calldata policy;
+4. stale signed state — denied by freshness and expiry; and
+5. opaque `personal_sign` — denied at the RPC boundary.
+
+The final summary must report `forwardedTransactions: 1`. Every denied scenario must report `walletForwarded: false`, and the audit chain must be valid with five records.
 
 No signing key is written to disk and no network transaction is sent.
-
-## Demonstrate fail-closed behavior
-
-Copy `examples/transaction-intent.json` and change any one of these fields:
-
-- `to` to an unknown contract;
-- the first four bytes of `data` to an unknown selector;
-- the spender ABI word to another address;
-- the amount ABI word above `1000000000`;
-- `chainId` to another network; or
-- `gas` above `350000`.
-
-Then run:
-
-```sh
-npx callscout authorize changed-intent.json \
-  --policy examples/wallet-policy.json
-```
-
-The command returns a deny receipt and exits with code `2`.
 
 ## Test the security boundary
 
@@ -46,7 +36,22 @@ The command returns a deny receipt and exits with code `2`.
 npm run verify
 ```
 
-The tests prove denied transactions are never forwarded to the mock wallet and that opaque signing methods are rejected.
+The tests cover policy validation, exact calldata constraints, signature quorum, state tampering, stale/expired/compromised state, contract binding, rollback, persistent-store failure, RPC quorum, bytecode mismatches, lagging nodes, cache fallback, audit-log tampering, and denied-request non-forwarding.
+
+## Real monitor pipeline
+
+`examples/protocol-monitor.demo.json` contains synthetic invariants for offline demonstration only. For a real integration, replace every invariant with reviewed deployment data, configure independent RPC endpoints, then collect and sign:
+
+```sh
+export CALLSCOUT_RPC_PRIMARY='https://first-independent-rpc.example'
+export CALLSCOUT_RPC_SECONDARY='https://second-independent-rpc.example'
+
+npx callscout state collect protocol-monitor.json \
+  --sequence 42 \
+  --out state-payload.json
+```
+
+Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separate signing and verification steps.
 
 ## Monitoring demo
 

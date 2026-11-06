@@ -92,4 +92,4 @@ Never place signing private keys in the repository, agent environment, browser b
 
 ## What produces status
 
-Signature verification proves who published a status, not whether the status is correct. Publishers should combine protocol-specific evidence such as implementation-slot and bytecode checks, pause state, oracle freshness, official incident signals, and independent RPC observations. The next monitoring milestone provides an on-chain collector for these deterministic checks.
+Signature verification proves who published a status, not whether the status is correct. Publishers should combine protocol-specific evidence such as implementation-slot and bytecode checks, pause state, oracle freshness, official incident signals, and independent RPC observations. CallScout's [deterministic protocol monitor](protocol-monitoring.md) collects bytecode, storage, and view-call invariants through an RPC quorum before signing.

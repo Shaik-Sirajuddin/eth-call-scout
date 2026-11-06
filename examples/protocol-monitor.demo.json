@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "chainId": 1,
+  "stateTtlSeconds": 300,
+  "rpcTimeoutMs": 8000,
+  "rpcQuorum": 2,
+  "maxBlockSkew": 5,
+  "sources": [
+    { "id": "primary", "env": "CALLSCOUT_RPC_PRIMARY" },
+    { "id": "secondary", "env": "CALLSCOUT_RPC_SECONDARY" }
+  ],
+  "protocols": [
+    {
+      "id": "usdc",
+      "contracts": [
+        {
+          "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "codeHash": "0xcf61a6eb3b9b89e75f1dadf3dcd16509616896cb50eac765a68fa27bbbc6de82",
+          "storage": [
+            {
+              "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "equals": "0x0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ],
+          "calls": [
+            {
+              "data": "0x18160ddd",
+              "operator": "uint-gte",
+              "expected": "1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -4,10 +4,12 @@ The guarded provider must be the agent's only path to wallet authority.
 
 ```js
 import fs from 'node:fs';
+import { createAuditLog } from '../src/audit-log.js';
 import { createGuardedProvider } from '../src/wallet-guard.js';
 import { createFileSequenceStore, createLiveStateSource } from '../src/protocol-state.js';
 
 const policy = JSON.parse(fs.readFileSync('wallet-policy.json', 'utf8'));
+const audit = createAuditLog('/trusted/callscout/receipts.jsonl');
 const guardedProvider = createGuardedProvider({
   provider: walletProvider,
   policy,
@@ -17,7 +19,7 @@ const guardedProvider = createGuardedProvider({
   }),
   stateSequenceStore: createFileSequenceStore('/trusted/callscout-sequence.json'),
   onDecision: async (receipt) => {
-    await auditStore.append(receipt);
+    await audit.append(receipt);
   },
 });
 
@@ -44,6 +46,8 @@ It denies raw signing, message signing, typed-data signing, raw transaction subm
 ## Audit sink
 
 `onDecision` receives allow and deny receipts. A receipt includes the evaluation timestamp, canonical policy hash, normalized transaction hash, decision, and every check result. Receipt storage should be append-only and should record the eventual transaction hash returned by the wallet alongside the authorization receipt.
+
+The built-in hash-chained JSONL sink is single-writer and tamper-evident. It is not immutable storage; protect its path from the agent and anchor its head hash separately for stronger deletion/replacement evidence.
 
 ## Error handling
 

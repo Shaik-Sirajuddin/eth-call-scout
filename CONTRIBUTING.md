@@ -20,6 +20,7 @@ Use Node.js 22 or newer. Do not commit `.env`, cache files, generated reports, w
 - Add a regression test for every deny condition and prove denied requests do not reach the underlying provider.
 - Document new trusted inputs and changes to the trusted computing base.
 - Treat new RPC mutation methods as new parsers and policy surfaces, not simple allowlist additions.
+- Protocol-monitor changes must test pass quorum, mismatch quorum, source disagreement, lag, malformed RPC data, and endpoint restrictions.
 
 ## Pull requests
 
