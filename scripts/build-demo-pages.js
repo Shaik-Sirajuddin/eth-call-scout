@@ -28,7 +28,7 @@ const findings = enrichFindings(scan.findings, registry).map((finding) => ({
 
 await fs.rm(DIST, { recursive: true, force: true });
 await fs.mkdir(DIST, { recursive: true });
-for (const asset of ['index.html', 'styles.css', 'app.js']) {
+for (const asset of ['index.html', 'setup.html', 'styles.css', 'app.js']) {
   await fs.copyFile(path.join(SITE, asset), path.join(DIST, asset));
 }
 

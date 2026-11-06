@@ -56,9 +56,10 @@ An `allow` receipt covers only the normalized transaction hash and authenticated
 
 ## Web demo
 
-The deployed demo includes the responsive product site, a generated monitoring report, and two purpose-separated authoring tools:
+The deployed demo includes a Secu static-analysis homepage with example pull request review previews, a self-setup guide for GitHub Actions, a generated call report, and two authoring tools:
 
-- [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
+- [Secu static-analysis homepage](https://shaik-sirajuddin.github.io/eth-call-scout/)
+- [Secu GitHub Actions setup guide](https://shaik-sirajuddin.github.io/eth-call-scout/setup.html)
 - [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
 - [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
 - [Scanner registry and risk terms](https://shaik-sirajuddin.github.io/eth-call-scout/scanner-ruleset.html)
@@ -71,7 +72,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/ruleset.html`, and `dist/scanner-ruleset.html` alongside the landing page. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate scanner editor changes only monitoring mappings and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
+`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html`, `dist/setup.html`, `dist/ruleset.html`, and `dist/scanner-ruleset.html` alongside the landing page. The Secu review workflows are in `.github/workflows/secu-review.yml` and `.github/workflows/secu-comment.yml`; the setup guide explains how to adapt them. The zoomable block canvas compiles an executable policy draft; it does not activate or enforce it. Run `npx callscout policy validate <exported-policy.json>` before loading a policy into the guarded provider. The separate scanner editor changes only monitoring mappings and risk terms. Run `npm run demo` to execute the offline policy, live-state, simulation, wallet-guard, and audit flow.
 
 ## Architecture
 

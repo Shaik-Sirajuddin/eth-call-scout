@@ -11,7 +11,7 @@ function requireMatch(pattern, message) {
   if (!pattern.test(html)) errors.push(message);
 }
 
-requireMatch(/<title>CallScout[^<]*<\/title>/, 'Landing page requires a descriptive CallScout title.');
+requireMatch(/<title>Secu[^<]*<\/title>/, 'Landing page requires a descriptive Secu title.');
 requireMatch(/<meta\s+name="description"\s+content="[^"]+"/, 'Landing page requires a meta description.');
 requireMatch(/<meta\s+name="viewport"/, 'Landing page requires a responsive viewport.');
 requireMatch(/<h1>[\s\S]*?<\/h1>/, 'Landing page requires one primary heading.');
@@ -19,7 +19,7 @@ requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.')
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
-for (const required of ['report.html', 'ruleset.html', 'scanner-ruleset.html']) {
+for (const required of ['report.html', 'ruleset.html', 'scanner-ruleset.html', 'setup.html']) {
   if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
 }
 const policyBuilderPath = path.join(root, 'ruleset.html');
