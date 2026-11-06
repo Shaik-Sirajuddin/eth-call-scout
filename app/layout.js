@@ -2,10 +2,10 @@ import './shell.css';
 
 export const metadata = {
   title: {
-    default: 'Keybound — AI proposes. Policy decides. Wallet signs.',
-    template: '%s — Keybound',
+    default: 'WalletCordon — Give agents a wallet, not unlimited authority.',
+    template: '%s — WalletCordon',
   },
-  description: 'Deterministic wallet authorization and live protocol defense for AI agents.',
+  description: 'Deterministic policy, live protocol checks, and full transaction simulation between AI agents and wallet signing authority.',
 };
 
 export default function RootLayout({ children }) {

@@ -32,7 +32,7 @@ try {
   throw error;
 }
 
-process.stdout.write(`Keybound Next.js app: http://${hostname}:${port}/\n`);
+process.stdout.write(`WalletCordon app: http://${hostname}:${port}/\n`);
 process.stdout.write(`Agent runs: http://${hostname}:${port}/runs\n`);
 process.stdout.write(`Agent API: http://${hostname}:${port}/api/v1/agent/capabilities\n`);
 

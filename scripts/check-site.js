@@ -11,7 +11,7 @@ function requireMatch(pattern, message) {
   if (!pattern.test(html)) errors.push(message);
 }
 
-requireMatch(/<title>Keybound[^<]*<\/title>/, 'Landing page requires a descriptive Keybound title.');
+requireMatch(/<title>WalletCordon[^<]*<\/title>/, 'Landing page requires a descriptive WalletCordon title.');
 requireMatch(/<meta\s+name="description"\s+content="[^"]+"/, 'Landing page requires a meta description.');
 requireMatch(/<meta\s+name="viewport"/, 'Landing page requires a responsive viewport.');
 requireMatch(/<h1>[\s\S]*?<\/h1>/, 'Landing page requires one primary heading.');
@@ -36,7 +36,7 @@ if (fs.existsSync(policyBuilderPath)) {
   if (!/id="policyPrompt"/.test(builder) || !/id="compilePrompt"/.test(builder)) errors.push('Policy builder must include plain-language policy generation.');
   if (!/id="zoomIn"/.test(builder) || !/id="fitView"/.test(builder)) errors.push('Policy builder must include zoom and fit-view controls.');
   if (!/__callScoutPolicyBuilder/.test(builder)) errors.push('Policy builder must expose deterministic compile and validation hooks.');
-  if (!/keybound policy validate/.test(builder)) errors.push('Policy builder must disclose the authoritative CLI validation boundary.');
+  if (!/walletcordon policy validate/.test(builder)) errors.push('Policy builder must disclose the authoritative CLI validation boundary.');
 }
 const reportPath = path.join(root, 'report.html');
 if (fs.existsSync(reportPath)) {

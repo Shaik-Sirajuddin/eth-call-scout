@@ -148,7 +148,7 @@ async function main() {
     const audit = createAuditLog(auditFile);
     const blockSpend = createBlockSpendTracker();
 
-    say('Keybound demo: an AI bot proposes, rules decide, the wallet signs.');
+    say('WalletCordon demo: the agent proposes, deterministic rules decide, and only then may the wallet sign.');
     say(`Mode            ${mode === 'dry-run' ? 'dry run on real mainnet nodes (nothing is signed or sent)' : mode === 'fork' ? 'local mainnet forks (no real money)' : 'REAL MAINNET'}`);
     say(`Simulation      ${nodes.join(' and ')}`);
     say(`Wallet          ${walletAddress}`);
@@ -292,7 +292,7 @@ async function main() {
     say();
     say(`Alert log       ${alertFile}`);
     say(`Decision log    ${auditFile} (${auditStatus.count} records, chain ${auditStatus.valid ? 'valid' : 'BROKEN'})`);
-    say(`Read later with npx keybound alerts show ${alertFile}`);
+    say(`Read later with walletcordon alerts show ${alertFile}`);
     say();
     say(firstAllowed && secondDenied ? 'Demo result     PASS: the honest swap was allowed and the exploiter was stopped.' : 'Demo result     FAIL: see the decisions above.');
     if (!firstAllowed || !secondDenied) process.exitCode = 1;

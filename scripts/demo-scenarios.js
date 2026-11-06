@@ -164,4 +164,4 @@ await scenario('Opaque message signing request', { method: 'personal_sign', para
 
 const auditStatus = await audit.verify();
 await fsp.rm(auditDirectory, { recursive: true });
-process.stdout.write(`${JSON.stringify({ product: 'Keybound', forwardedTransactions: forwarded, scenarios: results, audit: auditStatus }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ product: 'WalletCordon', forwardedTransactions: forwarded, scenarios: results, audit: auditStatus }, null, 2)}\n`);

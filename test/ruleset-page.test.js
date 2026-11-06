@@ -21,7 +21,7 @@ test('visual policy builder exposes the complete local authoring workflow', () =
     'id="promptMode"',
     'id="blocksMode"',
     '/api/policy/compile-prompt',
-    'AI suggests; deterministic code decides',
+    'The AI writes a draft, not a permission',
     'id="zoomIn"',
     'id="zoomOut"',
     'id="fitView"',
@@ -31,7 +31,7 @@ test('visual policy builder exposes the complete local authoring workflow', () =
     'Live state quorum',
     'Simulation quorum',
     'Authorization receipt',
-    'keybound policy validate',
+    'walletcordon policy validate',
     'window.__callScoutPolicyBuilder',
   ]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
@@ -54,7 +54,7 @@ test('policy seed and registry data cannot break out of the builder script', () 
 
 test('PR Review Agent term editor remains a separate monitoring-only surface', () => {
   const html = renderReviewRulesetBuilder(registry);
-  assert.match(html, /PR Review Agent Ruleset/);
+  assert.match(html, /WalletCordon PR Review Ruleset/);
   assert.match(html, /High slippage threshold/);
   assert.match(html, /Wallet authorization remains a separate executable policy/i);
   assert.doesNotMatch(html, /Authorization policy studio/);
