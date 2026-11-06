@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Set up Secu smart contract call reviews in your own GitHub repository using GitHub Actions.">
+  <meta name="theme-color" content="#f3f2ed"><title>Setup guide — Secu</title>
+  <link rel="stylesheet" href="./styles.css"><script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="./index.html"><span class="brand-mark">S</span><span>secu<span class="brand-dot">.</span></span></a>
+    <nav aria-label="Main navigation"><a href="./index.html#how-it-works">How it works</a><a href="./index.html#reviews">PR reviews</a><a href="../../ruleset.html">Policy builder</a><a href="./setup.html" aria-current="page">Setup guide</a></nav>
+    <a class="header-cta" href="https://github.com/x0rc1ph3r/eth-call-scout">View on GitHub <span>↗</span></a>
+    <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="mobile-nav" data-menu-toggle><span class="sr-only">Open menu</span><i></i><i></i></button>
+  </header>
+  <div class="mobile-nav" id="mobile-nav" data-mobile-nav><a href="./index.html#how-it-works">How it works</a><a href="./index.html#reviews">PR reviews</a><a href="../../ruleset.html">Policy builder</a><a href="./setup.html">Setup guide</a></div>
+  <main id="main">
+    <section class="guide-hero wrap">
+      <a class="back-link" href="./index.html">← Back to Secu</a>
+      <div class="section-kicker" style="margin-top:28px">SETUP GUIDE · ABOUT 10 MINUTES</div>
+      <h1>Put your PR review<br>on <em>autopilot.</em></h1>
+      <p>Install the scanner, choose which paths to inspect, add two GitHub Actions templates, then open a pull request to see the first review. Secu runs in your repository and uses GitHub’s built-in token.</p>
+    </section>
+    <div class="guide-layout wrap">
+      <nav class="guide-nav" aria-label="On this page"><a href="#requirements">Before you start</a><a href="#install">1. Add Secu</a><a href="#terms">2. Set your terms</a><a href="#workflows">3. Add workflows</a><a href="#permissions">4. Review permissions</a><a href="#try-it">5. Try a PR</a></nav>
+      <div class="guide-content">
+        <section class="guide-block" id="requirements"><span class="guide-index">BEFORE YOU START</span><h2>A repository with JavaScript or TypeScript</h2><p>Secu’s current analyzer scans JavaScript and TypeScript source in configured paths. It reports contract calls and JSON-RPC requests as static findings; it does not execute your code or guarantee safety.</p><ul class="guide-list"><li>A GitHub repository with Actions enabled</li><li>Node.js 24 available in Actions</li><li>A Rust toolchain in the runner to build the parser</li></ul></section>
+        <section class="guide-block" id="install"><span class="guide-index">STEP 01</span><h2>Add the scanner to your repository</h2><p>Copy the scanner, parser, and package files into your repository. Merge package scripts and dependencies with your existing files instead of replacing your project configuration.</p><div class="guide-code"><button type="button" data-copy-code>Copy</button><pre><code>git clone https://github.com/x0rc1ph3r/eth-call-scout.git
+# Copy or vendor the scanner source and parser into your project.
+# Keep the package scripts and dependencies from the template.
+npm ci --ignore-scripts
+npm run build:parser</code></pre></div><a class="guide-template-link" href="https://github.com/x0rc1ph3r/eth-call-scout/tree/main/src">Browse scanner source ↗</a> <a class="guide-template-link" href="https://github.com/x0rc1ph3r/eth-call-scout/tree/main/parser-rs">Browse Rust parser ↗</a></section>
+        <section class="guide-block" id="terms"><span class="guide-index">STEP 02</span><h2>Choose paths and trust terms</h2><p>Create a root <code>.secu</code> file. Start with a narrow set of source paths. Add protocol contracts, wallet addresses, and trusted functions to match your review scope; add addresses to the blacklist only after reviewing them.</p><div class="guide-code"><button type="button" data-copy-code>Copy</button><pre><code>{
+  "version": 1,
+  "includeDefaults": true,
+  "scanPaths": ["src", "contracts"],
+  "excludeAddresses": [],
+  "excludeProtocolIds": [],
+  "blacklistAddresses": [],
+  "knownAddresses": [],
+  "trustedFunctions": [],
+  "highSlippageBps": 500,
+  "tokens": [],
+  "protocols": [],
+  "contracts": []
+}</code></pre></div><p><code>knownAddresses</code> can include wallet addresses. Add protocol, token, and contract mappings in their matching lists. <code>trustedFunctions</code> uses function names as scan hints; the report includes detected signatures where available, but these terms are not runtime enforcement selectors.</p><div class="guide-callout"><strong>Keep terms on the base branch.</strong> Secu reads <code>.secu</code> and the analyzer from the pull request’s base revision. A proposed change cannot lower its own risk by editing the rules in that same pull request.</div></section>
+        <section class="guide-block" id="workflows"><span class="guide-index">STEP 03</span><h2>Add the two workflow templates</h2><p>The scan workflow compares findings from base and proposed source, then uploads a Markdown review artifact. The comment workflow runs after a successful scan and posts that artifact as a pull request review.</p><div class="guide-callout"><strong>Template files to copy</strong><br>Copy both complete files into <code>.github/workflows/</code>. They are pinned to action commit SHAs. The scan job gets read-only repository access; the separate comment job gets review permission and does not check out proposed code.</div><a class="guide-template-link" href="https://github.com/x0rc1ph3r/eth-call-scout/blob/main/.github/workflows/secu-review.yml">Open full scan workflow ↗</a><br><a class="guide-template-link" href="https://github.com/x0rc1ph3r/eth-call-scout/blob/main/.github/workflows/secu-comment.yml">Open review-comment workflow ↗</a><div class="guide-code"><button type="button" data-copy-code>Copy</button><pre><code># Minimal trigger shape; use the linked full templates.
+name: Secu contract call review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read</code></pre></div></section>
+        <section class="guide-block" id="permissions"><span class="guide-index">STEP 04</span><h2>Keep permissions small</h2><p>The scanner only needs read access. The separate comment workflow needs permission to create a pull request review, and it reads the generated artifact rather than checking out or running proposed code.</p><ul class="guide-list"><li>Set workflow default permissions to read-only in repository settings.</li><li>Keep <code>contents: read</code> on the analysis job.</li><li>Grant <code>pull-requests: write</code> only to the artifact comment job.</li><li>Do not put API keys or private credentials in the analyzer job.</li></ul><a class="guide-template-link" href="https://github.com/x0rc1ph3r/eth-call-scout/blob/main/.github/workflows/secu-comment.yml">Inspect the comment workflow ↗</a></section>
+        <section class="guide-block" id="try-it"><span class="guide-index">STEP 05</span><h2>Open a pull request and inspect the review</h2><p>Commit <code>.secu</code> and both workflows to your default branch. Open a pull request that adds or changes a contract call inside one of the configured paths. GitHub Actions will attach a Secu review after analysis completes.</p><ul class="guide-list"><li>Confirm the workflow run uses the expected base revision.</li><li>Check the Markdown artifact if the review did not post.</li><li>Review target identity and source context before changing trust terms.</li><li>Compare outcomes with the <a href="./index.html#reviews">example PR reviews</a>.</li></ul><div class="guide-final"><b>Ready to explore?</b><p>Open the generated scanner report or inspect the example review workflow runs in GitHub.</p><a class="guide-template-link" href="./report.html">Open scanner report ↗</a></div></section>
+      </div>
+    </div>
+  </main>
+  <footer class="site-footer"><a class="brand" href="./index.html"><span class="brand-mark">S</span><span>secu<span class="brand-dot">.</span></span></a><p>Static analysis for contract calls in pull requests.</p><div><a href="../../ruleset.html">Policy builder</a><a href="./index.html#reviews">PR reviews</a><a href="https://github.com/x0rc1ph3r/eth-call-scout">GitHub</a></div></footer>
+</body>
+</html>

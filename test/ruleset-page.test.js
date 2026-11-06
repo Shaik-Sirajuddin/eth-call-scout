@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { validatePolicy } from '../src/policy.js';
-import { renderRulesetBuilder, renderScanRulesetBuilder } from '../src/ruleset-page.js';
+import { renderReviewRulesetBuilder, renderRulesetBuilder } from '../src/ruleset-page.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const registry = JSON.parse(fs.readFileSync(path.join(root, 'data', 'registry.static.json'), 'utf8'));
@@ -27,7 +27,7 @@ test('visual policy builder exposes the complete local authoring workflow', () =
     'Authorization receipt',
     'callscout policy validate',
     'window.__callScoutPolicyBuilder',
-    'scanner-ruleset.html',
+    'pr-review-ruleset.html',
   ]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
   assert.match(html, /@media\(max-width:820px\)/);
@@ -46,10 +46,10 @@ test('policy seed and registry data cannot break out of the builder script', () 
   assert.match(html, /\\u003c\/script\\u003e/);
 });
 
-test('scanner term editor remains a separate monitoring-only surface', () => {
-  const html = renderScanRulesetBuilder(registry);
-  assert.match(html, /Ethereum scan ruleset builder/);
+test('PR Review Agent term editor remains a separate monitoring-only surface', () => {
+  const html = renderReviewRulesetBuilder(registry);
+  assert.match(html, /PR Review Agent Ruleset/);
   assert.match(html, /High slippage threshold/);
-  assert.match(html, /registry match is an identity hint, not a safety guarantee/i);
+  assert.match(html, /Wallet authorization remains a separate executable policy/i);
   assert.doesNotMatch(html, /Authorization policy studio/);
 });
