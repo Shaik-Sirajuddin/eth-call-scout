@@ -28,7 +28,7 @@ EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`
 ## Global invariants
 
 - `maxNativeValueWei` is required and caps transaction value.
-- `maxGas` is required, requires an explicit transaction gas limit, and caps it.
+- `maxGas` is required, requires an explicit transaction gas limit, and caps it. It is the overall ceiling. Each function also has its own, smaller limit: see [Function gas limits](#function-gas-limits).
 - `maxGasPriceWei` is required whenever a legacy `gasPrice` transaction is proposed and caps that exact field.
 - `maxFeePerGasWei` and `maxPriorityFeePerGasWei` require and cap EIP-1559 fee fields.
 - `requireCalldata` denies empty calldata.
@@ -38,7 +38,44 @@ EIP-1559 type-2 and EIP-7702 type-4 intents may include an EIP-2930 `accessList`
 
 A contract entry is identified by exact `chainId` and `address`. `protocolId` connects the target to authenticated live state. `maxNativeValueWei` can be stricter than the global limit. `allowEmptyCalldata` must be explicit.
 
-Each method entry names an exact four-byte selector. The optional `name` is display-only.
+Each method entry names an exact four-byte selector. The optional `name` is display-only. `maxGas` on a method or contract sets a [function gas limit](#function-gas-limits).
+
+## Function gas limits
+
+A call can be valid, keep funds safe, and still waste the wallet's gas. For example, a Uniswap swap path can be padded with extra hops that return to the same token. It passes every asset check and simulates cleanly. On a mainnet fork, a normal V3 swap used about 141,000 gas, and the same swap padded to 24 hops used about 1.2 million.
+
+So every allowed call has its own gas ceiling. It is checked against the transaction's `gas` field, the simulated estimate, and the traced gas. The ceiling is the first of these that applies:
+
+1. `maxGas` on the method in the policy.
+2. The measured rule in `data/gas-limits.json`, if its code version is still current.
+3. `maxGas` on the contract in the policy.
+4. `invariants.maxGas`, when a measured rule exists but cannot be used.
+
+Activation requires every allowed function to have a limit from one of the first three. Native transfers need a contract `maxGas`.
+
+Each measured rule has a `versionTag`, such as `aave-v3`, and a `codeVersion` that pins the contract's code hash and any proxy implementation it was measured on. Simulation compares these with the live contract. If the protocol has upgraded, or the rule set is past its `validUntil`, the old number is no longer trusted. The rule stops denying, so outdated data does not block honest calls. The overall cap still applies, and the receipt's `simulation.metrics.gasLimitSource` and `gasRule` say what happened. Refresh the rules with `npm run gas:sync`. Samples from before a proxy's latest upgrade are dropped, because they describe other code. This reads old contract state, so `ETHEREUM_HISTORY_RPC_URL` must point to a node that keeps it. A contract whose history cannot be read is left out, so a policy must set its limit.
+
+Rules measured on 2026-11-06:
+
+| Version tag | Function | Typical gas (p50) | p99 | Limit |
+| --- | --- | ---: | ---: | ---: |
+| `usdc-erc20` | USDC `approve` | 55,570 | 55,906 | 70,000 |
+| `usdc-erc20` | USDC `transfer` | 45,160 | 62,272 | 80,000 |
+| `weth9` | WETH `deposit` | 27,938 | 45,138 | 60,000 |
+| `uniswap-v2` | Uniswap V2 Router02 `swapExactTokensForTokens` | 117,908 | 190,191 | 240,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInputSingle` | 125,827 | 167,331 | 210,000 |
+| `uniswap-v3` | Uniswap V3 SwapRouter `exactInput` | 117,700 | 311,493 | 390,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInputSingle` | 139,685 | 149,668 | 190,000 |
+| `uniswap-v2-v3` | Uniswap V3 SwapRouter02 `exactInput` | 203,168 | 297,919 | 375,000 |
+| `uniswap-universal-v4` | Uniswap Universal Router V4 `execute` | 117,833 | 223,797 | 280,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `supply` | 155,811 | 191,922 | 240,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `withdraw` | 183,700 | 435,207 | 545,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `borrow` | 314,495 | 502,790 | 630,000 |
+| `aave-v3` | Aave V3 Ethereum Pool `repay` | 156,798 | 167,696 | 210,000 |
+
+The limit is the 99th percentile of gas used on mainnet plus 25%, rounded up. A function has no rule if it had too few samples, such as Aave flash loans and most Sushi, Curve, Balancer and Compound calls, or if its cost varies too much to give one number, such as positions `multicall`. A policy must set `maxGas` for those, and activation stops until it does. A policy can set a method's `maxGas` above the rule, and audit reports this as `function-gas-above-rule`.
+
+Gas and fee fields must be `0x` hex strings, and the limit must be sent as `gas`. Wallets read other forms differently, so a checked value could mean far more gas once forwarded.
 
 ## Static ABI-word constraints
 

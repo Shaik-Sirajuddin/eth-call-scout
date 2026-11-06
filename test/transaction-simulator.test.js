@@ -33,7 +33,7 @@ function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat
     }
     if (request.method === 'eth_getTransactionCount') return response(request.id, currentNonce);
     if (request.method === 'eth_call') return response(request.id, outputByHost[new URL(url).hostname] ?? '0x');
-    if (request.method === 'eth_estimateGas') return response(request.id, '0x30d40');
+    if (request.method === 'eth_estimateGas') return response(request.id, '0xea60');
     if (request.method === 'debug_traceCall' && request.params[2].tracer === 'callTracer') {
       const calls = unauthorizedInternalCall ? [{
         type: 'CALL', from: intent.to, to: '0x3333333333333333333333333333333333333333', value: '0x0', input: '0x', output: '0x',
@@ -46,6 +46,7 @@ function simulationFetch({ delegated = false, delegateAddress = `0x${'44'.repeat
         value: '0x0',
         input: tx.data,
         output: outputByHost[new URL(url).hostname] ?? '0x',
+        gasUsed: '0xea60',
         logs: [{
           address: intent.to,
           topics: [APPROVAL_TOPIC, topicAddress(tx.from), topicAddress('0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45')],

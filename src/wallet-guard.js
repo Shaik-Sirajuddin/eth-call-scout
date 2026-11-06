@@ -1,3 +1,4 @@
+import { assertGasRules, GAS_RULES } from './gas-limits.js';
 import { authorizeIntent, sha256 } from './policy.js';
 import { failedSimulation, finalizeSimulation, simulateTransaction } from './transaction-simulator.js';
 
@@ -48,9 +49,11 @@ export class WalletGuardError extends Error {
  * exact eth_sendTransaction after deterministic policy authorization. Raw signing,
  * chain mutation, permissions, and opaque/batched wallet calls are denied.
  */
-export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, simulator = simulateTransaction, simulationOptions = {}, protocolState = null, stateSource = null, stateSequenceStore = null, onDecision = () => {}, now } = {}) {
+export function createGuardedProvider({ provider, policy, authorize = authorizeIntent, simulator = simulateTransaction, simulationOptions = {}, protocolState = null, stateSource = null, stateSequenceStore = null, gasRules = GAS_RULES, onDecision = () => {}, now } = {}) {
   if (!provider || typeof provider.request !== 'function') throw new TypeError('provider.request is required');
   if (!policy) throw new TypeError('wallet policy is required');
+  assertGasRules(gasRules);
+  if (simulationOptions.gasRules !== undefined) throw new TypeError('Pass gasRules to createGuardedProvider. Authorization and simulation must use the same set.');
   if (stateSource != null && typeof stateSource !== 'function') throw new TypeError('stateSource must be a function');
   if (stateSequenceStore != null && (typeof stateSequenceStore.read !== 'function' || typeof stateSequenceStore.write !== 'function')) throw new TypeError('stateSequenceStore requires read and write functions');
   let highestStateSequence = policy.protocolState?.minimumSequence ?? 0;
@@ -99,6 +102,7 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         now,
         protocolState: currentState,
         minimumStateSequence: highestStateSequence,
+        gasRules,
       });
       if (receipt.intent) {
         const activeChainMatches = receipt.intent.chainId === activeChainId;
@@ -130,6 +134,7 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
             protocolState: currentState,
             minimumStateSequence: highestStateSequence,
             now,
+            gasRules,
           }));
         }
         catch (error) { receipt = failedSimulation(receipt, error); }

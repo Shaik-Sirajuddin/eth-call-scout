@@ -18,14 +18,15 @@ npm run demo
 
 The demo uses two independent monitor RPC endpoints and two independent trace-simulation endpoints, deterministic bytecode/storage/view-call monitoring, two ephemeral Ed25519 signers, a mandatory signature threshold, executable wallet policy, a guarded mock wallet, rollback tracking, and a hash-chained audit log.
 
-It runs six scenarios:
+It runs seven scenarios:
 
 1. healthy protocol plus bounded approval — allowed and forwarded;
 2. whitelisted contract with changed runtime bytecode — denied by live state;
 3. healthy protocol with an unapproved spender — denied by calldata policy;
 4. simulation reveals an unauthorized internal call — denied by trace policy and consensus;
-5. stale signed state — denied by freshness and expiry; and
-6. opaque `personal_sign` — denied at the RPC boundary.
+5. a valid call that wastes gas — denied by its function gas limit;
+6. stale signed state — denied by freshness and expiry; and
+7. opaque `personal_sign` — denied at the RPC boundary.
 
 The final summary must report `forwardedTransactions: 1`. Every denied scenario must report `walletForwarded: false`, and the audit chain must be valid with six records.
 

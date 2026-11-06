@@ -69,6 +69,12 @@ Each receipt lists these calls under `simulation.metrics.walletCalls`.
 
 The same trace rules apply when a type-4 transaction installs a delegate and invokes its batch path immediately; safety is not deferred until a later transaction.
 
+## Gas limits per function
+
+Passing simulation does not prove a call is cheap. An attacker can keep the same valid function and pad it, for example with extra swap hops, so funds stay safe and the wallet still pays for the waste.
+
+After tracing, each source reads the code version of every contract with a measured gas rule, then applies the function's limit to the transaction `gas`, the estimate, and the root trace's `gasUsed`. Each call the wallet itself makes inside a batch is checked against its own function limit. A trace that omits `gasUsed` on its root or on a call the wallet makes is malformed, so that source fails. A rule whose pinned code version no longer matches stops denying, and the policy's contract limit or overall cap applies instead. A failed version read fails closed. See [Function gas limits](policies.md#function-gas-limits).
+
 ## Security boundary and limitations
 
 Simulation describes one exact transaction against one sampled state. Between simulation and inclusion, balances, storage, prices, mempool ordering, block values, and protocol state may change. Independent RPC quorum reduces reliance on one provider but does not eliminate common client bugs or coordinated provider failure.

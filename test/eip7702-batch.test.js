@@ -59,15 +59,15 @@ function batchPolicy({ requireCalldata = true } = {}) {
     delegates: [{ chainId: 1, address: DELEGATE, codeHash: keccak256(DELEGATE_CODE) }],
   };
   policy.invariants.requireCalldata = requireCalldata;
-  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)' });
+  policy.contracts[0].methods.push({ selector: token.getFunction('balanceOf').selector, name: 'balanceOf(address)', maxGas: '100000' });
   policy.contracts.push(
-    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
-    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', allowEmptyCalldata: true },
+    { chainId: 1, address: WALLET, protocolId: 'agent-wallet', maxNativeValueWei: '0', maxGas: '500000', methods: [{ selector: EXECUTE, name: 'execute(bytes32,bytes)' }, { selector: RUN_ALL, name: 'runAll(address[],bytes[])' }] },
+    { chainId: 1, address: VAULT, protocolId: 'vault', maxNativeValueWei: '1000', maxGas: '100000', allowEmptyCalldata: true },
   );
   return policy;
 }
 
-const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x' });
+const frame = (input, { type = 'CALL', from = WALLET, to = USDC, value = '0x0' } = {}) => ({ type, from, to, value, input, output: '0x', gasUsed: '0xc350' });
 
 /** A delegated wallet on a fake chain whose simulated call tree contains the given frames. */
 function fakeChain(frames) {
@@ -79,11 +79,11 @@ function fakeChain(frames) {
       eth_getTransactionCount: () => '0x7',
       eth_getCode: () => (request.params[0].toLowerCase() === DELEGATE ? DELEGATE_CODE : `0xef0100${DELEGATE.slice(2)}`),
       eth_call: () => '0x',
-      eth_estimateGas: () => '0x30d40',
+      eth_estimateGas: () => '0xea60',
       debug_traceCall: () => {
         if (request.params[2].tracer === 'prestateTracer') return { pre: {}, post: {} };
         const tx = request.params[0];
-        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', calls: frames };
+        return { type: 'CALL', from: tx.from, to: tx.to, value: '0x0', input: tx.data, output: '0x', gasUsed: '0xea60', calls: frames };
       },
     };
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: results[request.method]() }));
