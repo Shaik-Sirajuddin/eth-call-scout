@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function POST() {
   try {
     const gateway = await getWalletGateway();
-    return Response.json(gateway.createTwoTransactionDemo(), {
+    return Response.json(await gateway.createTwoTransactionDemo(), {
       status: 202,
       headers: { 'cache-control': 'no-store' },
     });

@@ -1,4 +1,5 @@
 import { WalletPolicyGateway } from './wallet-policy-gateway.js';
+import { remoteGatewayFromEnvironment } from './remote-wallet-gateway.js';
 
 const KEY = Symbol.for('keybound.runtime');
 
@@ -15,11 +16,11 @@ export function installWalletGateway(runtime) {
 }
 
 export async function getWalletGateway() {
-  if (process.env.VERCEL) {
-    throw new Error('Live wallet execution is disabled on the hosted UI until the authenticated testnet Gateway is configured.');
-  }
   const current = state();
-  if (!current.runtime) current.runtime = new WalletPolicyGateway();
+  if (!current.runtime) {
+    if (process.env.VERCEL || process.env.WALLETCORDON_GATEWAY_URL) current.runtime = remoteGatewayFromEnvironment();
+    else current.runtime = new WalletPolicyGateway();
+  }
   if (!current.startPromise) {
     current.startPromise = current.runtime.start().catch((error) => {
       current.startPromise = null;

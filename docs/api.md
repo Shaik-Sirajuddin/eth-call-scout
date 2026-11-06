@@ -2,9 +2,9 @@
 
 The Gateway API is the only HTTP mutation surface intended for an AI agent. The agent can discover a narrow capability, submit one exact transaction proposal, and read the resulting evidence. It cannot access a signer, private key, raw wallet provider, policy administration, protocol-state signing keys, or an unguarded RPC method.
 
-Phase 1 runs on localhost with two Anvil nodes. It has no network authentication and must never be exposed to the public internet. The testnet beta will add authenticated agents, durable database storage, rate limits, and an isolated testnet signer while preserving these request and response shapes.
+Local development runs with two Anvil nodes and must never be exposed to the public internet. In the hosted beta, Vercel requires an agent bearer token, then forwards the same narrow request shape to an authenticated persistent Sepolia Gateway. The Gateway owns durable storage and an isolated testnet signer; Vercel and the agent do not.
 
-Default local origin: `http://127.0.0.1:3000`
+Default local origin: `http://127.0.0.1:3000`. Hosted origin: the public Vercel production domain.
 
 All responses are JSON except the product pages. API responses set `Cache-Control: no-store`.
 
@@ -35,6 +35,8 @@ npm run agent:smoke -- --origin http://127.0.0.1:3000
 The smoke client discovers capabilities, ABI-encodes an exact proposal, waits for the deterministic decision, verifies two-source simulation consensus and a mined transaction, then retries the same idempotency key and proves that it did not enqueue a second transaction.
 
 ## Agent-facing endpoints
+
+Hosted requests must include `Authorization: Bearer <agent-key>`. Local Anvil requests remain unauthenticated unless `WALLETCORDON_REQUIRE_AGENT_AUTH=1` is set. Missing or invalid hosted credentials fail before the Gateway is called.
 
 ### `GET /api/v1/agent/capabilities`
 

@@ -2,6 +2,8 @@
 
 The guarded provider must be the agent's only path to wallet authority.
 
+For the hosted Sepolia beta, the agent calls Vercel's authenticated `/api/v1/agent/*` surface. Vercel forwards only those exact operations to a persistent Gateway over HTTPS. The wallet key stays in the Gateway's isolated secret store, never in Vercel and never in the agent process. See [Sepolia beta rollout](testnet-beta.md).
+
 ```js
 import fs from 'node:fs';
 import { createAuditLog } from '../src/audit-log.js';

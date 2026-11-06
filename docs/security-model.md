@@ -52,6 +52,8 @@ The current trusted computing base includes:
 
 The model runtime, prompt, source scanner, registry, function labels, report UI, and unsigned network data are not trusted for authorization.
 
+For the hosted Sepolia beta, Vercel is not a signing boundary and holds no wallet key. The persistent Gateway host and its secret store join the trusted computing base. The Vercel-to-Gateway credential is scoped to the narrow proposal API; loss of that credential can create hostile proposals, but every proposal must still pass policy, signed live state, full simulation, and exact wallet forwarding.
+
 ## Known limitations
 
 Gas limits apply per transaction. A compromised agent can still send many allowed transactions, each within its limit, so unattended use needs a running gas budget, which does not exist yet. Limits are also ceilings: waste below a function's limit is not detected.
