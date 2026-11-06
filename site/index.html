@@ -30,7 +30,7 @@
         <div class="eyebrow"><span class="live-dot"></span> Open source · GitHub Actions</div>
         <h1>Every pull request<br>gets a <em>second set of eyes.</em></h1>
         <p class="hero-lede">Secu statically analyzes each pull request against your custom rules for protocols, wallet addresses, and trusted function names. Detected function signatures and unfamiliar calls appear in a source-linked GitHub review.</p>
-        <div class="hero-actions"><a class="button button-dark" href="./setup.html">Add Secu to your repo <span>→</span></a><a class="text-link" href="#reviews">See example reviews <span>↓</span></a></div>
+        <div class="hero-actions"><a class="button button-dark" href="./setup.html">Add Secu to your repo <span>→</span></a><a class="text-link" href="#reviews">See example reviews <span>↓</span></a><a class="text-link" href="./ruleset.html">Open policy builder <span>↗</span></a></div>
         <div class="hero-facts"><span><b>01</b> Static PR analysis</span><span><b>02</b> Your allowed terms</span><span><b>03</b> Review in GitHub</span></div>
       </div>
       <div class="hero-preview" aria-label="Example Secu pull request review">
@@ -54,7 +54,7 @@
         <div class="section-intro"><h2>Check every new call<br>against your rules.</h2><p>Secu statically compares the base branch with proposed changes. Set rules for protocol contracts, known wallet addresses, and trusted function names; inspect detected function signatures in the review. The analyzer and rules come from the trusted base revision so a pull request cannot rewrite its own review.</p></div>
       <div class="steps-grid">
         <article class="step-card"><span class="step-number">01</span><div class="step-graphic scan-graphic"><i></i><i></i><i></i><b>TS</b><span>src / changed files</span></div><h3>Find calls in code</h3><p>Parse configured paths and detect contract interactions, targets, methods, and source locations.</p></article>
-        <article class="step-card"><span class="step-number">02</span><div class="step-graphic terms-graphic"><b>.secu</b><span>protocol contracts</span><span>wallet addresses</span><span>function signatures</span></div><h3>Set your allowed rules</h3><p>Use a reviewed base-branch ruleset for protocols and wallet addresses; review trusted functions and detected signatures.</p><a class="step-link" href="./scanner-ruleset.html">Open the registry builder <b>↗</b></a></article>
+        <article class="step-card"><span class="step-number">02</span><div class="step-graphic terms-graphic"><b>.secu</b><span>protocol contracts</span><span>wallet addresses</span><span>function signatures</span></div><h3>Set your allowed rules</h3><p>Use a reviewed base-branch ruleset for protocols and wallet addresses; review trusted functions and detected signatures.</p><a class="step-link" href="./ruleset.html">Open the policy builder <b>↗</b></a><a class="step-link" href="./scanner-ruleset.html">Open the registry builder <b>↗</b></a></article>
         <article class="step-card"><span class="step-number">03</span><div class="step-graphic review-graphic"><span>Risk score</span><b>30 <small>/ 100</small></b><i><em></em></i><strong>MAINTAINER REVIEW</strong></div><h3>Show the diff in GitHub</h3><p>Get a concise review with only newly added calls, risk context, and links back to code.</p></article>
       </div>
     </section>
@@ -94,7 +94,7 @@
     </section>
 
     <section class="section wrap setup-cta" id="setup">
-      <div class="setup-cta-copy"><div class="section-kicker">Start with your repository</div><h2>Bring your own terms.<br><em>Keep the review yours.</em></h2><p>Set scan paths and trust mappings in `.secu`, then add two workflows. No hosted service or third-party token needed.</p><a class="button button-dark" href="./setup.html">Read the setup guide <span>→</span></a></div>
+      <div class="setup-cta-copy"><div class="section-kicker">Start with your repository</div><h2>Bring your own terms.<br><em>Keep the review yours.</em></h2><p>Set scan paths and trust mappings in `.secu`, then add two workflows. No hosted service or third-party token needed.</p><div class="hero-actions"><a class="button button-dark" href="./setup.html">Read the setup guide <span>→</span></a><a class="text-link" href="./ruleset.html">Open policy builder <span>↗</span></a></div></div>
       <div class="workflow-card"><div class="workflow-head"><span class="workflow-icon">⚙</span><div><b>Secu contract call review</b><small>.github/workflows/secu-review.yml</small></div><span class="workflow-active">ACTIVE</span></div><div class="workflow-step"><i>✓</i><span>Checkout trusted base + proposed code</span><small>2s</small></div><div class="workflow-step"><i>✓</i><span>Scan configured source paths</span><small>8s</small></div><div class="workflow-step"><i>✓</i><span>Compare findings and score risk</span><small>3s</small></div><div class="workflow-step final"><i>↗</i><span>Publish a review on the pull request</span><small>done</small></div><div class="workflow-total">Total duration <b>~15 seconds</b></div></div>
     </section>
   </main>
