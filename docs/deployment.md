@@ -28,17 +28,19 @@ To enable free-form policy translation on Vercel, add these server-side environm
 
 Do not prefix the key with `NEXT_PUBLIC_`; it must never be included in browser JavaScript. Without the key, Policy Studio remains usable through its strict canonical-rule fallback and visual editor. The model only proposes a draft and receives public registry names plus the user's description. It has no wallet key, signer, live-state signing key, active-policy write path, or transaction submission capability.
 
-## Phase boundary
+## Hosted execution boundary
 
-The current production build publishes the responsive landing page, report, AI-assisted policy builder, and run-history interface. The policy translation endpoint is authoring-only. The live phase-one Gateway deliberately binds to localhost and owns two local Anvil child processes. Vercel serverless functions are not a safe or durable place to run that local chain, store signing authority, or persist the current filesystem-backed history.
+The production build publishes the interface and acts as the authenticated public control plane. It never starts Anvil and never stores signing authority. Hosted transaction requests are sent over HTTPS to a persistent WalletCordon Sepolia Gateway; local development continues to use the loopback dual-Anvil Gateway.
 
-Therefore:
+Before the persistent Gateway is deployed and configured, hosted transaction execution fails closed. Configure these encrypted server-side Vercel variables:
 
-- use `npm run dev` for the full live dual-Anvil transaction demo;
-- do not present a Vercel `/runs` mutation as production wallet execution yet; and
-- keep real keys, mnemonics, and privileged RPC credentials out of Vercel environment variables until the isolated signer design is implemented and reviewed.
+| Variable | Value |
+| --- | --- |
+| `WALLETCORDON_GATEWAY_URL` | HTTPS origin of the isolated Gateway |
+| `WALLETCORDON_GATEWAY_TOKEN` | random service secret, at least 32 characters |
+| `WALLETCORDON_AGENT_API_KEYS` | one or more comma-separated random agent keys, each at least 32 characters |
 
-The testnet beta keeps the same agent API shapes but replaces the local adapter with:
+Do not put a wallet key, mnemonic, protocol-state signing key, or unrestricted signing credential in Vercel. The testnet beta uses:
 
 1. authenticated agent identities and per-agent policy assignment;
 2. two independent remote testnet RPC providers for monitoring and simulation;
@@ -48,6 +50,8 @@ The testnet beta keeps the same agent API shapes but replaces the local adapter 
 6. server-side policy activation separated from the agent-facing API.
 
 This separation is intentional: the agent never receives the signer or private key in either phase.
+
+The complete sequence and operational checks are in [Sepolia beta rollout](testnet-beta.md).
 
 ## Make the judge URL public
 

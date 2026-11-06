@@ -1,6 +1,6 @@
 # Architecture and trust boundaries
 
-Keybound is a least-authority bridge between an untrusted AI agent and a wallet. The model may propose actions and inspect public chain state, but it is not allowed to decide which transaction is safe or invoke arbitrary wallet capabilities.
+WalletCordon is a least-authority bridge between an untrusted AI agent and a wallet. The model may propose actions and inspect public chain state, but it is not allowed to decide which transaction is safe or invoke arbitrary wallet capabilities.
 
 ## Decision path
 
@@ -81,3 +81,5 @@ The source scanner, ABI decoder, registry, and HTML report help humans inventory
 ## Deployment recommendation
 
 For a serious deployment, run the guard as a small service or wallet plugin with no model runtime dependencies. Use independent trace-capable RPC providers, pin policy and live-state trust roots through a reviewed release process, and protect EIP-7702 delegate approvals as security-critical configuration. Send immutable receipts to storage the agent cannot edit. Keep policy authoring and policy activation separate, ideally with human confirmation or multisig approval.
+
+In the Sepolia beta, Vercel is only the public control plane. It authenticates the agent and calls a fixed HTTPS API on the persistent Gateway. The Gateway is the security boundary and owns the guarded provider, durable state, independent RPC connections, and isolated testnet signer. The service credential in Vercel can submit exact proposals but cannot sign arbitrary data or access the private key. See [Sepolia beta rollout](testnet-beta.md).

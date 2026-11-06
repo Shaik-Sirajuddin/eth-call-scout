@@ -1,12 +1,12 @@
-# Keybound
+# WalletCordon
 
 Deterministic wallet authorization and live protocol defense for AI agents.
 
-AI agents are useful planners, but they should not be wallet security boundaries. Keybound lets an agent propose transactions through a restricted provider while ordinary code—not a prompt—decides whether the exact transaction may reach the wallet.
+AI agents are useful planners, but they should not be wallet security boundaries. WalletCordon lets an agent propose transactions through a restricted provider while ordinary code—not a prompt—decides whether the exact transaction may reach the wallet.
 
 > **AI proposes. Policy decides. Wallet signs.**
 
-Keybound combines four layers:
+WalletCordon combines four layers:
 
 1. **Executable wallet policy** — exact chains, wallets, contracts, selectors, value and fee ceilings, expiries, and ABI-word constraints.
 2. **Authenticated protocol state** — fresh, signed protocol health can veto a whitelisted target when it is degraded, paused, compromised, stale, or unknown.
@@ -80,7 +80,7 @@ The Next.js app serves the complete responsive demo from one origin:
 
 The Policy Studio can translate a plain-language description into constrained rules and then into the visual graph. AI output is always an untrusted draft: server-side code resolves registry identities, rejects unsupported clauses, and runs the authoritative activation validator. Neither the prompt nor the canvas activates or enforces policy. Run `npx keybound policy validate <exported-policy.json>` before controlled activation. See the [policy reference](docs/policies.md), [Gateway API](docs/api.md), and [Vercel deployment](docs/deployment.md).
 
-The current Vercel configuration builds the Next.js interface. The local Anvil Gateway is deliberately loopback-only and is not a production serverless backend. The later testnet beta requires authenticated agents, durable storage, independent remote RPC providers, and an isolated signer adapter before `/runs` can execute hosted transactions; the deployment guide states this boundary explicitly.
+The hosted beta uses Vercel as the public control plane and a separate persistent Sepolia Gateway as the wallet security boundary. Vercel authenticates agents and proxies only the fixed run API; it never stores the wallet key. Local development still uses the dual-Anvil Gateway. See the [Sepolia beta rollout](docs/testnet-beta.md) for the deployment sequence and secret boundaries.
 
 ## Architecture
 
@@ -308,6 +308,7 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Live dual-Anvil runbook](docs/anvil-demo.md)
 - [Demo and verification guide](docs/demo.md)
 - [Vercel deployment](docs/deployment.md)
+- [Sepolia beta rollout](docs/testnet-beta.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Project status
