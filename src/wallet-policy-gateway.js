@@ -198,7 +198,7 @@ function buildPolicy(deployment, stateSigners) {
   const maximumInput = (1_000n * 10n ** 18n).toString();
   return {
     version: 1,
-    name: 'Keybound local trading policy',
+    name: 'WalletCordon local trading policy',
     defaultAction: 'deny',
     chains: [CHAIN_ID],
     wallets: [deployment.wallet],
@@ -478,7 +478,7 @@ export class WalletPolicyGateway {
   }
 
   async capabilities() {
-    if (!this.started) throw new Error('Keybound Gateway is not ready.');
+    if (!this.started) throw new Error('WalletCordon gateway is not ready.');
     const [primaryNonce, secondaryNonce] = await Promise.all([
       this.chains.primary.provider.getTransactionCount(this.chains.primary.wallet, 'pending'),
       this.chains.secondary.provider.getTransactionCount(this.chains.secondary.wallet, 'pending'),
@@ -527,7 +527,7 @@ export class WalletPolicyGateway {
   }
 
   createRun(prompt, { scenario = 'safe', source = 'bundled-agent', requestId = null, proposal = null, demo = null } = {}) {
-    if (!this.started) throw new Error('Keybound Gateway is not ready.');
+    if (!this.started) throw new Error('WalletCordon gateway is not ready.');
     if (!RUN_SCENARIOS.has(scenario)) throw new Error(`Unknown demo scenario ${scenario}.`);
     if (source === 'agent-api') {
       if (!AGENT_REQUEST_ID.test(requestId ?? '')) throw new Error('Agent requestId must be 8-128 URL-safe characters.');
@@ -571,7 +571,7 @@ export class WalletPolicyGateway {
   }
 
   createTwoTransactionDemo() {
-    if (!this.started) throw new Error('Keybound Gateway is not ready.');
+    if (!this.started) throw new Error('WalletCordon gateway is not ready.');
     const id = `demo_${Date.now().toString(36)}_${String(++this.runCounter).padStart(3, '0')}`;
     const runs = TWO_TRANSACTION_DEMO.map((entry) => this.createRun(entry.prompt, {
       scenario: entry.scenario,

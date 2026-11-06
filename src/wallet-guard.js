@@ -206,7 +206,7 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
       if (verifier && typeof transactionHash === 'string') {
         const pending = verifier.verify(transactionHash, receipt).then(async (result) => {
           try { await onVerification(result); }
-          catch (error) { process.stderr.write(`[keybound] onVerification failed: ${error.message}\n`); }
+          catch (error) { process.stderr.write(`[walletcordon] onVerification failed: ${error.message}\n`); }
           return result;
         });
         verifications.set(transactionHash.toLowerCase(), pending);

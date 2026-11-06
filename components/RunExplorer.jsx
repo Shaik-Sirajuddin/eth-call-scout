@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const scenarios = [
-  { value: 'safe', title: 'Safe path', detail: 'All gates pass; one tx is mined', verdict: 'ALLOW' },
-  { value: 'exploiter', title: 'Exploiter recipient', detail: 'Bot pays the Binance bridge exploiter', verdict: 'DENY' },
-  { value: 'block-limit', title: 'Block spend limit', detail: 'Second swap in one block goes over', verdict: 'DENY' },
-  { value: 'compromised', title: 'Protocol paused', detail: 'Signed live state vetoes first', verdict: 'DENY' },
-  { value: 'hidden-call', title: 'Compromised router', detail: 'Trace finds a hidden target', verdict: 'DENY' },
-  { value: 'slippage', title: 'Slippage revert', detail: 'Exact call fails on both nodes', verdict: 'DENY' },
+  { value: 'safe', title: 'Expected swap', detail: 'Every gate passes and the wallet signs', verdict: 'ALLOW' },
+  { value: 'exploiter', title: 'Known attacker', detail: 'The recipient appears on the denylist', verdict: 'DENY' },
+  { value: 'block-limit', title: 'Spend limit reached', detail: 'A second swap exceeds this block’s cap', verdict: 'DENY' },
+  { value: 'compromised', title: 'Protocol paused', detail: 'Fresh signed state vetoes the request', verdict: 'DENY' },
+  { value: 'hidden-call', title: 'Hidden contract call', detail: 'The EVM trace reaches a new target', verdict: 'DENY' },
+  { value: 'slippage', title: 'Slippage failure', detail: 'The exact transaction reverts on both nodes', verdict: 'DENY' },
 ];
 
 const guidedSteps = [
@@ -18,14 +18,14 @@ const guidedSteps = [
     title: 'Legitimate swap',
     intent: 'Swap 100 dUSD → at least 190 dETH',
     expected: 'ALLOW + MINE',
-    detail: 'Policy, signed live state, and two independent simulations all agree.',
+    detail: 'Policy, current protocol state, and both EVM traces agree on the outcome.',
   },
   {
     step: 2,
-    title: 'Compromised router',
+    title: 'Router with a hidden call',
     intent: 'Swap 75 dUSD → at least 140 dETH',
     expected: 'DENY BEFORE WALLET',
-    detail: 'The calldata looks safe, but simulation exposes a hidden call to an unauthorized contract.',
+    detail: 'The calldata looks ordinary. The trace reaches a contract the policy never authorized.',
   },
 ];
 
@@ -172,10 +172,10 @@ export default function RunExplorer({ initialRunId = null }) {
     <>
       <main id="demo-main" className="workspace">
         <header className="topbar">
-          <div><span className="topbar-kicker">WALLET POLICY GATEWAY / TRANSACTION CONTROL</span><h1>Agent transaction runs</h1></div>
+          <div><span className="topbar-kicker">WALLETCORDON / GUARDED EXECUTION</span><h1>Agent runs</h1></div>
           <div className="environment" aria-live="polite">
-            <div className={`mode-badge ${health?.ready ? 'live' : 'checking'}`}><i></i><span>{health?.ready ? 'LIVE DUAL-ANVIL' : 'STARTING ENGINE'}</span></div>
-            <div className="chain-badge"><span>CHAIN</span><strong>{health?.chainId ?? '—'}</strong></div>
+            <div className={`mode-badge ${health?.ready ? 'live' : 'checking'}`}><i></i><span>{health?.ready ? 'LOCAL ENGINE READY' : 'STARTING ENGINE'}</span></div>
+            <div className="chain-badge"><span>ANVIL</span><strong>{health?.chainId ?? '—'}</strong></div>
           </div>
         </header>
 
@@ -184,10 +184,10 @@ export default function RunExplorer({ initialRunId = null }) {
         <section className="guided-demo" aria-labelledby="guided-demo-title">
           <div className="guided-copy">
             <span className="section-label">TWO-TRANSACTION PROOF</span>
-            <h2 id="guided-demo-title">One agent. Two proposals. One hard boundary.</h2>
-            <p>The first trade is authorized and mined. The second looks ordinary in calldata, but a compromised router attempts a hidden internal call—so deterministic simulation blocks it before the wallet sees it.</p>
+            <h2 id="guided-demo-title">Same agent. Same wallet. Different answer.</h2>
+            <p>The first swap stays inside the owner’s rules and reaches the signer. The second looks normal until simulation reveals a call to an unauthorized contract. It stops at the boundary.</p>
             <button className="demo-run-button" type="button" onClick={runGuidedDemo} disabled={demoBusy || !health?.ready}>
-              <span>{demoBusy ? 'Starting both runs…' : 'Run the 2-transaction demo'}</span><b aria-hidden="true">→</b>
+              <span>{demoBusy ? 'Running both transactions…' : 'Run both transactions'}</span><b aria-hidden="true">→</b>
             </button>
           </div>
           <div className="guided-sequence" aria-live="polite">
@@ -207,35 +207,35 @@ export default function RunExplorer({ initialRunId = null }) {
         <section className="command-panel" aria-labelledby="command-title">
           <div className="command-copy">
             <span className="section-label">CUSTOM SINGLE RUN</span>
-            <h2 id="command-title">Test another agent request.</h2>
-            <p>Edit the goal or chain condition. The agent may construct an exact transaction, but it never receives the signer or direct provider access.</p>
+            <h2 id="command-title">Send a request through the boundary.</h2>
+            <p>Change the trading goal or choose a chain condition. The agent constructs the transaction; WalletCordon decides whether the exact request may reach the signer.</p>
           </div>
           <form className="prompt-form" onSubmit={submit}>
             <label htmlFor="trade-prompt">Trading request</label>
             <div className="prompt-row">
               <textarea id="trade-prompt" rows="3" maxLength="500" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-              <button className="run-button" type="submit" disabled={busy || demoBusy || !health?.ready}><span>{busy ? 'Submitting…' : 'Run one test'}</span><b aria-hidden="true">→</b></button>
+              <button className="run-button" type="submit" disabled={busy || demoBusy || !health?.ready}><span>{busy ? 'Checking request…' : 'Run transaction'}</span><b aria-hidden="true">→</b></button>
             </div>
             <fieldset className="scenario-picker">
               <legend>Choose the chain condition</legend>
               {scenarios.map((entry) => <label key={entry.value} className={`scenario ${scenario === entry.value ? 'active' : ''}`}><input type="radio" name="scenario" value={entry.value} checked={scenario === entry.value} onChange={() => setScenario(entry.value)} /><span><b>{entry.title}</b><small>{entry.detail}</small></span><i>{entry.verdict}</i></label>)}
             </fieldset>
-            <p className={`form-status ${error ? 'error' : ''}`}>{busy ? 'The proposal is entering the deterministic boundary…' : ''}</p>
+            <p className={`form-status ${error ? 'error' : ''}`}>{busy ? 'Policy, live state, and simulation are checking the exact transaction…' : ''}</p>
           </form>
         </section>
 
         <section className="engine-strip" aria-label="Active security gates">
-          <div><i className="green"></i><span>POLICY</span><strong>Executable</strong></div>
-          <div><i className="aqua"></i><span>LIVE STATE</span><strong>2 / 2 signed</strong></div>
-          <div><i className="amber"></i><span>SIMULATION</span><strong>2 independent traces</strong></div>
-          <div><i className="green"></i><span>HISTORY</span><strong>Persistent snapshots</strong></div>
+          <div><i className="green"></i><span>POLICY</span><strong>Executable rules loaded</strong></div>
+          <div><i className="aqua"></i><span>LIVE STATE</span><strong>2 of 2 monitors signed</strong></div>
+          <div><i className="amber"></i><span>SIMULATION</span><strong>Two traces required</strong></div>
+          <div><i className="green"></i><span>HISTORY</span><strong>Receipts preserved</strong></div>
         </section>
 
         <section className="runs-layout" aria-label="Run explorer">
           <aside className="run-rail">
-            <div className="rail-heading"><div><span className="section-label">ALL SESSIONS</span><h2>Runs</h2></div><span className="run-count">{runs.length}</span></div>
+            <div className="rail-heading"><div><span className="section-label">HISTORY</span><h2>Recent runs</h2></div><span className="run-count">{runs.length}</span></div>
             <div className="run-list" aria-live="polite">
-              {!runs.length && <p className="run-list-empty">No stored runs yet.</p>}
+              {!runs.length && <p className="run-list-empty">No transactions have crossed the boundary yet.</p>}
               {runs.map((run) => <button key={run.id} type="button" className={`run-item ${activeId === run.id ? 'active' : ''}`} onClick={() => selectRun(run.id)}><span className="run-item-top"><span className="run-id">{run.id}</span><span className={`decision-pill ${statusClass(run.decision ?? run.status)}`}>{String(run.decision ?? run.status).toUpperCase()}</span></span><p className="run-prompt">{run.prompt}</p><span className="run-meta"><span>{run.demo ? `DEMO ${run.demo.step}/${run.demo.total}` : run.source === 'agent-api' ? 'AGENT API' : run.scenario}</span><span>{time(run.updatedAt)}</span></span></button>)}
             </div>
           </aside>
@@ -255,7 +255,7 @@ function RunDetail({ run, onCopy }) {
   const audit = eventFor(run, 'audit');
   const simulationFailures = [...new Set((simulation?.sources ?? []).flatMap((source) => source.failures ?? []))];
   const passed = useMemo(() => checks.filter((check) => check.status === 'pass').length, [checks]);
-  if (!run) return <article className="run-detail"><div className="empty-state"><span>NO RUN SELECTED</span><h2>Evidence will appear here.</h2><p>Start a guarded trade or select a stored run to inspect every deterministic decision.</p></div></article>;
+  if (!run) return <article className="run-detail"><div className="empty-state"><span>SELECT A RUN</span><h2>Read the complete decision.</h2><p>Choose a stored run or submit a transaction to see what the agent requested, what every gate observed, and whether the wallet was contacted.</p></div></article>;
 
   const verdict = run.decision ?? run.status;
   return (
@@ -271,7 +271,7 @@ function RunDetail({ run, onCopy }) {
 
       <section className="detail-section"><div className="section-row"><div><span className="section-label">END-TO-END FLOW</span><h3>Decision timeline</h3></div><span>{run.events?.length ?? 0} events</span></div><div className="timeline">{(run.events ?? []).map((event) => <div key={`${event.index}-${event.at}`} className={`event ${statusClass(event.status)}`}><span className="event-index">{String(event.index).padStart(2, '0')}</span><span className="event-phase">{event.phase}</span><div className="event-copy"><strong>{event.title}</strong><p>{event.detail}</p></div></div>)}</div></section>
 
-      <section className="detail-section"><div className="section-row"><div><span className="section-label">VERIFIABLE EVIDENCE</span><h3>What the system saw</h3></div><button className="copy-json" type="button" onClick={onCopy}>Copy run JSON</button></div><div className="evidence-grid">
+      <section className="detail-section"><div className="section-row"><div><span className="section-label">VERIFIABLE EVIDENCE</span><h3>Why WalletCordon made this decision</h3></div><button className="copy-json" type="button" onClick={onCopy}>Copy run JSON</button></div><div className="evidence-grid">
         <Evidence title="AGENT PROPOSAL" state={run.transaction ? 'FIXED' : 'PENDING'}><KeyValue rows={[['source', run.source ?? 'bundled-agent'], ['request id', run.requestId ?? '—'], ['to', short(run.transaction?.to, 14, 8)], ['selector', run.transaction?.data?.slice(0, 10) ?? '—'], ['nonce', run.transaction?.nonce ?? '—'], ['type', run.transaction?.type ?? '—']]} /></Evidence>
         <Evidence title="LIVE PROTOCOL STATE" state={liveState?.status === 'deny' ? 'VETO' : liveState ? 'SIGNED' : 'PENDING'} deny={liveState?.status === 'deny'}><KeyValue rows={[['sequence', liveState?.data?.sequence ?? '—'], ['signers', liveState?.data?.signatures?.join(', ') ?? '—'], ['block', liveState?.data?.blockNumber ?? '—'], ['evidence', liveState?.data?.evidence?.length != null ? `${liveState.data.evidence.length} monitor results` : '—']]} /></Evidence>
         <Evidence title="POLICY + INVARIANTS" state={checks.some((check) => check.status === 'deny') ? 'DENY' : checks.length ? 'PASS' : 'PENDING'} deny={checks.some((check) => check.status === 'deny')} wide><div className="check-list">{checks.map((check) => <div key={check.id} className={`check ${statusClass(check.status)}`}><i></i><b>{check.id}</b><span>{check.detail}</span></div>)}</div></Evidence>

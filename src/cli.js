@@ -14,13 +14,13 @@ import { ATTACKER_DOCUMENT, ATTACKER_LIST } from './attacker-list.js';
 import { createPolicyFromRuleSet, GENERAL_RULE_SET, ruleSetProfiles, toBaseUnits } from './rule-sets.js';
 import { failedSimulation, finalizeSimulation, simulateTransaction } from './transaction-simulator.js';
 
-const HELP = `Keybound — deterministic wallet authorization for AI agents\n\nUsage:\n  keybound authorize <intent.json|-> --policy <policy.json> [--state <bundle.json>] [--out <receipt.json>]\n  keybound policy <validate|audit> <policy.json>\n  keybound state <collect|sign|verify> ...\n  keybound audit verify <receipts.jsonl>\n  keybound scan <file-or-directory...> [scan options]\n  keybound registry <sync|list|search> ...\n\nThe agent may propose transactions, but executable policy and signed live protocol state decide\nwhether the exact request reaches the wallet. All unsupported mutation methods deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply review terms exported from pr-review-ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner is a monitoring feature, not the wallet authorization boundary.\n`;
+const HELP = `WalletCordon — deterministic signing control for AI agents\n\nUsage:\n  walletcordon authorize <intent.json|-> --policy <policy.json> [--state <bundle.json>] [--out <receipt.json>]\n  walletcordon policy <validate|audit> <policy.json>\n  walletcordon state <collect|sign|verify> ...\n  walletcordon audit verify <receipts.jsonl>\n  walletcordon scan <file-or-directory...> [scan options]\n  walletcordon registry <sync|list|search> ...\n\nThe agent may build a transaction, but executable policy, signed live protocol state, and full\nsimulation decide whether that exact request may reach the signer. Unsupported mutations deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply review terms exported from pr-review-ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner provides evidence. It is not the wallet authorization boundary.\n`;
 
-const POLICY_HELP = `Keybound executable wallet policies:\n  keybound policy init --wallet <address> --state-key <id:base64> --state-key <id:base64> [--profile general|swapper|lender|payments] [--max-per-tx USDC=100] [--max-per-block USDC=100] [--max-slippage-bps 100] [--block <address>] [--payee <address>] [--valid-days 90] [--out <policy.json>]\n  keybound policy profiles\n  keybound policy validate <policy.json>\n  keybound policy audit <policy.json>\n  keybound authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction and state hashes in the receipt; the wallet guard must forward those same fields.\n`;
+const POLICY_HELP = `WalletCordon executable wallet policies:\n  walletcordon policy init --wallet <address> --state-key <id:base64> --state-key <id:base64> [--profile general|swapper|lender|payments] [--max-per-tx USDC=100] [--max-per-block USDC=100] [--max-slippage-bps 100] [--block <address>] [--payee <address>] [--valid-days 90] [--out <policy.json>]\n  walletcordon policy profiles\n  walletcordon policy validate <policy.json>\n  walletcordon policy audit <policy.json>\n  walletcordon authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. An allow only covers the exact transaction and\nstate hashes in its receipt; the wallet guard must forward those same fields.\n`;
 
-const REGISTRY_HELP = `Registry commands:\n  eth-call-scout registry sync [all|tokens|protocols|volume|contracts]\n  eth-call-scout registry list [tokens|protocols|contracts|trackers|sources]\n  eth-call-scout registry search <query>\n\nLive sources are cached locally under .cache/eth-call-scout/registry.json.\n`;
+const REGISTRY_HELP = `Registry commands:\n  walletcordon registry sync [all|tokens|protocols|volume|contracts]\n  walletcordon registry list [tokens|protocols|contracts|trackers|sources]\n  walletcordon registry search <query>\n\nLive sources are cached locally under .cache/eth-call-scout/registry.json.\n`;
 
-const STATE_HELP = `Keybound signed protocol state:\n  keybound state collect <monitor.json> --sequence <n> --out <payload.json>\n  keybound state sign <payload.json> --key <private-key.pem> --key-id <id> --out <bundle.json>\n      [--append <existing-bundle.json>]\n  keybound state verify <bundle.json> --policy <policy.json> --intent <intent.json>\n\nCollector RPC URLs are read from environment variables named in monitor config. Private keys\nshould live in an isolated signer or HSM outside the agent process.\n`;
+const STATE_HELP = `WalletCordon signed protocol state:\n  walletcordon state collect <monitor.json> --sequence <n> --out <payload.json>\n  walletcordon state sign <payload.json> --key <private-key.pem> --key-id <id> --out <bundle.json>\n      [--append <existing-bundle.json>]\n  walletcordon state verify <bundle.json> --policy <policy.json> --intent <intent.json>\n\nCollector RPC URLs come from environment variables named in the monitor config. Private keys\nshould live in an isolated signer or HSM outside the agent process.\n`;
 
 async function runRegistry(args) {
   const action = args[0];
@@ -130,7 +130,7 @@ function runPolicyInit(args) {
 async function runAttackers(args) {
   const action = args[0];
   if (!action || action === '--help' || action === '-h') {
-    process.stdout.write(`Keybound attacker list:\n  keybound attackers info\n  keybound attackers check <address>\n  keybound attackers update [--from <url>] [--out <file>]\n\nThe list is always on. Updates can only add addresses. Default source: ${DEFAULT_ATTACKER_LIST_URL}\n`);
+    process.stdout.write(`WalletCordon attacker list:\n  walletcordon attackers info\n  walletcordon attackers check <address>\n  walletcordon attackers update [--from <url>] [--out <file>]\n\nThe list is always on. Updates can only add addresses. Default source: ${DEFAULT_ATTACKER_LIST_URL}\n`);
     return;
   }
   if (action === 'info') {
@@ -138,7 +138,7 @@ async function runAttackers(args) {
     return;
   }
   if (action === 'check') {
-    if (!args[1]) throw new Error('Usage: keybound attackers check <address>');
+    if (!args[1]) throw new Error('Usage: walletcordon attackers check <address>');
     const match = ATTACKER_LIST.find(args[1]);
     writeJson({ address: args[1].toLowerCase(), listed: Boolean(match), label: match?.label ?? null, sources: match?.sources ?? [], reference: match?.reference ?? null, listVersion: ATTACKER_LIST.version });
     if (match) process.exitCode = 1;
@@ -155,11 +155,11 @@ async function runAttackers(args) {
 async function runAlerts(args) {
   const action = args[0];
   if (!action || action === '--help' || action === '-h') {
-    process.stdout.write('Keybound alerts:\n  keybound alerts show <alerts.jsonl> [--severity critical|warning|info]\n  keybound alerts verify <alerts.jsonl>\n');
+    process.stdout.write('WalletCordon alerts:\n  walletcordon alerts show <alerts.jsonl> [--severity critical|warning|info]\n  walletcordon alerts verify <alerts.jsonl>\n');
     return;
   }
   const file = args[1];
-  if (!file) throw new Error(`Usage: keybound alerts ${action} <alerts.jsonl>`);
+  if (!file) throw new Error(`Usage: walletcordon alerts ${action} <alerts.jsonl>`);
   if (action === 'verify') {
     const result = await verifyAuditLog(path.resolve(file));
     writeJson(result);
@@ -270,8 +270,8 @@ async function runState(args) {
 async function runAudit(args) {
   const action = args[0];
   const file = args[1];
-  if (!action || action === '--help' || action === '-h') { process.stdout.write('Keybound audit log:\n  keybound audit verify <receipts.jsonl>\n'); return; }
-  if (action !== 'verify' || !file) throw new Error('Usage: keybound audit verify <receipts.jsonl>');
+  if (!action || action === '--help' || action === '-h') { process.stdout.write('WalletCordon audit log:\n  walletcordon audit verify <receipts.jsonl>\n'); return; }
+  if (action !== 'verify' || !file) throw new Error('Usage: walletcordon audit verify <receipts.jsonl>');
   const result = await verifyAuditLog(path.resolve(file));
   writeJson(result);
   if (!result.valid) process.exitCode = 2;
@@ -285,7 +285,7 @@ export async function runCli(argv) {
     if (argv[0] === 'audit') { await runAudit(argv.slice(1)); return; }
     if (argv[0] === 'attackers') { await runAttackers(argv.slice(1)); return; }
     if (argv[0] === 'alerts') { await runAlerts(argv.slice(1)); return; }
-    if (argv[0] === 'registry') { runRegistry(argv.slice(1)).catch((error) => { process.stderr.write(`eth-call-scout: ${error.message}\n`); process.exitCode = 1; }); return; }
+    if (argv[0] === 'registry') { runRegistry(argv.slice(1)).catch((error) => { process.stderr.write(`walletcordon: ${error.message}\n`); process.exitCode = 1; }); return; }
     if (argv[0] === 'scan') argv = argv.slice(1);
     const paths = [];
     let html = 'eth-call-report.html';
@@ -332,7 +332,7 @@ export async function runCli(argv) {
     if (!noHtml) process.stdout.write(`HTML review: ${path.resolve(html)}\n`);
     if (json) process.stdout.write(`JSON findings: ${path.resolve(json)}\n`);
   } catch (error) {
-    process.stderr.write(`eth-call-scout: ${error.message}\n`);
+    process.stderr.write(`walletcordon: ${error.message}\n`);
     process.exitCode = 1;
   }
 }

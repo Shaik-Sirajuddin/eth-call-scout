@@ -22,7 +22,7 @@ export const ALERT_CODES = Object.freeze({
 });
 
 function describe(alert) {
-  return `[keybound ${alert.severity}] ${alert.code}: ${alert.message}${alert.transactionHash ? ` (tx ${alert.transactionHash})` : ''}`;
+  return `[walletcordon ${alert.severity}] ${alert.code}: ${alert.message}${alert.transactionHash ? ` (tx ${alert.transactionHash})` : ''}`;
 }
 
 /** Writes alerts to stderr only. Used when no alert log is configured, so nothing is lost silently. */
@@ -72,6 +72,6 @@ export function formatAlert(alert) {
 export async function raiseAlert(sink, { severity = 'warning', code, message, transactionHash = null, blockNumber = null, details = null }, now = () => new Date()) {
   const alert = { version: 1, at: new Date(now()).toISOString(), severity, code, message, transactionHash, blockNumber, details };
   try { await sink.append(alert); }
-  catch (error) { process.stderr.write(`[keybound] Could not write alert: ${error.message}. ${describe(alert)}\n`); }
+  catch (error) { process.stderr.write(`[walletcordon] Could not write alert: ${error.message}. ${describe(alert)}\n`); }
   return alert;
 }

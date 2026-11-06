@@ -1,10 +1,11 @@
 {
-  "name": "eth-call-scout",
+  "name": "walletcordon",
   "version": "0.1.0",
   "private": true,
   "description": "Deterministic wallet authorization and monitoring for AI agents.",
   "type": "module",
   "bin": {
+    "walletcordon": "./bin/eth-call-scout.js",
     "keybound": "./bin/eth-call-scout.js",
     "eth-call-scout": "./bin/eth-call-scout.js"
   },
