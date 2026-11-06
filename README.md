@@ -41,8 +41,8 @@ npx callscout policy validate examples/wallet-policy.json
 # Audit a threshold-protected live-state policy.
 npx callscout policy audit examples/wallet-policy-live.json
 
-# Run a fresh end-to-end threshold-signed authorization without a real wallet.
-npm run demo:live
+# Run the complete allow/deny scenario demo without a real wallet or RPC.
+npm run demo
 
 # Run every syntax check, security test, and the safe demo authorization.
 npm run verify
@@ -158,6 +158,25 @@ Policies can require a fresh protocol-state bundle signed by a threshold of pinn
 
 Fetching and caching never create trust; bundles remain untrusted until they pass inside the authorization path. See [Authenticated protocol state](docs/protocol-state.md).
 
+## Deterministic on-chain monitors
+
+CallScout can collect protocol observations from multiple independent RPC endpoints before signing. Monitor configuration pins expected runtime bytecode hashes and can add exact storage-slot and view-call invariants. A quorum of matching sources produces `operational`; a quorum of deterministic mismatches produces `compromised`; disagreement or outages produce `degraded`.
+
+```sh
+export CALLSCOUT_RPC_PRIMARY='https://first-rpc.example'
+export CALLSCOUT_RPC_SECONDARY='https://second-rpc.example'
+
+callscout state collect protocol-monitor.json \
+  --sequence 42 \
+  --out state-payload.json
+```
+
+Collection remains separate from signing so RPC-facing monitor processes never need state-signing private keys. See [Protocol monitoring](docs/protocol-monitoring.md).
+
+## Tamper-evident decisions
+
+Authorization receipts can be written to a single-writer, hash-chained JSONL log and verified with `callscout audit verify`. Protect or externally anchor the chain head; hash chaining detects tampering but is not immutable storage by itself. See [Authorization audit log](docs/audit-log.md).
+
 ## Monitoring: static call discovery
 
 CallScout can inventory Ethereum interactions in JavaScript and TypeScript. It uses the TypeScript parser and never executes scanned source code.
@@ -203,6 +222,8 @@ Report vulnerabilities through [SECURITY.md](SECURITY.md). Do not include privat
 - [Security and threat model](docs/security-model.md)
 - [Policy reference](docs/policies.md)
 - [Authenticated live protocol state](docs/protocol-state.md)
+- [Deterministic protocol monitoring](docs/protocol-monitoring.md)
+- [Authorization audit log](docs/audit-log.md)
 - [Wallet integration](docs/integration.md)
 - [Monitoring and scanner](docs/monitoring.md)
 - [Demo runbook](docs/demo.md)

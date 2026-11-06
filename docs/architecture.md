@@ -38,6 +38,14 @@ The state layer cannot generically discover every exploit. Protocol-specific mon
 
 The provider keeps the highest authenticated state sequence and can persist it through a trusted sequence store. A signed unsafe status advances this floor, preventing replay of an older operational snapshot. Persistence failures deny before wallet forwarding.
 
+### Protocol monitor
+
+`src/protocol-monitor.js` checks reviewed runtime bytecode hashes, storage slots, and view-call results through independent RPC sources. Duplicate endpoints and lagging nodes are excluded. Matching quorum produces an operational observation; mismatch quorum produces compromised; disagreement or source failure produces degraded. The collector has no signing key.
+
+### Audit log
+
+`src/audit-log.js` writes single-writer, hash-chained JSONL receipts. This makes modification and chain breaks evident when a trusted head is retained. It is not immutable storage and should be protected or anchored externally.
+
 ### Monitoring plane
 
 The source scanner, ABI decoder, registry, and HTML report help humans inventory interactions and author policies. They are outside the authorization path. Scanner misses must not create wallet permissions, and registry matches must not imply safety.
