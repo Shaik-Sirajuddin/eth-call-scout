@@ -89,7 +89,6 @@ export function renderPolicyBuilder(registry = {}, seedPolicy = DEFAULT_POLICY) 
       <a href="./"><span>⌂</span>Overview</a>
       <a href="./report.html"><span>◫</span>Call report</a>
       <a class="active" href="./ruleset.html" aria-current="page"><span>⌁</span>Policy builder</a>
-      <a href="./pr-review-ruleset.html"><span>⌕</span>Review ruleset</a>
       <a href="https://github.com/x0rc1ph3r/eth-call-scout/tree/main/docs"><span>?</span>Docs</a>
     </nav>
     <div class="trust-card"><span class="eyebrow">Security boundary</span><strong>Author here. Enforce in code.</strong><p>The canvas never grants wallet access. The CLI validator and guarded provider re-check the exported policy.</p></div>

@@ -26,7 +26,7 @@ The production URL must not require a Vercel account.
 3. Open **Settings → Deployment Protection**.
 4. Select **Standard Protection** (production domains remain public) or **None**. Do not use **All Deployments** for the judge build.
 5. Open the production domain in a private browser window. It must load the CallScout landing page without redirecting to `vercel.com/login`.
-6. Verify `/demo.html`, `/report.html`, `/ruleset.html`, and `/pr-review-ruleset.html` on that same domain.
+6. Verify `/demo.html`, `/report.html`, and `/ruleset.html` on that same domain.
 
 The hosted control room deliberately shows **EXAMPLE EVIDENCE**. The real execution demo runs locally because it starts two Anvil processes and deploys contracts. Run `npm run demo:serve` and open `http://127.0.0.1:4174/demo.html` for the green **LIVE DUAL-ANVIL** mode.
 
