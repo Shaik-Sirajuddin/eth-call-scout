@@ -14,6 +14,15 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function parseChainId(value) {
+  try {
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value;
+    if (typeof value !== 'string' || (!/^0x[0-9a-fA-F]+$/.test(value) && !/^[1-9][0-9]*$/.test(value))) return null;
+    const parsed = BigInt(value);
+    return parsed > 0n && parsed <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(parsed) : null;
+  } catch { return null; }
+}
+
 function deniedRpcReceipt(method, detail) {
   return {
     version: 1,
@@ -69,6 +78,12 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         await onDecision(receipt);
         throw new WalletGuardError('Wallet guard could not establish the active chain.', receipt);
       }
+      const activeChainId = parseChainId(chainId);
+      if (activeChainId == null) {
+        const receipt = deniedRpcReceipt(method, 'Wallet returned a malformed or unsupported active chain ID.');
+        await onDecision(receipt);
+        throw new WalletGuardError('Wallet guard could not validate the active chain.', receipt);
+      }
       let currentState = protocolState;
       if (stateSource) {
         try { currentState = await stateSource(); }
@@ -79,12 +94,24 @@ export function createGuardedProvider({ provider, policy, authorize = authorizeI
         try { highestStateSequence = Math.max(highestStateSequence, await stateSequenceStore.read()); }
         catch (error) { sequenceStoreError = error; }
       }
-      const exactIntent = { ...transaction, chainId: transaction?.chainId ?? chainId };
+      const exactIntent = transaction;
       let receipt = await authorize(policy, exactIntent, {
         now,
         protocolState: currentState,
         minimumStateSequence: highestStateSequence,
       });
+      if (receipt.intent) {
+        const activeChainMatches = receipt.intent.chainId === activeChainId;
+        receipt = {
+          ...receipt,
+          decision: activeChainMatches ? receipt.decision : 'deny',
+          checks: [...receipt.checks, {
+            id: 'wallet:active-chain',
+            status: activeChainMatches ? 'pass' : 'deny',
+            detail: `Transaction chain ${receipt.intent.chainId} must exactly match active wallet chain ${activeChainId}.`,
+          }],
+        };
+      }
       if (receipt.protocolState?.authenticated && Number.isSafeInteger(receipt.protocolState.sequence)) {
         const nextSequence = Math.max(highestStateSequence, receipt.protocolState.sequence);
         if (stateSequenceStore && !sequenceStoreError) {

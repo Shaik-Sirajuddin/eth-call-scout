@@ -9,11 +9,12 @@ Transactions denied by an earlier check are not simulated because they can never
 For the exact normalized transaction, each configured source must provide:
 
 1. `eth_chainId` for exact network binding and `eth_blockNumber` for lag filtering;
-2. `eth_getCode` for sender and any EIP-7702 delegate inspection;
-3. `eth_call` for top-level execution and revert detection;
-4. `eth_estimateGas` for the configured gas ceiling;
-5. `debug_traceCall` with `callTracer` and logs for the complete internal call tree; and
-6. `debug_traceCall` with `prestateTracer` in diff mode for account, storage, and code effects.
+2. `eth_getTransactionCount(..., "pending")` to bind the explicit outer nonce;
+3. `eth_getCode` for sender and any EIP-7702 delegate inspection;
+4. `eth_call` for top-level execution and revert detection;
+5. `eth_estimateGas` for the configured gas ceiling;
+6. `debug_traceCall` with `callTracer` and logs for the complete internal call tree; and
+7. `debug_traceCall` with `prestateTracer` in diff mode for account, storage, and code effects.
 
 The analyzer first proves that the trace root exactly matches sender, target, calldata, and value. It then enforces call type, chain-bound internal target allowlists, maximum depth and count, native outflow, gas, touched accounts, storage writes, code changes, ERC-20 transfers, ERC-20 approvals, recipients, and spenders. ERC-721-style event shapes, ERC-1155 wallet outflows, and operator-wide approvals deny until purpose-built asset policies exist. It canonicalizes the observed effects into a fingerprint. At least `quorum` sources must agree on one passing fingerprint, and a violation quorum always vetoes.
 
@@ -21,7 +22,8 @@ RPC URLs must be HTTPS except for loopback development, may not contain credenti
 
 ## Supported transaction envelopes
 
-- omitted type, legacy/type `0`, and EIP-1559/type `2` use the normal policy, state, and simulation path;
+- omitted type, legacy/type `0`, and EIP-1559/type `2` use the normal policy, state, and simulation path, but must carry an explicit chain and outer nonce;
+- type-2 access lists are strictly parsed, bounded, included in the transaction hash, and passed unchanged to every simulator; legacy access lists deny;
 - EIP-7702/type `4` uses the additional controls below; and
 - type `1`, type `3` blob transactions, raw signed transactions, opaque message signing, wallet batches, and other wallet mutation APIs deny until purpose-built parsers and equivalent simulation coverage exist.
 
@@ -38,7 +40,8 @@ For an opted-in type-4 authorization list, CallScout requires:
 - an explicit type-4 envelope with exactly one authorization;
 - authorization chain equal to the transaction chain—chain ID zero is rejected;
 - signature recovery to the exact guarded wallet;
-- authorization nonce equal to the sender's pending nonce plus one, matching EIP-7702 processing for a self-authorization;
+- outer transaction nonce equal to the sender's pending nonce at every simulation source;
+- authorization nonce equal to that exact outer nonce plus one, matching EIP-7702 processing for a self-authorization;
 - a non-zero delegate chain/address pair present in policy;
 - delegate runtime bytecode matching its pinned Keccak-256 hash at every agreeing source;
 - no delegate-to-delegate chain; and

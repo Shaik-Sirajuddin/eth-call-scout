@@ -7,10 +7,10 @@ CallScout is a least-authority bridge between an untrusted AI agent and a wallet
 1. The user gives a goal to an agent.
 2. The agent constructs an EIP-1193 `eth_sendTransaction` proposal.
 3. The guarded provider copies the JSON request and obtains the active chain from the underlying provider.
-4. The policy engine normalizes the exact transaction fields and validates the policy.
+4. The policy engine requires and normalizes the exact transaction fields, including chain, outer nonce, type, access list, gas, fees, target, value, and calldata, then validates the policy.
 5. Deterministic checks evaluate wallet, chain, target, selector, value, fees, expiry, and ABI-word constraints.
 6. The live-state verifier evaluates an authenticated, fresh protocol-health snapshot bound to the target.
-7. The simulator sends the same normalized transaction to independent trace-capable RPC endpoints and evaluates call results, gas, full call trees and logs, state diffs, asset effects, and EIP-7702 state.
+7. The simulator first requires every source to agree that the explicit outer nonce is pending, then sends the same normalized transaction to independent trace-capable RPC endpoints and evaluates call results, gas, full call trees and logs, state diffs, asset effects, and EIP-7702 state.
 8. A quorum must agree on one passing trace fingerprint. Any policy-violation quorum, missing pass quorum, lag, malformed output, or RPC failure that prevents quorum produces `deny`.
 9. Only an all-pass receipt permits the copied request that was evaluated to reach the underlying wallet.
 10. The receipt, including simulation fingerprint and source summary, is written to an audit sink chosen by the integrator.
@@ -45,7 +45,7 @@ The provider keeps the highest authenticated state sequence and can persist it t
 
 ### Transaction simulator
 
-`src/transaction-simulator.js` is a mandatory final gate, not an LLM tool. It runs the exact transaction with `eth_call`, `eth_estimateGas`, `debug_traceCall` call tracing with logs, and `debug_traceCall` pre/post state diffing. It rejects unapproved internal targets or call types, reverts, excessive depth, gas, writes, native outflow, token transfers or approvals, unexpected code changes, trace disagreement, and insufficient quorum.
+`src/transaction-simulator.js` is a mandatory final gate, not an LLM tool. It binds the outer nonce with `eth_getTransactionCount(..., "pending")`, then runs the exact transaction with `eth_call`, `eth_estimateGas`, `debug_traceCall` call tracing with logs, and `debug_traceCall` pre/post state diffing. It rejects nonce disagreement, unapproved internal targets or call types, reverts, excessive depth, gas, writes, native outflow, token transfers or approvals, unexpected code changes, trace disagreement, and insufficient quorum.
 
 The simulator reads the sender's current code before tracing. EIP-7702 authorization lists and already-delegated EOAs are default-deny. When explicitly enabled, authorization signature, authority, chain, nonce, delegate identity, runtime code hash, and the exact delegation code change are checked before the ordinary full-trace rules apply.
 

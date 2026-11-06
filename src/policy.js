@@ -7,6 +7,7 @@ import { evaluateProtocolState } from './protocol-state.js';
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SELECTOR = /^0x[a-fA-F0-9]{8}$/;
 const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
+const STORAGE_KEY = /^0x[a-fA-F0-9]{64}$/;
 const DECIMAL_UINT = /^(?:0|[1-9][0-9]*)$/;
 const MAX_UINT256 = (1n << 256n) - 1n;
 const MAX_UINT64 = (1n << 64n) - 1n;
@@ -294,10 +295,48 @@ function normalizeAuthorization(raw, index, errors) {
   };
 }
 
+function normalizeAccessList(raw, errors) {
+  if (!Array.isArray(raw)) {
+    errors.push(issue('invalid-access-list', '$.accessList', 'accessList must be an array.'));
+    return null;
+  }
+  if (raw.length > 256) errors.push(issue('access-list-too-large', '$.accessList', 'accessList may contain at most 256 addresses.'));
+  const addresses = new Set();
+  let totalStorageKeys = 0;
+  const normalizedEntries = raw.map((entry, index) => {
+    const path = `$.accessList[${index}]`;
+    if (!isPlainObject(entry)) {
+      errors.push(issue('invalid-access-list-entry', path, 'Access-list entries must be objects.'));
+      return null;
+    }
+    rejectUnknown(entry, new Set(['address', 'storageKeys']), path, errors);
+    const address = String(entry.address ?? '').toLowerCase();
+    if (!ADDRESS.test(address)) errors.push(issue('invalid-address', `${path}.address`, 'Access-list entry requires an exact address.'));
+    if (addresses.has(address)) errors.push(issue('duplicate-access-list-address', `${path}.address`, 'Access-list addresses must be unique.'));
+    addresses.add(address);
+    if (!Array.isArray(entry.storageKeys)) {
+      errors.push(issue('invalid-access-list-storage', `${path}.storageKeys`, 'storageKeys must be an array.'));
+      return null;
+    }
+    totalStorageKeys += entry.storageKeys.length;
+    const keys = new Set();
+    const storageKeys = entry.storageKeys.map((key, keyIndex) => {
+      const normalized = String(key).toLowerCase();
+      if (!STORAGE_KEY.test(normalized)) errors.push(issue('invalid-storage-key', `${path}.storageKeys[${keyIndex}]`, 'Access-list storage keys must be 32-byte hex values.'));
+      if (keys.has(normalized)) errors.push(issue('duplicate-storage-key', `${path}.storageKeys[${keyIndex}]`, 'Access-list storage keys must be unique per address.'));
+      keys.add(normalized);
+      return normalized;
+    });
+    return { address, storageKeys };
+  }).filter(Boolean);
+  if (totalStorageKeys > 4096) errors.push(issue('access-list-too-large', '$.accessList', 'accessList may contain at most 4096 storage keys.'));
+  return normalizedEntries;
+}
+
 export function normalizeIntent(intent) {
   const errors = [];
   if (!isPlainObject(intent)) return { valid: false, errors: [issue('invalid-intent', '$', 'Transaction intent must be an object.')], intent: null };
-  rejectUnknown(intent, new Set(['chainId', 'from', 'to', 'data', 'value', 'gas', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas', 'type', 'authorizationList']), '$', errors);
+  rejectUnknown(intent, new Set(['chainId', 'from', 'to', 'data', 'value', 'gas', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas', 'nonce', 'type', 'accessList', 'authorizationList']), '$', errors);
   let chainId = intent.chainId;
   if (typeof chainId === 'string' && (/^0x[0-9a-fA-F]+$/.test(chainId) || DECIMAL_UINT.test(chainId))) chainId = Number(BigInt(chainId));
   if (!Number.isSafeInteger(chainId) || chainId < 1) errors.push(issue('invalid-chain', '$.chainId', 'Intent requires a positive chain ID.'));
@@ -311,8 +350,11 @@ export function normalizeIntent(intent) {
   const gasPrice = normalizeQuantity(intent.gasPrice, '$.gasPrice', errors);
   const maxFeePerGas = normalizeQuantity(intent.maxFeePerGas, '$.maxFeePerGas', errors);
   const maxPriorityFeePerGas = normalizeQuantity(intent.maxPriorityFeePerGas, '$.maxPriorityFeePerGas', errors);
+  const nonce = normalizeQuantity(intent.nonce, '$.nonce', errors, { required: true });
+  if (nonce != null && nonce >= MAX_UINT64) errors.push(issue('invalid-nonce', '$.nonce', 'Transaction nonce must be less than 2^64 - 1.'));
   if (gasPrice != null && (maxFeePerGas != null || maxPriorityFeePerGas != null)) errors.push(issue('conflicting-fee-model', '$.gasPrice', 'Legacy gasPrice cannot be combined with EIP-1559 fee fields.'));
   const type = normalizeQuantity(intent.type, '$.type', errors);
+  const accessList = intent.accessList == null ? null : normalizeAccessList(intent.accessList, errors);
   let authorizationList = null;
   if (intent.authorizationList != null) {
     if (!Array.isArray(intent.authorizationList)) errors.push(issue('invalid-eip7702-authorization-list', '$.authorizationList', 'authorizationList must be an array.'));
@@ -328,7 +370,9 @@ export function normalizeIntent(intent) {
     gasPrice,
     maxFeePerGas,
     maxPriorityFeePerGas,
+    nonce,
     type,
+    accessList,
     authorizationList,
   };
   return { valid: errors.length === 0, errors, intent: normalized };
@@ -363,7 +407,9 @@ function serializableIntent(intent) {
     gasPrice: intent.gasPrice?.toString() ?? null,
     maxFeePerGas: intent.maxFeePerGas?.toString() ?? null,
     maxPriorityFeePerGas: intent.maxPriorityFeePerGas?.toString() ?? null,
+    nonce: intent.nonce.toString(),
     type: intent.type?.toString() ?? null,
+    accessList: intent.accessList,
     authorizationList: intent.authorizationList?.map((authorization) => ({
       chainId: authorization.chainId.toString(),
       address: authorization.address,
@@ -403,6 +449,7 @@ export function authorizeIntent(policy, rawIntent, { now = new Date(), protocolS
   const legacyFees = intent.gasPrice != null;
   const eip1559Fees = intent.maxFeePerGas != null && intent.maxPriorityFeePerGas != null;
   add('transaction:fee-model', legacyFees !== eip1559Fees && (intent.type !== 0n || legacyFees) && (intent.type !== 2n && intent.type !== 4n || eip1559Fees), 'Transaction must contain exactly one fee model matching its explicit envelope type.');
+  add('transaction:access-list', intent.accessList == null || (!legacyFees && intent.type !== 0n), 'Access lists are supported only by EIP-1559 type-2 and EIP-7702 type-4 envelopes.');
   if (!usesEip7702) add('eip7702:request', true, 'Transaction does not request an EIP-7702 delegation change.');
   else {
     const eip7702 = policy.simulation.eip7702;

@@ -73,6 +73,40 @@ test('advances an exact transaction to mandatory simulation after every determin
   assert.ok(receipt.checks.every((check) => check.status === 'pass'));
 });
 
+test('binds the outer nonce and safely normalizes EIP-1559 access lists', () => {
+  const withAccessList = clone(intent);
+  withAccessList.accessList = [{
+    address: intent.to.toUpperCase().replace('0X', '0x'),
+    storageKeys: [`0x${'AB'.repeat(32)}`],
+  }];
+  let receipt = authorizeIntent(fixture, withAccessList, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'simulate');
+  assert.equal(receipt.intent.nonce, '7');
+  assert.deepEqual(receipt.intent.accessList, [{ address: intent.to.toLowerCase(), storageKeys: [`0x${'ab'.repeat(32)}`] }]);
+
+  const duplicate = clone(withAccessList);
+  duplicate.accessList[0].storageKeys.push(duplicate.accessList[0].storageKeys[0]);
+  receipt = authorizeIntent(fixture, duplicate, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'deny');
+  assert.ok(receipt.checks.some((check) => check.id === 'intent:duplicate-storage-key'));
+
+  const legacy = clone(withAccessList);
+  legacy.type = '0x0';
+  legacy.gasPrice = '0x3b9aca00';
+  delete legacy.maxFeePerGas;
+  delete legacy.maxPriorityFeePerGas;
+  receipt = authorizeIntent(fixture, legacy, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.checks.find((check) => check.id === 'transaction:access-list').status, 'deny');
+});
+
+test('denies transactions without an explicit outer nonce', () => {
+  const missingNonce = clone(intent);
+  delete missingNonce.nonce;
+  const receipt = authorizeIntent(fixture, missingNonce, { now: NOW, protocolState: STATE });
+  assert.equal(receipt.decision, 'deny');
+  assert.ok(receipt.checks.some((check) => check.id === 'intent:missing-quantity'));
+});
+
 test('denies an unknown target and selector', () => {
   const unknownTarget = clone(intent);
   unknownTarget.to = '0x2222222222222222222222222222222222222222';
@@ -169,6 +203,7 @@ test('supports a bounded legacy fee model and rejects mixed fee fields', () => {
   legacy.gasPrice = '0x3b9aca00';
   delete legacy.maxFeePerGas;
   delete legacy.maxPriorityFeePerGas;
+  delete legacy.accessList;
   let receipt = authorizeIntent(fixture, legacy, { now: NOW, protocolState: STATE });
   assert.equal(receipt.decision, 'simulate');
   assert.equal(receipt.checks.find((check) => check.id === 'fee:legacy-max').status, 'pass');

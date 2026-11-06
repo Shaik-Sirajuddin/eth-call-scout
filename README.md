@@ -22,7 +22,7 @@ Markdown instructions and system prompts are advisory. They can be ignored, misr
 The guarded provider:
 
 - forwards a fixed set of read-only RPC methods;
-- evaluates the exact `eth_sendTransaction` fields immediately before forwarding;
+- evaluates the exact `eth_sendTransaction` envelope—including explicit chain, outer nonce, access list, gas, fees, calldata, target, and value—immediately before forwarding;
 - requires full call, trace, log, and state-diff simulation after policy and live-state checks;
 - denies raw signing, typed-data signing, opaque raw transactions, wallet permission changes, chain switching, and unsupported batch methods;
 - forwards a transaction only when every deterministic check passes; and
@@ -50,7 +50,7 @@ npm run demo
 npm run verify
 ```
 
-An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. Production integrations must use the guarded provider so the checked transaction is the transaction forwarded to the wallet.
+An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; CallScout never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by CallScout is the request forwarded to the wallet.
 
 ## Landing page
 
@@ -197,7 +197,7 @@ Never expose the underlying wallet provider, signer, seed phrase, private key, s
 
 ## Full transaction simulation
 
-Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, trace disagreement, missing quorum, or malformed output deny.
+Every transaction eligible for forwarding must pass the same exact-transaction simulation through a configured quorum of independent, trace-capable RPC endpoints. CallScout requires the proposed outer nonce to match each source's pending account nonce, then evaluates `eth_call`, `eth_estimateGas`, `callTracer` output with logs, and a `prestateTracer` diff using the same access list and envelope fields. It enforces internal call targets and types, call depth/count, gas, native outflow, ERC-20 transfers and approvals, touched accounts, storage writes, and unexpected code changes. Node errors, lag, nonce disagreement, trace disagreement, missing quorum, or malformed output deny.
 
 EIP-7702 is default-deny. An opted-in type-4 transaction additionally requires an authorization signed by the guarded wallet, exact non-zero chain binding, the sender's next valid nonce, one allowlisted delegate with a pinned runtime code hash, and a state diff proving the expected delegation designator. Existing delegated EOAs are independently detected and require a separate opt-in. The full trace still applies. See [Full transaction simulation](docs/transaction-simulation.md).
 
