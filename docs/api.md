@@ -249,6 +249,8 @@ Common status codes:
 
 The API intentionally has no endpoint for raw signing, message signing, typed-data signing, raw transaction submission, wallet permissions, chain changes, policy weakening, live-state signing, or direct RPC forwarding. Adding a new mutation requires a purpose-built parser, executable policy rules, live-state binding, full simulation support, audit evidence, and tests. A generic pass-through endpoint would defeat the architecture.
 
+In the hosted beta, Vercel calls an internal Gateway API under `/v1/agent/*` and `/v1/operator/*` with a separate service credential. The isolated service exposes no CORS access, no generic RPC relay and no signer endpoint. Its public `/live` response contains only `{ "alive": true }`; authenticated `/health` carries the chain and policy posture that the Vercel proxy pins.
+
 ## Attacker list endpoints
 
 Free, public and read-only. See [Attacker list](attacker-list.md). Unlike the endpoints above, these are safe to expose and are cached.

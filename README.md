@@ -82,6 +82,8 @@ The Policy Studio can translate a plain-language description into constrained ru
 
 The hosted beta uses Vercel as the public control plane and a separate persistent Sepolia Gateway as the wallet security boundary. Vercel authenticates agents and proxies only the fixed run API; it never stores the wallet key. Local development still uses the dual-Anvil Gateway. See the [Sepolia beta rollout](docs/testnet-beta.md) for the deployment sequence and secret boundaries.
 
+The repository includes `Dockerfile.gateway` and a fail-closed Sepolia bootstrap. `npm run sepolia:prepare` creates a disposable wallet and state keys in a git-ignored `0600` file; `npm run sepolia:deploy` first proves that two distinct RPC providers support the complete call/log/state-diff trace surface, then deploys the real allow/deny fixtures and writes the public policy manifest. The service will not substitute shallow `eth_call` checks when trace access is unavailable.
+
 ## Architecture
 
 ```text

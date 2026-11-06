@@ -14,3 +14,4 @@ scanner-ruleset.html
 .env.*
 !.env.example
 .keybound/
+.walletcordon/

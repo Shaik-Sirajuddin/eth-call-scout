@@ -1,0 +1,13 @@
+.git
+.github
+.next
+.walletcordon
+.env*
+assets
+demo
+dist
+node_modules
+parser-rs
+public
+reports
+test
