@@ -36,3 +36,12 @@ test('run selection stays mounted without a route or stylesheet flash', () => {
   assert.doesNotMatch(screen, /legacy\/runs\.css/);
   assert.match(layout, /legacy\/runs\.css/);
 });
+
+test('Agent Runs labels the active local or Sepolia runtime without exposing unsupported scenarios', () => {
+  assert.match(explorer, /health\?\.mode === 'sepolia-beta'/);
+  assert.match(explorer, /SEPOLIA GATEWAY READY/);
+  assert.match(explorer, /const testnetScenarios = localScenarios\.filter/);
+  assert.match(explorer, /\['safe', 'hidden-call'\]/);
+  assert.match(explorer, /run\.chainReceipt \? `mined/);
+  assert.match(explorer, /run\.transactionHash \? `broadcast/);
+});
