@@ -1,6 +1,7 @@
 node_modules/
 parser-rs/target/
 reports/
+dist/
 .cache/
 .env
 .env.*
