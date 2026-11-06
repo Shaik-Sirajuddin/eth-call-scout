@@ -19,8 +19,16 @@ requireMatch(/class="skip-link"/, 'Landing page requires a keyboard skip link.')
 if (!/prefers-reduced-motion/.test(css)) errors.push('Landing page styles must respect reduced motion.');
 
 if ((html.match(/<h1\b/g) ?? []).length !== 1) errors.push('Landing page must contain exactly one h1.');
-for (const required of ['report.html', 'ruleset.html']) {
+for (const required of ['report.html', 'ruleset.html', 'scanner-ruleset.html']) {
   if (!fs.existsSync(path.join(root, required))) errors.push(`Missing generated demo page: ${required}`);
+}
+const policyBuilderPath = path.join(root, 'ruleset.html');
+if (fs.existsSync(policyBuilderPath)) {
+  const builder = fs.readFileSync(policyBuilderPath, 'utf8');
+  if (!/id="canvas"/.test(builder)) errors.push('Policy builder must include the visual block canvas.');
+  if (!/id="zoomIn"/.test(builder) || !/id="fitView"/.test(builder)) errors.push('Policy builder must include zoom and fit-view controls.');
+  if (!/__callScoutPolicyBuilder/.test(builder)) errors.push('Policy builder must expose deterministic compile and validation hooks.');
+  if (!/callscout policy validate/.test(builder)) errors.push('Policy builder must disclose the authoritative CLI validation boundary.');
 }
 const reportPath = path.join(root, 'report.html');
 if (fs.existsSync(reportPath)) {

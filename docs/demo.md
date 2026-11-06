@@ -59,13 +59,20 @@ Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separ
 Public judge-ready pages:
 
 - [Example interactive report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
-- [Ruleset builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
+- [Visual wallet policy builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
+- [Scanner registry and risk terms](https://shaik-sirajuddin.github.io/eth-call-scout/scanner-ruleset.html)
 
 To generate and serve the same pages locally:
 
 ```sh
 npm run site:check
 npm run site:serve
+```
+
+The policy studio supports draggable blocks, explicit connections, pan, zoom, fit-to-view, a minimap, local persistence, import/export, and continuous structural checks. Exported JSON must still pass the authoritative validator before it can be activated:
+
+```sh
+npx callscout policy validate path/to/exported-policy.json
 ```
 
 Or generate a focused report directly:

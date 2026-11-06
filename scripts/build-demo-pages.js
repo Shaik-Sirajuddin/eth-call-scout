@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { scanProject } from '../src/rust-scanner.js';
 import { applyRuleset, enrichFindings } from '../src/registry.js';
 import { renderReport } from '../src/report.js';
-import { renderRulesetBuilder } from '../src/ruleset-page.js';
+import { renderRulesetBuilder, renderScanRulesetBuilder } from '../src/ruleset-page.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SITE = path.join(ROOT, 'site');
@@ -18,6 +18,7 @@ const publicPath = (file) => {
 
 const baseRegistry = await readJson(path.join(ROOT, 'data', 'registry.static.json'));
 const ruleset = await readJson(path.join(ROOT, '.secu'));
+const walletPolicy = await readJson(path.join(ROOT, 'examples', 'wallet-policy.json'));
 const registry = applyRuleset(baseRegistry, ruleset);
 const scan = scanProject([path.join(ROOT, 'examples')]);
 const findings = enrichFindings(scan.findings, registry).map((finding) => ({
@@ -38,7 +39,8 @@ const report = {
 };
 await fs.writeFile(path.join(DIST, 'report.html'), renderReport(report), 'utf8');
 await fs.writeFile(path.join(DIST, 'report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-await fs.writeFile(path.join(DIST, 'ruleset.html'), renderRulesetBuilder(baseRegistry), 'utf8');
+await fs.writeFile(path.join(DIST, 'ruleset.html'), renderRulesetBuilder(baseRegistry, walletPolicy), 'utf8');
+await fs.writeFile(path.join(DIST, 'scanner-ruleset.html'), renderScanRulesetBuilder(baseRegistry), 'utf8');
 await fs.writeFile(path.join(DIST, '.nojekyll'), '', 'utf8');
 
-process.stdout.write(`Demo site: ${DIST}\nExample report: ${path.join(DIST, 'report.html')}\nRuleset builder: ${path.join(DIST, 'ruleset.html')}\n`);
+process.stdout.write(`Demo site: ${DIST}\nExample report: ${path.join(DIST, 'report.html')}\nPolicy builder: ${path.join(DIST, 'ruleset.html')}\nScanner terms: ${path.join(DIST, 'scanner-ruleset.html')}\n`);

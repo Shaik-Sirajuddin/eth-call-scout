@@ -1,6 +1,8 @@
+export { renderPolicyBuilder as renderRulesetBuilder } from './policy-builder-page.js';
+
 const escapeScriptJson = (value) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 
-export function renderRulesetBuilder(registry) {
+export function renderScanRulesetBuilder(registry) {
   const seed = {
     tokens: registry.tokens ?? [],
     protocols: registry.protocols ?? [],

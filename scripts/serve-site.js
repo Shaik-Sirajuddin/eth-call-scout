@@ -35,5 +35,6 @@ const server = http.createServer(async (request, response) => {
 server.listen(port, '127.0.0.1', () => {
   process.stdout.write(`CallScout demo: http://127.0.0.1:${port}/\n`);
   process.stdout.write(`Example report: http://127.0.0.1:${port}/report.html\n`);
-  process.stdout.write(`Ruleset builder: http://127.0.0.1:${port}/ruleset.html\n`);
+  process.stdout.write(`Policy builder: http://127.0.0.1:${port}/ruleset.html\n`);
+  process.stdout.write(`Scanner terms: http://127.0.0.1:${port}/scanner-ruleset.html\n`);
 });

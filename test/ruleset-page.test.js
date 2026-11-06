@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { validatePolicy } from '../src/policy.js';
+import { renderRulesetBuilder, renderScanRulesetBuilder } from '../src/ruleset-page.js';
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const registry = JSON.parse(fs.readFileSync(path.join(root, 'data', 'registry.static.json'), 'utf8'));
+const policy = JSON.parse(fs.readFileSync(path.join(root, 'examples', 'wallet-policy.json'), 'utf8'));
+
+test('visual policy builder exposes the complete local authoring workflow', () => {
+  assert.equal(validatePolicy(policy).valid, true);
+  const html = renderRulesetBuilder(registry, policy);
+
+  for (const marker of [
+    'id="canvas"',
+    'id="zoomIn"',
+    'id="zoomOut"',
+    'id="fitView"',
+    'id="minimap"',
+    'Policy block library',
+    'EIP-7702 boundary',
+    'Live state quorum',
+    'Simulation quorum',
+    'Authorization receipt',
+    'callscout policy validate',
+    'window.__callScoutPolicyBuilder',
+    'scanner-ruleset.html',
+  ]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+  assert.match(html, /@media\(max-width:820px\)/);
+  assert.match(html, /prefers-reduced-motion/);
+  assert.match(html, /localStorage\.setItem\(STORAGE_KEY/);
+  assert.match(html, /application\/callscout-block/);
+});
+
+test('policy seed and registry data cannot break out of the builder script', () => {
+  const hostile = structuredClone(policy);
+  hostile.name = '</script><script>globalThis.pwned=true</script>';
+  const html = renderRulesetBuilder({ tokens: [{ name: '</script><img src=x onerror=alert(1)>', address: policy.wallets[0] }] }, hostile);
+
+  assert.doesNotMatch(html, /<script>globalThis\.pwned/);
+  assert.doesNotMatch(html, /<img src=x onerror/);
+  assert.match(html, /\\u003c\/script\\u003e/);
+});
+
+test('scanner term editor remains a separate monitoring-only surface', () => {
+  const html = renderScanRulesetBuilder(registry);
+  assert.match(html, /Ethereum scan ruleset builder/);
+  assert.match(html, /High slippage threshold/);
+  assert.match(html, /registry match is an identity hint, not a safety guarantee/i);
+  assert.doesNotMatch(html, /Authorization policy studio/);
+});
