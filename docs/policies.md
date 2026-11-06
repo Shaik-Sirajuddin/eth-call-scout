@@ -177,6 +177,20 @@ The rules are in `data/rule-sets/general.json`. `npm run rules:general` rebuilds
 
 The limits are examples of a low starting point, not advice on what is safe for you.
 
+## Swap slippage
+
+A fixed minimum output can never be right, because prices move. So swaps in the default rule sets are checked against a fresh quote when the bot proposes them:
+
+1. The simulation sources ask the on-chain quoter for the same swap on each measured pool for that pair.
+2. The swap minimum must be within `invariants.maxSlippageBps` of the best quote. The default is 100 (1%). Set your own with `--max-slippage-bps`.
+3. The simulation must show the wallet really receiving at least that amount.
+
+A one-unit minimum is denied, and so is routing through a measured pool with a much worse price. Swap value must be 0, or exactly the amount in when spending wrapped ETH, because extra ETH stays in the router where anyone can take it. A non-zero price limit is refused for the same reason.
+
+Set this on a method with `swapQuote`. Audit reports common swap functions without it as `swap-without-fresh-quote`, and a limit over 500 basis points as `high-slippage-limit`.
+
+This protects against a bad minimum and a bad pool. It cannot detect a price that was manipulated across all the measured pools just before the quote, and it does not cover multi-hop swaps yet.
+
 ## Per-block spend limits
 
 Set the most a wallet may send in one block, across all of its transactions:

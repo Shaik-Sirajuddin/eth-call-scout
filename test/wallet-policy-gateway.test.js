@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { WalletPolicyGateway } from '../src/wallet-policy-gateway.js';
+import { WalletPolicyGateway, walletEventsForAttempts } from '../src/wallet-policy-gateway.js';
 
 async function temporaryRuntime(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wallet-gateway-'));
@@ -47,6 +47,25 @@ test('persists completed run history and reloads it in a new gateway instance', 
   const mode = (await fs.stat(path.join(runtimeDirectory, 'runs', 'run_persisted_001.json'))).mode & 0o777;
   // Windows does not have Unix file modes.
   if (process.platform !== 'win32') assert.equal(mode, 0o600);
+});
+
+test('a run with a mined swap and a denied swap reports each one truthfully', () => {
+  const hash = `0x${'a'.repeat(64)}`;
+  const events = walletEventsForAttempts([
+    { label: 'First swap', transactionHash: hash, chainReceipt: { blockNumber: '0x10' }, decision: 'allow' },
+    { label: 'Second swap', transactionHash: null, chainReceipt: null, decision: 'deny' },
+  ]);
+  assert.deepEqual(events.map((event) => event.status), ['pass', 'deny']);
+  assert.equal(events[0].title, 'First swap was mined');
+  assert.match(events[0].detail, new RegExp(`${hash}.*block 16`));
+  assert.equal(events[0].data.transactionHash, hash);
+  assert.equal(events[1].title, 'Wallet never received the second swap');
+  assert.ok(!events.some((event) => event.title === 'Wallet never received the transaction'), 'The wallet did receive the first swap.');
+});
+
+test('a run with one attempt keeps its plain wallet messages', () => {
+  assert.equal(walletEventsForAttempts([{ label: 'Swap', transactionHash: '0xabc', chainReceipt: { blockNumber: '0x1' } }])[0].title, 'Wallet forwarded one exact request');
+  assert.equal(walletEventsForAttempts([{ label: 'Swap', transactionHash: null }])[0].title, 'Wallet never received the transaction');
 });
 
 test('recovers an interrupted queued or running record as a terminal error', async (t) => {

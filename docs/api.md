@@ -226,3 +226,7 @@ Free, public and read-only. See [Attacker list](attacker-list.md). Unlike the en
 - `GET /api/v1/attackers/{address}`: whether one address is listed, and why.
 
 Gas and fee fields in a proposal must be `0x` hex strings.
+
+## Runs with more than one attempt
+
+A run can forward one transaction and deny the next. `attempts` lists each one with its own `decision`, `transactionHash`, `chainReceipt`, `verification` and `receipt`. `transactionHash`, `chainReceipt` and `verification` on the run describe the first forwarded attempt, and `decision` and `receipt` describe the last attempt.

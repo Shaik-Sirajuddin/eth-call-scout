@@ -19,6 +19,7 @@ const MAX = (1n << 256n) - 1n;
 
 const FACTORY = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
 const ROUTER = '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45';
+const QUOTER = '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
 const AAVE_POOL = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 const TOKENS = [
@@ -30,6 +31,7 @@ const TOKENS = [
 
 const erc20 = new Interface(['function approve(address,uint256)', 'function balanceOf(address) view returns (uint256)']);
 const weth = new Interface(['function deposit() payable', 'function withdraw(uint256)']);
+const quoter = new Interface(['function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96)) returns (uint256 amountOut,uint160,uint32,uint256)']);
 const factory = new Interface(['function getPool(address,address,uint24) view returns (address)']);
 const router = new Interface(['function exactInputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96)) payable returns (uint256)']);
 const aave = new Interface([
@@ -121,6 +123,9 @@ async function main() {
         if (a === WETH) await send('swap', `ETH to ${tokenB.symbol} (fee ${fee})`, ROUTER, swap(tokenA, tokenB, small(tokenA)), small(tokenA));
         await send('swap', `${tokenA.symbol} to ${tokenB.symbol} (fee ${fee})`, ROUTER, swap(tokenA, tokenB, small(tokenA)));
         await send('swap', `${tokenB.symbol} to ${tokenA.symbol} (fee ${fee})`, ROUTER, swap(tokenB, tokenA, small(tokenB)));
+        // A pool the quote check cannot price must not be listed, or honest swaps through it would be denied.
+        const quoted = await provider.call({ to: QUOTER, data: quoter.encodeFunctionData('quoteExactInputSingle', [{ tokenIn: a, tokenOut: b, amountIn: small(tokenA), fee, sqrtPriceLimitX96: 0n }]) });
+        if (BigInt(quoted.slice(0, 66)) === 0n) throw new Error('the quoter returned nothing');
         swapPools.push({ pool, token0: a, token1: b, fee });
       } catch (error) { console.log(`skipped pool ${tokenA.symbol}/${tokenB.symbol} ${fee}: ${error.message.slice(0, 60)}`); }
     }
@@ -189,13 +194,21 @@ async function main() {
         methods: [{
           signature: 'exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))',
           selector: selector('exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))'),
-          // Swap output must come back to the wallet, and a zero minimum output is refused.
+          // Output must come back to the wallet. A price limit could leave part of the input stuck in the router.
           constraints: [
             { type: 'address-in', argument: 0, addresses: tokenAddresses },
             { type: 'address-in', argument: 1, addresses: tokenAddresses },
             { type: 'address-in', argument: 3, addresses: ['$wallet'] },
-            { type: 'uint-min', argument: 5, value: '1' },
+            { type: 'uint-equals', argument: 6, value: '0' },
           ],
+          // A fixed minimum can never be right. Each swap is checked against a fresh quote and maxSlippageBps.
+          swapQuote: {
+            kind: 'uniswap-v3-exact-input-single',
+            quoter: QUOTER,
+            wrappedNative: WETH,
+            arguments: { tokenIn: 0, tokenOut: 1, fee: 2, amountIn: 4, minimumOut: 5 },
+            pools: swapPools.map((entry) => ({ tokenA: entry.token0, tokenB: entry.token1, fee: entry.fee })),
+          },
         }],
       },
       {
@@ -226,7 +239,7 @@ async function main() {
       forkBlock: await provider.getBlockNumber(),
       profiles: { general: ['wrap', 'swap', 'lending'], swapper: ['wrap', 'swap'], lender: ['wrap', 'lending'] },
       native: { maxValueWei: parseEther('0.5').toString(), maxPerBlockWei: parseEther('0.5').toString() },
-      invariants: { maxGas: '700000', maxGasPriceWei: '100000000000', maxFeePerGasWei: '100000000000', maxPriorityFeePerGasWei: '5000000000' },
+      invariants: { maxSlippageBps: '100', maxGas: '700000', maxGasPriceWei: '100000000000', maxFeePerGasWei: '100000000000', maxPriorityFeePerGasWei: '5000000000' },
       simulation: { maxCallDepth: 16, maxInternalCalls: 128, maxStateAccounts: 64, maxStorageWrites: 128, allowedCallTypes: [...callTypes].filter((type) => ['CALL', 'STATICCALL', 'DELEGATECALL'].includes(type)).sort() },
       assetLimits,
       contracts,

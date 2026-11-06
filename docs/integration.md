@@ -66,13 +66,17 @@ Once a transaction lands, the guard checks it against the chain in the backgroun
 | Check | Fails when |
 |---|---|
 | `onchain:status` | The transaction reverted |
-| `onchain:transaction-match` | The wallet sent a different sender, target, calldata, value or nonce than was approved |
-| `onchain:attacker` | A listed attacker received value or approval |
+| `onchain:transaction-match` | Any signed field differs from what was approved: chain, sender, target, calldata, value, nonce, type, gas, fees, access list or authorizations |
+| `onchain:attacker` | A listed attacker was called, paid or approved, including through internal ETH transfers |
 | `onchain:asset-limits` | Tokens left beyond the policy's limits or to an unapproved address |
+| `onchain:native-limit` | The wallet sent more ETH than the policy allows, counting internal sends |
+| `onchain:swap-output` | A swap paid the wallet less than the fresh quote required |
 | `onchain:block-limit` | The real block went over a per-block limit |
 | `onchain:gas` | More gas was used than the function allows |
 | `onchain:matches-simulation` | More left the wallet than simulation showed |
 | `onchain:all-transactions-approved` | The wallet sent a transaction that did not go through the guard |
+
+Internal calls come from `debug_traceTransaction`. If no source can trace the transaction, `onchain:attacker` reports `unknown` instead of passing, a warning alert is written, and the result is `incomplete` rather than `verified`. The result is `verified` only when every check passed and internal calls were read.
 
 Failures do not undo anything, because the transaction has already happened. They are written as alerts for you to read:
 

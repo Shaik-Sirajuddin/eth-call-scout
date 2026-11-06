@@ -16,7 +16,7 @@ import { failedSimulation, finalizeSimulation, simulateTransaction } from './tra
 
 const HELP = `Keybound — deterministic wallet authorization for AI agents\n\nUsage:\n  keybound authorize <intent.json|-> --policy <policy.json> [--state <bundle.json>] [--out <receipt.json>]\n  keybound policy <validate|audit> <policy.json>\n  keybound state <collect|sign|verify> ...\n  keybound audit verify <receipts.jsonl>\n  keybound scan <file-or-directory...> [scan options]\n  keybound registry <sync|list|search> ...\n\nThe agent may propose transactions, but executable policy and signed live protocol state decide\nwhether the exact request reaches the wallet. All unsupported mutation methods deny.\n\nScan options:\n  -o, --out <file>      Write the interactive monitoring report (default: eth-call-report.html)\n      --json <file>     Also write machine-readable findings\n      --decode          Look up verified ABIs and decode raw calldata\n      --chain-id <id>   EVM chain ID for ABI lookups (default: 1)\n      --ruleset <file>  Apply review terms exported from pr-review-ruleset.html\n      --no-html         Skip HTML output\n  -h, --help            Show this help\n\nThe static scanner is a monitoring feature, not the wallet authorization boundary.\n`;
 
-const POLICY_HELP = `Keybound executable wallet policies:\n  keybound policy init --wallet <address> --state-key <id:base64> --state-key <id:base64> [--profile general|swapper|lender|payments] [--max-per-tx USDC=100] [--max-per-block USDC=100] [--block <address>] [--payee <address>] [--valid-days 90] [--out <policy.json>]\n  keybound policy profiles\n  keybound policy validate <policy.json>\n  keybound policy audit <policy.json>\n  keybound authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction and state hashes in the receipt; the wallet guard must forward those same fields.\n`;
+const POLICY_HELP = `Keybound executable wallet policies:\n  keybound policy init --wallet <address> --state-key <id:base64> --state-key <id:base64> [--profile general|swapper|lender|payments] [--max-per-tx USDC=100] [--max-per-block USDC=100] [--max-slippage-bps 100] [--block <address>] [--payee <address>] [--valid-days 90] [--out <policy.json>]\n  keybound policy profiles\n  keybound policy validate <policy.json>\n  keybound policy audit <policy.json>\n  keybound authorize <intent.json|-> --policy <policy.json> --state <bundle.json> [--out <receipt.json>]\n\nAuthorization is deterministic and fail-closed. A successful decision only covers the exact\ntransaction and state hashes in the receipt; the wallet guard must forward those same fields.\n`;
 
 const REGISTRY_HELP = `Registry commands:\n  eth-call-scout registry sync [all|tokens|protocols|volume|contracts]\n  eth-call-scout registry list [tokens|protocols|contracts|trackers|sources]\n  eth-call-scout registry search <query>\n\nLive sources are cached locally under .cache/eth-call-scout/registry.json.\n`;
 
@@ -86,7 +86,7 @@ function parseAmounts(entries = [], flag) {
 
 /** Build a ready policy from the default rule set. Users set limits in normal units, not base units. */
 function runPolicyInit(args) {
-  const flags = readFlags(args, ['--wallet', '--profile', '--state-key', '--max-per-tx', '--max-per-block', '--block', '--payee', '--valid-days', '--out']);
+  const flags = readFlags(args, ['--wallet', '--profile', '--state-key', '--max-per-tx', '--max-per-block', '--max-slippage-bps', '--block', '--payee', '--valid-days', '--out']);
   if (!flags['--wallet']?.[0]) throw new Error('policy init requires --wallet <address>');
   const trustedKeys = (flags['--state-key'] ?? []).map((entry) => {
     const separator = entry.indexOf(':');
@@ -119,6 +119,7 @@ function runPolicyInit(args) {
     native,
     payees: flags['--payee'] ?? [],
     blockedAddresses: flags['--block'] ?? [],
+    maxSlippageBps: flags['--max-slippage-bps']?.[0] ?? null,
     validUntil: new Date(Date.now() + days * 86_400_000).toISOString(),
   });
   const validation = validatePolicy(policy);

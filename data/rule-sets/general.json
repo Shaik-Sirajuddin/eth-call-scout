@@ -4,8 +4,8 @@
   "name": "General user",
   "description": "Low limits for everyday use: wrap ETH, swap major tokens back to your own wallet, and lend on Aave. Borrowing, flash loans, transfers to other people, and everything else stay denied.",
   "chainId": 1,
-  "measuredAt": "2026-11-06T16:30:19.055Z",
-  "forkBlock": 26357063,
+  "measuredAt": "2026-11-06T19:13:51.900Z",
+  "forkBlock": 26357877,
   "profiles": {
     "general": [
       "wrap",
@@ -26,6 +26,7 @@
     "maxPerBlockWei": "500000000000000000"
   },
   "invariants": {
+    "maxSlippageBps": "100",
     "maxGas": "700000",
     "maxGasPriceWei": "100000000000",
     "maxFeePerGasWei": "100000000000",
@@ -413,11 +414,90 @@
               ]
             },
             {
-              "type": "uint-min",
-              "argument": 5,
-              "value": "1"
+              "type": "uint-equals",
+              "argument": 6,
+              "value": "0"
             }
-          ]
+          ],
+          "swapQuote": {
+            "kind": "uniswap-v3-exact-input-single",
+            "quoter": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+            "wrappedNative": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "arguments": {
+              "tokenIn": 0,
+              "tokenOut": 1,
+              "fee": 2,
+              "amountIn": 4,
+              "minimumOut": 5
+            },
+            "pools": [
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              }
+            ]
+          }
         }
       ]
     },
@@ -503,7 +583,7 @@
   ],
   "internalTargets": {
     "wrap": [
-      "0xfed8a42b337f467e8d3e624789023435e4c80f40"
+      "0x47a7c19a541227911cd4bd7493e66dac64daf10a"
     ],
     "swap": [
       "0x11b815efb8f581194ae79006d24e0d814b7697f6",
@@ -577,15 +657,15 @@
     },
     {
       "label": "ETH to USDC (fee 100)",
-      "gasUsed": "119785"
+      "gasUsed": "119799"
     },
     {
       "label": "WETH to USDC (fee 100)",
-      "gasUsed": "119811"
+      "gasUsed": "119825"
     },
     {
       "label": "USDC to WETH (fee 100)",
-      "gasUsed": "124079"
+      "gasUsed": "124093"
     },
     {
       "label": "ETH to USDC (fee 500)",
@@ -601,15 +681,15 @@
     },
     {
       "label": "ETH to USDC (fee 3000)",
-      "gasUsed": "119797"
+      "gasUsed": "119781"
     },
     {
       "label": "WETH to USDC (fee 3000)",
-      "gasUsed": "128485"
+      "gasUsed": "119807"
     },
     {
       "label": "USDC to WETH (fee 3000)",
-      "gasUsed": "133051"
+      "gasUsed": "124363"
     },
     {
       "label": "ETH to USDT (fee 100)",
@@ -625,43 +705,43 @@
     },
     {
       "label": "ETH to USDT (fee 500)",
-      "gasUsed": "120779"
+      "gasUsed": "120753"
     },
     {
       "label": "WETH to USDT (fee 500)",
-      "gasUsed": "120805"
+      "gasUsed": "120779"
     },
     {
       "label": "USDT to WETH (fee 500)",
-      "gasUsed": "121103"
+      "gasUsed": "121077"
     },
     {
       "label": "ETH to USDT (fee 3000)",
-      "gasUsed": "120717"
+      "gasUsed": "120749"
     },
     {
       "label": "WETH to USDT (fee 3000)",
-      "gasUsed": "120743"
+      "gasUsed": "120775"
     },
     {
       "label": "USDT to WETH (fee 3000)",
-      "gasUsed": "121051"
+      "gasUsed": "121083"
     },
     {
       "label": "ETH to DAI (fee 500)",
-      "gasUsed": "117948"
+      "gasUsed": "117923"
     },
     {
       "label": "WETH to DAI (fee 500)",
-      "gasUsed": "109338"
+      "gasUsed": "109312"
     },
     {
       "label": "DAI to WETH (fee 500)",
-      "gasUsed": "110357"
+      "gasUsed": "110331"
     },
     {
       "label": "ETH to DAI (fee 3000)",
-      "gasUsed": "108334"
+      "gasUsed": "109280"
     },
     {
       "label": "WETH to DAI (fee 3000)",
@@ -673,11 +753,11 @@
     },
     {
       "label": "USDC to USDT (fee 100)",
-      "gasUsed": "135057"
+      "gasUsed": "135084"
     },
     {
       "label": "USDT to USDC (fee 100)",
-      "gasUsed": "131640"
+      "gasUsed": "131632"
     },
     {
       "label": "USDC to USDT (fee 500)",
@@ -697,11 +777,11 @@
     },
     {
       "label": "USDC to DAI (fee 100)",
-      "gasUsed": "123778"
+      "gasUsed": "123786"
     },
     {
       "label": "DAI to USDC (fee 100)",
-      "gasUsed": "120753"
+      "gasUsed": "120726"
     },
     {
       "label": "USDC to DAI (fee 500)",

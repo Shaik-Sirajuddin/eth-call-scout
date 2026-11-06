@@ -107,7 +107,9 @@ test('a policy can add blocked addresses but cannot allow a listed attacker', ()
   assert.equal(validatePolicy({ ...policy, blockedAddresses: ['nope'] }).valid, false);
 });
 
-function fakeChain({ logs = [], logsByHost = {}, extraCalls = [] } = {}) {
+const QUOTER = '0x61ffe014ba17989e743c5f6cb21bf9697530b21e';
+
+function fakeChain({ logs = [], logsByHost = {}, extraCalls = [], quote = 1_000_000n } = {}) {
   const response = (requestId, result) => {
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: requestId, result }));
     return { ok: true, headers: { get: () => String(body.length) }, arrayBuffer: async () => body };
@@ -121,7 +123,7 @@ function fakeChain({ logs = [], logsByHost = {}, extraCalls = [] } = {}) {
       case 'eth_getTransactionCount': return response(request.id, '0x7');
       case 'eth_getCode': return response(request.id, request.params[0].toLowerCase() === WALLET ? '0x' : '0x60016000');
       case 'eth_getStorageAt': return response(request.id, `0x${'0'.repeat(64)}`);
-      case 'eth_call': return response(request.id, '0x');
+      case 'eth_call': return response(request.id, request.params[0].to?.toLowerCase() === QUOTER ? amountData(quote) : '0x');
       case 'eth_estimateGas': return response(request.id, '0xc350');
       case 'debug_traceCall': {
         const tx = request.params[0];
@@ -136,18 +138,19 @@ function fakeChain({ logs = [], logsByHost = {}, extraCalls = [] } = {}) {
 test('an attacker hidden from calldata is caught in the simulated transfers', async () => {
   const policy = policyFor();
   const hiddenPayout = { address: USDC, topics: [TRANSFER, topic(ROUTER), topic(EXPLOITER)], data: amountData(5_000_000n) };
+  const paidToWallet = { address: USDC, topics: [TRANSFER, topic(ROUTER), topic(WALLET)], data: amountData(1_000_000n) };
   const intent = intentFor(ROUTER, swapData(WALLET), { value: '0x38d7ea4c68000' });
 
-  const clean = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logs: [] }), now: NOW, protocolState: signedState(policy) });
+  const clean = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logs: [paidToWallet] }), now: NOW, protocolState: signedState(policy) });
   assert.equal(clean.valid, true, JSON.stringify(clean.summary.sources));
 
-  const dirty = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logs: [hiddenPayout] }), now: NOW, protocolState: signedState(policy) });
+  const dirty = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logs: [paidToWallet, hiddenPayout] }), now: NOW, protocolState: signedState(policy) });
   assert.equal(dirty.valid, false);
   assert.equal(dirty.checks.find((check) => check.id === 'attacker:effects').status, 'deny');
   assert.equal(dirty.summary.attackerHits[0].address, EXPLOITER.toLowerCase());
 
   // One source reporting a thief is enough, even when the other looks clean.
-  const oneSource = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logsByHost: { 'a.example': [hiddenPayout] } }), now: NOW, protocolState: signedState(policy) });
+  const oneSource = await simulateTransaction(policy, intent, { rpcUrls, fetchImpl: fakeChain({ logs: [paidToWallet], logsByHost: { 'a.example': [paidToWallet, hiddenPayout] } }), now: NOW, protocolState: signedState(policy) });
   assert.equal(oneSource.valid, false);
   assert.equal(oneSource.checks.find((check) => check.id === 'attacker:effects').status, 'deny');
 });
@@ -182,7 +185,7 @@ function guardedSwap({ limitWei = '150', metrics = { nativeOutflow: '100', outfl
     verification,
     now: NOW,
   });
-  const request = (nonce = '0x7') => guard.request({ method: 'eth_sendTransaction', params: [intentFor(ROUTER, swapData(WALLET), { value: '0x64', nonce })] });
+  const request = (nonce = '0x7') => guard.request({ method: 'eth_sendTransaction', params: [intentFor(ROUTER, swapData(WALLET, { amountIn: 100n }), { value: '0x64', nonce })] });
   return { guard, request, sent, alerts };
 }
 
@@ -251,12 +254,13 @@ test('blocked attacker requests raise a critical alert and never reach the walle
 });
 
 function chainFor({ receipt = {}, transaction = {}, latestNonce = '0x8', logs = [] } = {}) {
-  const decisionIntent = { chainId: 1, from: WALLET.toLowerCase(), to: ROUTER.toLowerCase(), data: '0xabcd', value: '0', nonce: '7' };
+  const decisionIntent = { chainId: 1, from: WALLET.toLowerCase(), to: ROUTER.toLowerCase(), data: '0xabcd', value: '0', nonce: '7', gas: '180000', gasPrice: null, maxFeePerGas: '1000', maxPriorityFeePerGas: '10', type: '2', accessList: null, authorizationList: null };
   return {
     decision: { policy: { name: 't', hash: 'h' }, intent: decisionIntent, simulation: { metrics: { gasLimit: '190000', outflows: {} } } },
     request: async (method) => {
       if (method === 'eth_getTransactionReceipt') return { status: '0x1', blockNumber: '0x100', gasUsed: '0x1000', logs, ...receipt };
-      if (method === 'eth_getTransactionByHash') return { from: WALLET, to: ROUTER, input: '0xabcd', value: '0x0', nonce: '0x7', ...transaction };
+      if (method === 'eth_getTransactionByHash') return { chainId: '0x1', from: WALLET, to: ROUTER, input: '0xabcd', value: '0x0', nonce: '0x7', gas: '0x2bf20', maxFeePerGas: '0x3e8', maxPriorityFeePerGas: '0xa', type: '0x2', accessList: [], ...transaction };
+      if (method === 'debug_traceTransaction') return { type: 'CALL', from: WALLET, to: transaction.to ?? ROUTER, value: '0x0', input: '0xabcd', calls: [] };
       if (method === 'eth_getTransactionCount') return latestNonce;
       throw new Error(method);
     },
@@ -310,7 +314,7 @@ test('the guard verifies in the background and reports the result', async () => 
   const policy = policyFor({ native: { maxValueWei: '1000', maxPerBlockWei: '1000' } });
   const provider = { async request(request) { return request.method === 'eth_chainId' ? '0x1' : `0x${'c'.repeat(64)}`; } };
   const guard = createGuardedProvider({ provider, policy, protocolState: signedState(policy), simulator: allowedSimulator({ nativeOutflow: '100', outflows: {} }), alerts: memoryAlerts(), verification: { request: chain.request, timeoutMs: 50, pollMs: 5 }, onVerification: (result) => results.push(result), now: NOW });
-  const hash = await guard.request({ method: 'eth_sendTransaction', params: [intentFor(ROUTER, swapData(WALLET), { value: '0x64' })] });
+  const hash = await guard.request({ method: 'eth_sendTransaction', params: [intentFor(ROUTER, swapData(WALLET, { amountIn: 100n }), { value: '0x64' })] });
   const [settled] = await guard.settled();
   assert.equal(settled.transactionHash, hash);
   assert.equal((await guard.verification(hash)).kind, 'onchain-verification');

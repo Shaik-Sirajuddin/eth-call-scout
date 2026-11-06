@@ -38,6 +38,7 @@ export function createPolicyFromRuleSet({
   native = {},
   payees = [],
   blockedAddresses = [],
+  maxSlippageBps = null,
   timeoutMs = 25_000,
 }) {
   if (!ADDRESS.test(String(wallet))) throw new Error('A rule set needs one exact wallet address.');
@@ -79,6 +80,7 @@ export function createPolicyFromRuleSet({
       .map((method) => ({
         selector: method.selector,
         name: method.signature,
+        ...(method.swapQuote ? { swapQuote: method.swapQuote } : {}),
         constraints: method.constraints.map((constraint) => {
           if (constraint.addresses) {
             const addresses = constraint.addresses.map((address) => fill(address, contract));
@@ -116,7 +118,8 @@ export function createPolicyFromRuleSet({
     protocolState: { required: true, maxAgeSeconds: 300, maxClockSkewSeconds: 15, minimumSequence: 1, threshold: 2, trustedKeys },
     simulation: {
       required: true,
-      blockTag: 'pending',
+      // One pinned block lets independent nodes agree exactly, even on the output of a busy pool.
+      blockTag: 'latest',
       timeoutMs,
       quorum: 2,
       maxBlockSkew: 5,
@@ -132,6 +135,7 @@ export function createPolicyFromRuleSet({
       maxNativeValueWei: nativeValue,
       maxNativeOutflowPerBlockWei: nativePerBlock,
       ...ruleSet.invariants,
+      ...(maxSlippageBps != null ? { maxSlippageBps: String(maxSlippageBps) } : {}),
       requireCalldata: true,
       denyUnlimitedApproval: true,
     },

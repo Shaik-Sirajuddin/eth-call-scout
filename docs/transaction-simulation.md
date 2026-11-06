@@ -80,3 +80,9 @@ After tracing, each source reads the code version of every contract with a measu
 Simulation describes one exact transaction against one sampled state. Between simulation and inclusion, balances, storage, prices, mempool ordering, block values, and protocol state may change. Independent RPC quorum reduces reliance on one provider but does not eliminate common client bugs or coordinated provider failure.
 
 Use short-lived policies, conservative slippage and asset ceilings, fresh signed protocol state, protected delegate registries, and wallet-native confirmation for high-value actions. A passing simulation is an authorization requirement, not a guarantee of economic profit or future contract safety.
+
+## Keeping independent nodes in agreement
+
+With `blockTag: "latest"`, every read runs at one block number that all sources have: the lowest head they report. Without this, a head that moves during a simulation, or one node being a block ahead, changes the output of any busy pool, and two honest nodes appear to disagree. The default rule sets use it. With `"pending"`, reads cannot be pinned because each node's mempool is its own, so a swap on an active pool can occasionally be denied for disagreement.
+
+Simulating one fixed block also means a transaction that depends on your own unmined transaction, such as a swap right after its approval, should wait for the first one to be mined.

@@ -12,6 +12,11 @@ const HEX_DATA = /^0x(?:[a-fA-F0-9]{2})*$/;
 const STORAGE_KEY = /^0x[a-fA-F0-9]{64}$/;
 const DECIMAL_UINT = /^(?:0|[1-9][0-9]*)$/;
 const MAX_UINT256 = (1n << 256n) - 1n;
+const SWAP_QUOTE_KINDS = new Set(['uniswap-v3-exact-input-single']);
+const MAX_SLIPPAGE_BPS = 5000n;
+const HIGH_SLIPPAGE_BPS = 500n;
+// Common swap functions, flagged by audit when a policy allows them with no fresh-quote check.
+const UNQUOTED_SWAP_SELECTORS = new Set(['0x04e45aaf', '0x414bf389', '0xb858183f', '0xc04b8d59', '0x38ed1739', '0x7ff36ab5', '0x18cbafe5', '0x8803dbee', '0xfb3bdb41', '0x4a25d94a', '0x3593564c', '0x24856bc3']);
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const MIN_TRANSACTION_GAS = 21000n;
@@ -169,6 +174,21 @@ function validateGasCeiling(value, path, errors) {
   if (parsed != null && parsed < MIN_TRANSACTION_GAS) errors.push(issue('invalid-gas-limit', path, `Gas limit must be at least ${MIN_TRANSACTION_GAS}.`));
 }
 
+/** Bind a swap to a fresh quote. Only Uniswap V3 single-pool swaps are supported so far. */
+function validateSwapQuote(rule, path, errors) {
+  if (!isPlainObject(rule)) { errors.push(issue('invalid-swap-quote', path, 'swapQuote must be an object.')); return; }
+  rejectUnknown(rule, new Set(['kind', 'quoter', 'wrappedNative', 'arguments', 'pools']), path, errors);
+  if (!SWAP_QUOTE_KINDS.has(rule.kind)) errors.push(issue('invalid-swap-quote', `${path}.kind`, `Unsupported swap quote kind ${rule.kind}.`));
+  for (const field of ['quoter', 'wrappedNative']) if (!ADDRESS.test(String(rule[field] ?? ''))) errors.push(issue('invalid-address', `${path}.${field}`, 'Expected a 20-byte 0x address.'));
+  if (!isPlainObject(rule.arguments)) errors.push(issue('invalid-swap-quote', `${path}.arguments`, 'arguments must map each swap field to a calldata word.'));
+  else for (const field of ['tokenIn', 'tokenOut', 'fee', 'amountIn', 'minimumOut']) if (!Number.isInteger(rule.arguments[field]) || rule.arguments[field] < 0 || rule.arguments[field] > 63) errors.push(issue('invalid-swap-quote', `${path}.arguments.${field}`, 'Expected a calldata word index.'));
+  if (!Array.isArray(rule.pools) || !rule.pools.length) errors.push(issue('invalid-swap-quote', `${path}.pools`, 'List at least one measured pool.'));
+  else rule.pools.forEach((pool, index) => {
+    const at = `${path}.pools[${index}]`;
+    if (!isPlainObject(pool) || !ADDRESS.test(String(pool.tokenA ?? '')) || !ADDRESS.test(String(pool.tokenB ?? '')) || !Number.isSafeInteger(pool.fee) || pool.fee <= 0) errors.push(issue('invalid-swap-quote', at, 'Each pool needs tokenA, tokenB and a fee tier.'));
+  });
+}
+
 function validateConstraint(constraint, path, errors) {
   if (!isPlainObject(constraint)) { errors.push(issue('invalid-constraint', path, 'Constraint must be an object.')); return; }
   rejectUnknown(constraint, new Set(['type', 'argument', 'addresses', 'value']), path, errors);
@@ -214,6 +234,7 @@ function attackersInPolicy(policy, attackerList) {
       (Array.isArray(method?.constraints) ? method.constraints : []).forEach((constraint, constraintIndex) => {
         if (constraint?.type === 'address-in' && Array.isArray(constraint.addresses)) constraint.addresses.forEach((address, addressIndex) => check(address, `$.contracts[${index}].methods[${methodIndex}].constraints[${constraintIndex}].addresses[${addressIndex}]`));
       });
+      if (method?.swapQuote?.quoter) check(method.swapQuote.quoter, `$.contracts[${index}].methods[${methodIndex}].swapQuote.quoter`);
     });
   });
   const simulation = policy.simulation;
@@ -250,9 +271,11 @@ export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES
 
   if (!isPlainObject(policy.invariants)) errors.push(issue('missing-invariants', '$.invariants', 'Policy requires an invariants object.'));
   else {
-    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxNativeOutflowPerBlockWei', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
+    rejectUnknown(policy.invariants, new Set(['maxNativeValueWei', 'maxNativeOutflowPerBlockWei', 'maxSlippageBps', 'maxGas', 'maxGasPriceWei', 'maxFeePerGasWei', 'maxPriorityFeePerGasWei', 'requireCalldata', 'denyUnlimitedApproval']), '$.invariants', errors);
     parseUint(policy.invariants.maxNativeValueWei, '$.invariants.maxNativeValueWei', errors, { optional: false });
     parseUint(policy.invariants.maxNativeOutflowPerBlockWei, '$.invariants.maxNativeOutflowPerBlockWei', errors);
+    const slippage = parseUint(policy.invariants.maxSlippageBps, '$.invariants.maxSlippageBps', errors);
+    if (slippage != null && (slippage < 1n || slippage > MAX_SLIPPAGE_BPS)) errors.push(issue('invalid-slippage-limit', '$.invariants.maxSlippageBps', `maxSlippageBps must be between 1 and ${MAX_SLIPPAGE_BPS}.`));
     parseUint(policy.invariants.maxGas, '$.invariants.maxGas', errors);
     parseUint(policy.invariants.maxGasPriceWei, '$.invariants.maxGasPriceWei', errors);
     parseUint(policy.invariants.maxFeePerGasWei, '$.invariants.maxFeePerGasWei', errors);
@@ -286,7 +309,11 @@ export function validatePolicy(policy, { activation = true, gasRules = GAS_RULES
         contract.methods.forEach((method, methodIndex) => {
           const methodPath = `${path}.methods[${methodIndex}]`;
           if (!isPlainObject(method)) { errors.push(issue('invalid-method', methodPath, 'Method entry must be an object.')); return; }
-          rejectUnknown(method, new Set(['selector', 'name', 'maxGas', 'constraints']), methodPath, errors);
+          rejectUnknown(method, new Set(['selector', 'name', 'maxGas', 'constraints', 'swapQuote']), methodPath, errors);
+          if (method.swapQuote != null) {
+            validateSwapQuote(method.swapQuote, `${methodPath}.swapQuote`, errors);
+            if (policy.invariants?.maxSlippageBps == null) errors.push(issue('missing-slippage-limit', '$.invariants.maxSlippageBps', 'A swap with a quote check needs maxSlippageBps, the most slippage the user accepts.'));
+          }
           validateGasCeiling(method.maxGas, `${methodPath}.maxGas`, errors);
           if (!SELECTOR.test(String(method.selector ?? ''))) errors.push(issue('invalid-selector', `${methodPath}.selector`, 'Expected a four-byte selector such as 0x095ea7b3.'));
           const selector = String(method.selector ?? '').toLowerCase();
@@ -462,6 +489,43 @@ function calldataWord(data, argument) {
   return data.slice(start, start + 64).toLowerCase();
 }
 
+/** The swap rule for a call, if the policy binds that function to a fresh quote. */
+export function findSwapRule(policy, chainId, to, data) {
+  if (!/^0x[0-9a-fA-F]{8}/.test(String(data))) return null;
+  const selector = String(data).slice(0, 10).toLowerCase();
+  const contract = policy.contracts?.find((entry) => entry.chainId === chainId && entry.address.toLowerCase() === String(to).toLowerCase());
+  return contract?.methods?.find((entry) => entry.selector.toLowerCase() === selector)?.swapQuote ?? null;
+}
+
+/** Read a swap's arguments from fixed calldata words. Returns null unless every word is well formed. */
+export function decodeSwapCall(rule, data) {
+  const lower = String(data).toLowerCase();
+  const uint = (name) => { const word = calldataWord(lower, rule.arguments[name]); return word ? BigInt(`0x${word}`) : null; };
+  const address = (name) => { const word = calldataWord(lower, rule.arguments[name]); return word && /^0{24}[0-9a-f]{40}$/.test(word) ? `0x${word.slice(24)}` : null; };
+  const swap = { tokenIn: address('tokenIn'), tokenOut: address('tokenOut'), fee: uint('fee'), amountIn: uint('amountIn'), minimumOut: uint('minimumOut') };
+  return Object.values(swap).some((value) => value == null) ? null : swap;
+}
+
+/** The fee tiers of the measured pools for a pair. Only these count as a fair price. */
+export function listedSwapFees(rule, tokenIn, tokenOut) {
+  const a = String(tokenIn).toLowerCase();
+  const b = String(tokenOut).toLowerCase();
+  return rule.pools
+    .filter((pool) => { const x = pool.tokenA.toLowerCase(); const y = pool.tokenB.toLowerCase(); return (x === a && y === b) || (x === b && y === a); })
+    .map((pool) => BigInt(pool.fee));
+}
+
+/** What can be checked without the chain. The fresh quote itself is checked during simulation. */
+function evaluateSwapCall(rule, data, value, add) {
+  const swap = decodeSwapCall(rule, data);
+  if (!add('swap:decoded', Boolean(swap), 'Swap arguments must decode to exact tokens and amounts.')) return;
+  add('swap:pool-listed', listedSwapFees(rule, swap.tokenIn, swap.tokenOut).includes(swap.fee), `The pool for ${swap.tokenIn} to ${swap.tokenOut} at fee ${swap.fee} must be one of the measured pools.`);
+  add('swap:amount-set', swap.amountIn > 0n, 'Swap amount must be greater than zero.');
+  add('swap:minimum-set', swap.minimumOut > 0n, 'Swap minimum output must be greater than zero.');
+  // Extra ETH stays in the router, where anyone can take it.
+  add('swap:native-input', value === 0n || (swap.tokenIn === rule.wrappedNative.toLowerCase() && value === swap.amountIn), `Native value ${value} must be 0, or exactly the amount in when swapping from the wrapped native token.`);
+}
+
 function evaluateConstraint(constraint, data) {
   const word = calldataWord(data, constraint.argument);
   if (!word) return { ok: false, detail: `Calldata does not contain ABI word ${constraint.argument}.` };
@@ -521,6 +585,7 @@ function evaluateTargetCall(policy, { chainId, to, data, value }, add, valueToTa
       const result = evaluateConstraint(constraint, data);
       add(`constraint:${index}:${constraint.type}`, result.ok, result.detail);
     }
+    if (method?.swapQuote) evaluateSwapCall(method.swapQuote, data, value, add);
   }
   return contract;
 }
@@ -696,6 +761,7 @@ export function auditPolicy(policy, { gasRules = GAS_RULES } = {}) {
   const eip7702 = policy.simulation.eip7702;
   if (eip7702.allowAuthorizationList && !eip7702.allowDelegatedWallet) findings.push(issue('eip7702-wallet-lockout', '$.simulation.eip7702.allowDelegatedWallet', 'A permitted delegation will make later transactions deny until delegated-wallet use is separately enabled.', 'medium'));
   findings.push(...uncappedGasFindings(policy, gasRules));
+  if (policy.invariants?.maxSlippageBps != null && BigInt(policy.invariants.maxSlippageBps) > HIGH_SLIPPAGE_BPS) findings.push(issue('high-slippage-limit', '$.invariants.maxSlippageBps', `Allowing more than ${HIGH_SLIPPAGE_BPS} basis points of slippage leaves swaps open to heavy price manipulation.`, 'high'));
   if (Date.parse(gasRules.validUntil) <= Date.now()) findings.push(issue('gas-rules-expired', '$.contracts', `The gas rule set expired on ${gasRules.validUntil}, so only the overall gas cap applies. Run npm run gas:sync.`, 'medium'));
   policy.contracts.forEach((contract, index) => {
     contract.methods?.forEach((method, methodIndex) => {
@@ -705,6 +771,7 @@ export function auditPolicy(policy, { gasRules = GAS_RULES } = {}) {
     if (!contract.protocolId) findings.push(issue('missing-protocol-binding', `$.contracts[${index}].protocolId`, 'Contract is not bound to a protocol identity for live-state enforcement.', 'high'));
     if (contract.allowEmptyCalldata) findings.push(issue('native-transfer-enabled', `$.contracts[${index}].allowEmptyCalldata`, 'Contract accepts empty-calldata native transfers.', 'medium'));
     contract.methods?.forEach((method, methodIndex) => {
+      if (UNQUOTED_SWAP_SELECTORS.has(method.selector.toLowerCase()) && !method.swapQuote) findings.push(issue('swap-without-fresh-quote', `$.contracts[${index}].methods[${methodIndex}]`, `Selector ${method.selector} is a swap with no swapQuote, so nothing stops a very low minimum output.`, 'high'));
       if (!(method.constraints?.length)) findings.push(issue('unconstrained-method', `$.contracts[${index}].methods[${methodIndex}]`, `Selector ${method.selector} has no argument constraints.`, 'medium'));
       if (method.selector.toLowerCase() === '0x095ea7b3') {
         const constraints = method.constraints ?? [];

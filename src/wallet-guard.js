@@ -44,13 +44,20 @@ function deniedRpcReceipt(method, detail) {
  * up, as with a stubbed simulator, because then there is no independent place to confirm a result.
  */
 function independentChainReader(policy, simulationOptions) {
-  for (const source of policy?.simulation?.sources ?? []) {
-    const value = simulationOptions.rpcUrls?.[source.id] ?? process.env[source.env];
-    if (!value) continue;
-    const url = validateUrl(value);
-    return (method, params) => rpc(url, method, params, { fetchImpl: simulationOptions.fetchImpl ?? fetch, timeoutMs: 12_000 });
-  }
-  return null;
+  const urls = (policy?.simulation?.sources ?? [])
+    .map((source) => simulationOptions.rpcUrls?.[source.id] ?? process.env[source.env])
+    .filter(Boolean)
+    .map(validateUrl);
+  if (!urls.length) return null;
+  // Try the next source when one fails, because not every node can trace every transaction.
+  return async (method, params) => {
+    let lastError;
+    for (const url of urls) {
+      try { return await rpc(url, method, params, { fetchImpl: simulationOptions.fetchImpl ?? fetch, timeoutMs: 12_000 }); }
+      catch (error) { lastError = error; }
+    }
+    throw lastError;
+  };
 }
 
 export class WalletGuardError extends Error {

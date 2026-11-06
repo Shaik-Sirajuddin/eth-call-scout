@@ -31,7 +31,7 @@
   },
   "simulation": {
     "required": true,
-    "blockTag": "pending",
+    "blockTag": "latest",
     "timeoutMs": 25000,
     "quorum": 2,
     "maxBlockSkew": 5,
@@ -55,7 +55,7 @@
     "internalTargets": [
       {
         "chainId": 1,
-        "address": "0xfed8a42b337f467e8d3e624789023435e4c80f40"
+        "address": "0x47a7c19a541227911cd4bd7493e66dac64daf10a"
       },
       {
         "chainId": 1,
@@ -336,6 +336,7 @@
   "invariants": {
     "maxNativeValueWei": "500000000000000000",
     "maxNativeOutflowPerBlockWei": "500000000000000000",
+    "maxSlippageBps": "100",
     "maxGas": "700000",
     "maxGasPriceWei": "100000000000",
     "maxFeePerGasWei": "100000000000",
@@ -477,6 +478,85 @@
         {
           "selector": "0x04e45aaf",
           "name": "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))",
+          "swapQuote": {
+            "kind": "uniswap-v3-exact-input-single",
+            "quoter": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+            "wrappedNative": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "arguments": {
+              "tokenIn": 0,
+              "tokenOut": 1,
+              "fee": 2,
+              "amountIn": 4,
+              "minimumOut": 5
+            },
+            "pools": [
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 500
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "fee": 3000
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 100
+              },
+              {
+                "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "tokenB": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "fee": 500
+              }
+            ]
+          },
           "constraints": [
             {
               "type": "address-in",
@@ -506,9 +586,9 @@
               ]
             },
             {
-              "type": "uint-min",
-              "argument": 5,
-              "value": "1"
+              "type": "uint-equals",
+              "argument": 6,
+              "value": "0"
             }
           ]
         }

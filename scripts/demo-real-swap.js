@@ -12,6 +12,8 @@
 //   --amount-eth 0.001     Size of the swap
 //   --token USDC           Token to buy: USDC, USDT or DAI
 //   --block-limit          Also show the per-block limit denying a second swap in the same block
+//   --low-minimum          Also show a swap with a one-unit minimum output being denied
+//   --max-slippage-bps 100 The most slippage the policy accepts
 //   --wallet 0x...         Wallet to simulate in a dry run
 //   --sim-a URL --sim-b URL   Trace-capable nodes (or CALLSCOUT_SIM_PRIMARY and CALLSCOUT_SIM_SECONDARY)
 //   --fork-urls a,b        Use forks that are already running
@@ -27,6 +29,7 @@ import { createAuditLog } from '../src/audit-log.js';
 import { createBlockSpendTracker } from '../src/block-spend.js';
 import { collectProtocolState } from '../src/protocol-monitor.js';
 import { addProtocolStateSignature, signProtocolState } from '../src/protocol-state.js';
+import { findSwapRule, listedSwapFees } from '../src/policy.js';
 import { createMonitorFromPolicy, createPolicyFromRuleSet, GENERAL_RULE_SET } from '../src/rule-sets.js';
 import { rpc } from '../src/transaction-simulator.js';
 import { createGuardedProvider, WalletGuardError } from '../src/wallet-guard.js';
@@ -35,7 +38,8 @@ const EXPLOITER = '0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc';
 const ROUTER = '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45';
 const QUOTER = '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
-const POOL_FEE = 500;
+// The bot asks for half of what the policy allows, so a small price move does not deny an honest swap.
+const BOT_SLIPPAGE_DIVISOR = 2n;
 const SWAP_GAS = 180_000n;
 const DEFAULT_NODES = ['https://eth.drpc.org', 'https://ethereum.blinklabs.xyz'];
 // A large public wallet that rarely moves, used only to simulate a dry run. Nothing is ever sent from it.
@@ -54,6 +58,8 @@ function parseArgs(argv) {
     else if (flag === '--fork') options.fork = true;
     else if (flag === '--confirm') options.confirm = true;
     else if (flag === '--block-limit') options.blockLimit = true;
+    else if (flag === '--low-minimum') options.lowMinimum = true;
+    else if (flag === '--max-slippage-bps') options.maxSlippageBps = next();
     else if (flag === '--amount-eth') options.amountEth = next();
     else if (flag === '--token') options.token = next();
     else if (flag === '--wallet') options.wallet = next();
@@ -128,6 +134,7 @@ async function main() {
       trustedKeys,
       sources,
       name: 'Demo: everyday swaps with low limits',
+      maxSlippageBps: options.maxSlippageBps ?? null,
       validUntil: new Date(Date.now() + 86_400_000).toISOString(),
       // Room for one swap per block, so a second swap in the same block hits the limit.
       native: { maxValueWei: (amount * 2n).toString(), maxPerBlockWei: ((amount * 3n) / 2n).toString() },
@@ -148,6 +155,7 @@ async function main() {
     say(`Rule set        ${GENERAL_RULE_SET.name}, swapper profile`);
     say(`Attacker list   ${ATTACKER_LIST.count} addresses, version ${ATTACKER_LIST.version}`);
     say(`Spend limits    ${formatEther(policy.invariants.maxNativeValueWei)} ETH per transaction, ${formatEther(policy.invariants.maxNativeOutflowPerBlockWei)} ETH per block`);
+    say(`Max slippage    ${policy.invariants.maxSlippageBps} basis points, checked against a fresh quote`);
 
     const monitor = createMonitorFromPolicy(policy, { sources: [{ id: 'node-a', env: 'CALLSCOUT_RPC_PRIMARY' }, { id: 'node-b', env: 'CALLSCOUT_RPC_SECONDARY' }] });
     const now = new Date();
@@ -180,23 +188,33 @@ async function main() {
       simulationOptions: { rpcUrls },
       alerts,
       blockSpend,
-      verification: signer ? { request: read, timeoutMs: 180_000, pollMs: 2_000 } : false,
+      verification: signer ? { timeoutMs: 180_000, pollMs: 2_000 } : false,
       onDecision: (receipt) => audit.append(receipt),
       onVerification: (result) => audit.append(result),
     });
 
-    const quote = quoterAbi.decodeFunctionResult('quoteExactInputSingle', await read('eth_call', [{ to: QUOTER, data: quoterAbi.encodeFunctionData('quoteExactInputSingle', [{ tokenIn: WETH, tokenOut: token.token, amountIn: amount, fee: POOL_FEE, sqrtPriceLimitX96: 0n }]) }, 'latest']))[0];
-    const minimumOut = (quote * 99n) / 100n;
+    // Use the best measured pool, the same way the guard does, so the honest swap gets a fair price.
+    const swapRule = findSwapRule(policy, GENERAL_RULE_SET.chainId, ROUTER, routerAbi.getFunction('exactInputSingle').selector);
+    let quote = 0n;
+    let poolFee = null;
+    for (const fee of listedSwapFees(swapRule, WETH, token.token)) {
+      try {
+        const [amountOut] = quoterAbi.decodeFunctionResult('quoteExactInputSingle', await read('eth_call', [{ to: QUOTER, data: quoterAbi.encodeFunctionData('quoteExactInputSingle', [{ tokenIn: WETH, tokenOut: token.token, amountIn: amount, fee, sqrtPriceLimitX96: 0n }]) }, 'latest']));
+        if (amountOut > quote) { quote = amountOut; poolFee = fee; }
+      } catch { /* This pool could not be priced. Another one may be. */ }
+    }
+    if (poolFee == null) throw new Error(`No measured pool could quote ETH to ${token.symbol}.`);
+    const minimumOut = quote - (quote * BigInt(policy.invariants.maxSlippageBps)) / (10_000n * BOT_SLIPPAGE_DIVISOR);
     const block = await read('eth_getBlockByNumber', ['latest', false]);
     const baseFee = BigInt(block.baseFeePerGas);
     const tip = 1_000_000_000n;
     const maxFeePerGas = baseFee * 2n + tip;
 
-    const proposal = async (recipient) => ({
+    const proposal = async (recipient, minimum = minimumOut) => ({
       chainId: GENERAL_RULE_SET.chainId,
       from: walletAddress,
       to: ROUTER,
-      data: routerAbi.encodeFunctionData('exactInputSingle', [{ tokenIn: WETH, tokenOut: token.token, fee: POOL_FEE, recipient, amountIn: amount, amountOutMinimum: minimumOut, sqrtPriceLimitX96: 0n }]),
+      data: routerAbi.encodeFunctionData('exactInputSingle', [{ tokenIn: WETH, tokenOut: token.token, fee: poolFee, recipient, amountIn: amount, amountOutMinimum: minimum, sqrtPriceLimitX96: 0n }]),
       value: toBeHex(amount),
       gas: toBeHex(SWAP_GAS),
       maxFeePerGas: toBeHex(maxFeePerGas),
@@ -209,10 +227,11 @@ async function main() {
       if (!(error instanceof WalletGuardError)) throw error;
       say('Decision        DENIED. The wallet was never called.');
       for (const check of denied(error.receipt)) say(`  ${check.id.padEnd(26)} ${check.detail}`);
+      for (const failure of new Set((error.receipt.simulation?.sources ?? []).flatMap((source) => source.failures ?? []))) say(`  ${'simulation'.padEnd(26)} ${failure}`);
     };
 
     heading('Transaction 1: honest swap, proceeds to the wallet');
-    say(`Bot proposes    Swap ${options.amountEth} ETH for ${token.symbol}. Quote ${formatUnits(quote, token.decimals)}, minimum ${formatUnits(minimumOut, token.decimals)}.`);
+    say(`Bot proposes    Swap ${options.amountEth} ETH for ${token.symbol}. Best fresh quote ${formatUnits(quote, token.decimals)} (fee tier ${poolFee}), minimum ${formatUnits(minimumOut, token.decimals)}.`);
     say(`Recipient       ${walletAddress} (the wallet)`);
     const before = await tokenBalance(walletAddress);
     let firstAllowed = false;
@@ -224,7 +243,7 @@ async function main() {
         say(`Transaction     ${hash}`);
         const verification = await guard.verification(hash);
         say(`On-chain check  ${verification?.status?.toUpperCase() ?? 'NOT RUN'}${verification?.blockNumber ? ` in block ${verification.blockNumber}, ${verification.gasUsed} gas` : ''}`);
-        for (const check of verification?.checks ?? []) say(`  ${check.status === 'pass' ? 'ok  ' : 'FAIL'} ${check.id.padEnd(34)} ${check.detail}`);
+        for (const check of verification?.checks ?? []) say(`  ${check.status === 'pass' ? 'ok  ' : check.status === 'unknown' ? '??  ' : 'FAIL'} ${check.id.padEnd(34)} ${check.detail}`);
         const after = await tokenBalance(walletAddress);
         say(`Wallet received ${formatUnits(after - before, token.decimals)} ${token.symbol}`);
       } else say('Not sent        This is a dry run, so the demo wallet did not sign.');
@@ -240,6 +259,16 @@ async function main() {
       const hash = await guard.request({ method: 'eth_sendTransaction', params: [await proposal(EXPLOITER)] });
       say(`Decision        ALLOWED, which is WRONG. Transaction: ${hash}`);
     } catch (error) { showDenied(error); secondDenied = true; }
+
+    if (options.lowMinimum) {
+      heading('Extra: compromised bot sets a one-unit minimum, so anyone can take the difference');
+      say('Bot proposes    The same swap to the wallet, with a minimum output of 1 base unit.');
+      try {
+        const hash = await guard.request({ method: 'eth_sendTransaction', params: [await proposal(walletAddress, 1n)] });
+        say(`Decision        ALLOWED, which is WRONG. Transaction: ${hash}`);
+        process.exitCode = 1;
+      } catch (error) { showDenied(error); }
+    }
 
     if (options.blockLimit) {
       heading('Extra: a second honest swap in the same block');

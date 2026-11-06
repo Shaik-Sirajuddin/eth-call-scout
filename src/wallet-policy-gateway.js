@@ -313,6 +313,21 @@ function normalizeAgentProposal(proposal) {
   return Object.fromEntries(required.map((field) => [field, typeof proposal[field] === 'number' ? proposal[field] : String(proposal[field]) ]));
 }
 
+/**
+ * What the wallet did in each attempt of a run. A run can forward one transaction and deny the next,
+ * so one final decision cannot describe them both.
+ */
+export function walletEventsForAttempts(attempts) {
+  const single = attempts.length === 1;
+  return attempts.map((attempt) => {
+    if (attempt.transactionHash) {
+      const block = attempt.chainReceipt?.blockNumber;
+      return { status: 'pass', title: single ? 'Wallet forwarded one exact request' : `${attempt.label} was mined`, detail: `Transaction ${attempt.transactionHash} was mined${block != null ? ` in block ${BigInt(block)}` : ''} on the primary Anvil node.`, data: { transactionHash: attempt.transactionHash, blockNumber: block ?? null } };
+    }
+    return { status: 'deny', title: single ? 'Wallet never received the transaction' : `Wallet never received the ${attempt.label.toLowerCase()}`, detail: 'The guarded provider returned a denial and did not call eth_sendTransaction.', data: null };
+  });
+}
+
 export class WalletPolicyGateway {
   constructor({ primaryUrl, secondaryUrl, primaryPort = 9545, secondaryPort = 9546, runtimeDirectory = RUNTIME_ROOT } = {}) {
     this.urls = {
@@ -673,37 +688,55 @@ export class WalletPolicyGateway {
       now,
     });
 
-    try {
-      if (run.scenario === 'block-limit') {
-        // Hold both nodes on the same block, send one swap, then try another that would pass the limit.
-        await rpc(this.urls.primary, 'evm_setAutomine', [false]);
-        await rpc(this.urls.secondary, 'evm_setAutomine', [false]);
-        try {
-          const firstHash = await guard.request({ method: 'eth_sendTransaction', params: [transaction] });
-          this.addEvent(run, 'wallet', 'pass', 'First swap forwarded', `Transaction ${firstHash} is waiting in the same block. It used 600 of the 1,000 dUSD per-block limit.`, { transactionHash: firstHash });
+    const attempts = [];
+    const submit = async (label, proposal) => {
+      capturedReceipt = null;
+      const attempt = { label, transaction: proposal, decision: null, transactionHash: null, chainReceipt: null, verification: null, receipt: null };
+      attempts.push(attempt);
+      try { attempt.transactionHash = await guard.request({ method: 'eth_sendTransaction', params: [proposal] }); }
+      catch (error) { if (!(error instanceof WalletGuardError)) throw error; }
+      attempt.receipt = capturedReceipt;
+      attempt.decision = capturedReceipt?.decision ?? null;
+      return attempt;
+    };
+    if (run.scenario === 'block-limit') {
+      // Hold both nodes on the same block, send one swap, then try another that would pass the limit.
+      await rpc(this.urls.primary, 'evm_setAutomine', [false]);
+      await rpc(this.urls.secondary, 'evm_setAutomine', [false]);
+      try {
+        const first = await submit('First swap', transaction);
+        if (first.transactionHash) {
+          this.addEvent(run, 'wallet', 'pass', 'First swap forwarded', `Transaction ${first.transactionHash} is waiting in the same block. It used 600 of the 1,000 dUSD per-block limit.`, { transactionHash: first.transactionHash });
           const second = await this.buildTransaction(parsed, run.scenario);
           run.transaction = second;
           this.addEvent(run, 'agent', 'pass', 'Second swap proposed in the same block', 'Another 600 dUSD would take this block over its limit.', second);
-          await guard.request({ method: 'eth_sendTransaction', params: [second] });
-        } finally {
-          await rpc(this.urls.primary, 'evm_mine', []);
-          await rpc(this.urls.secondary, 'evm_mine', []);
-          await rpc(this.urls.primary, 'evm_setAutomine', [true]);
-          await rpc(this.urls.secondary, 'evm_setAutomine', [true]);
+          await submit('Second swap', second);
         }
-      } else {
-        run.transactionHash = await guard.request({ method: 'eth_sendTransaction', params: [transaction] });
-        run.chainReceipt = jsonSafe(await waitForTransactionReceipt(this.urls.primary, run.transactionHash));
+      } finally {
+        await rpc(this.urls.primary, 'evm_mine', []);
+        await rpc(this.urls.secondary, 'evm_mine', []);
+        await rpc(this.urls.primary, 'evm_setAutomine', [true]);
+        await rpc(this.urls.secondary, 'evm_setAutomine', [true]);
       }
-    } catch (error) {
-      if (!(error instanceof WalletGuardError)) throw error;
+    } else {
+      await submit('Swap', transaction);
     }
-    const verifications = await guard.settled();
-    if (verifications.length) {
-      run.verification = jsonSafe(verifications.at(-1));
-      const failed = verifications.some((result) => result.status !== 'verified');
-      this.addEvent(run, 'onchain', failed ? 'deny' : 'pass', failed ? 'On-chain check found a problem' : 'On-chain check passed', failed ? 'See the alert log for details.' : 'The mined transaction matches what was approved, and nothing reached a listed attacker.', run.verification);
+    for (const attempt of attempts) {
+      if (!attempt.transactionHash) continue;
+      attempt.chainReceipt = jsonSafe(await waitForTransactionReceipt(this.urls.primary, attempt.transactionHash));
+      attempt.verification = jsonSafe(await guard.verification(attempt.transactionHash));
+      if (!attempt.verification) continue;
+      const { status } = attempt.verification;
+      const title = status === 'verified' ? 'On-chain check passed' : status === 'incomplete' ? 'On-chain check incomplete' : 'On-chain check found a problem';
+      const detail = status === 'verified' ? `${attempt.label}: the mined transaction matches what was approved, and no listed attacker was called or paid, including through internal calls.` : `${attempt.label}: see the alert log for details.`;
+      this.addEvent(run, 'onchain', status === 'verified' ? 'pass' : 'deny', title, detail, attempt.verification);
     }
+    // The first forwarded transaction stays on the run, even when a later attempt was denied.
+    const forwarded = attempts.find((attempt) => attempt.transactionHash) ?? null;
+    run.attempts = jsonSafe(attempts);
+    run.transactionHash = forwarded?.transactionHash ?? null;
+    run.chainReceipt = forwarded?.chainReceipt ?? null;
+    run.verification = forwarded?.verification ?? null;
     run.receipt = capturedReceipt;
     if (!capturedReceipt) throw new Error('Wallet guard produced no decision receipt.');
     const policyDenials = capturedReceipt.checks.filter((check) => check.status === 'deny' && !check.id.startsWith('simulation:'));
@@ -719,11 +752,7 @@ export class WalletPolicyGateway {
     const auditStatus = await this.audit.verify();
     this.addEvent(run, 'audit', auditStatus.valid ? 'pass' : 'deny', 'Receipt appended to hash chain', `${auditStatus.count} decision receipt${auditStatus.count === 1 ? '' : 's'} verified.`, auditStatus);
     run.decision = capturedReceipt.decision;
-    if (capturedReceipt.decision === 'allow') {
-      this.addEvent(run, 'wallet', 'pass', 'Wallet forwarded one exact request', `Transaction ${run.transactionHash} was mined on the primary Anvil node.`, { transactionHash: run.transactionHash, blockNumber: run.chainReceipt?.blockNumber ?? null });
-    } else {
-      this.addEvent(run, 'wallet', 'deny', 'Wallet never received the transaction', 'The guarded provider returned a denial and did not call eth_sendTransaction.');
-    }
+    for (const event of walletEventsForAttempts(attempts)) this.addEvent(run, 'wallet', event.status, event.title, event.detail, event.data);
     run.status = 'complete';
     run.updatedAt = new Date().toISOString();
     await this.persistRun(run);

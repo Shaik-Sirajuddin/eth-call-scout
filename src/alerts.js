@@ -15,6 +15,8 @@ export const ALERT_CODES = Object.freeze({
   ONCHAIN_GAS_EXCEEDED: 'onchain-gas-exceeded',
   ONCHAIN_DIFFERS_FROM_SIMULATION: 'onchain-differs-from-simulation',
   ONCHAIN_NOT_MINED: 'onchain-not-mined',
+  ONCHAIN_TRACE_UNAVAILABLE: 'onchain-trace-unavailable',
+  ONCHAIN_SWAP_OUTPUT: 'onchain-swap-output',
   ONCHAIN_UNAVAILABLE: 'onchain-unavailable',
   UNAPPROVED_TRANSACTION: 'unapproved-transaction',
 });

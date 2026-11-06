@@ -10,7 +10,7 @@ This protects the wallet when a bot is compromised and tries to send funds to a 
 |---|---|---|
 | Before simulation | The target, every byte of the calldata (including packed swap paths), and EIP-7702 delegates | `attacker:target`, `attacker:calldata`, `attacker:delegate` |
 | In simulation | Every call, token transfer, approval and state change, including transfers the wallet did not make itself | `attacker:effects`. One source reporting a hit is enough to deny |
-| After mining | The real transaction and its logs | `onchain:attacker`, plus a critical alert |
+| After mining | The real transaction, its logs, and every internal call, including ETH transfers that emit no log | `onchain:attacker`, plus a critical alert |
 | Writing a policy | Contracts, recipients and spenders the policy tries to allow | `attacker-in-policy`, and the policy is refused |
 
 Every receipt records the list's version and hash, and the hash is part of the decision fingerprint. Receiving tokens *from* a listed address does not deny a call.

@@ -115,7 +115,7 @@ npm run demo:swap -- --fork --block-limit
 KEYBOUND_DEMO_PRIVATE_KEY=0x... npm run demo:swap -- --mainnet --confirm --amount-eth 0.001
 ```
 
-The exploiter is `0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc`, from the October 2022 BNB bridge attack. Transaction 2 is denied in every mode, so it never costs gas.
+The exploiter is `0x489A8756C18C0b8B24EC2a2b9FF3D4d447F79BEc`, from the October 2022 BNB bridge attack. Transaction 2 is denied in every mode, so it never costs gas. Add `--low-minimum` to also show a one-unit minimum output being denied against a fresh quote.
 
 The same two cases are in the control room at `/runs` as **Safe path** and **Exploiter recipient**, on local demo tokens. **Block spend limit** shows a second swap in the same block being denied. Each run shows its on-chain check and alerts.
 
