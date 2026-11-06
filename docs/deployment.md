@@ -56,6 +56,6 @@ Before sharing the submission:
 - `npm run verify` passes from a clean checkout with Node.js 22 and Foundry installed;
 - `npm run anvil:smoke` proves one allowed and three denied real-chain scenarios;
 - `npm run agent:smoke -- --origin http://127.0.0.1:3000` proves the external agent contract and idempotency;
-- the local `/runs` control room completes a fresh safe transaction and exposes the full evidence trail;
+- the local `/runs` control room completes the guided pair: one safe transaction is mined and one compromised-router transaction is denied before wallet forwarding;
 - the Vercel production domain is public and all four product surfaces render responsively; and
 - the presentation clearly labels live transaction execution as local Anvil until the testnet adapter is deployed.

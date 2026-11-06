@@ -51,6 +51,7 @@ npm run demo
 # Start the judge-facing Next.js app, Gateway API, contracts, and both Anvil nodes.
 npm run dev
 # open http://127.0.0.1:3000
+# click "Run the 2-transaction demo" to mine one safe trade and block one compromised trade
 
 # In another terminal, exercise the external-agent API without a signer.
 npm run agent:smoke -- --origin http://127.0.0.1:3000
@@ -69,7 +70,7 @@ An `allow` receipt covers only the normalized transaction hash and authenticated
 The Next.js app serves the complete responsive demo from one origin:
 
 - `/` — product story and architecture;
-- `/runs` — live agent control room and persistent run history;
+- `/runs` — guided two-transaction proof, custom agent tests, and persistent run history;
 - `/runs/:id` — complete evidence for one decision;
 - `/report` — interactive call-surface report;
 - `/policy` — zoomable wallet-policy block builder; and

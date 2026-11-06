@@ -153,6 +153,19 @@ Returns Gateway readiness, local chain ID, independent RPC sources, wallet and c
 
 Lists all persisted run summaries, whether created by the bundled intent planner or the agent API.
 
+### `POST /api/runs/demo`
+
+Local Anvil presentation endpoint. It atomically queues the fixed two-transaction story and returns both run records in execution order:
+
+1. `safe` — a legitimate swap expected to be authorized and mined;
+2. `hidden-call` — a normal-looking swap executed against the compromised fixture, expected to be denied when both traces expose an unauthorized internal target.
+
+```sh
+curl -sS -X POST http://127.0.0.1:3000/api/runs/demo
+```
+
+The response contains a shared demo ID plus two independently persisted runs. Each run carries `demo.id`, `demo.step`, `demo.total`, its expected verdict, and the human-readable reason. The Gateway serializes them so step 1 completes before step 2 begins. This endpoint is presentation-fixture control, not an agent-facing production API.
+
 ### `POST /api/runs`
 
 Local Anvil test harness only. It lets the Control Room turn a prompt into a proposal with the bundled deterministic intent planner.
