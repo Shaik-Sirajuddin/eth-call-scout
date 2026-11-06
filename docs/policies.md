@@ -102,11 +102,11 @@ Pinned code identity does not replace simulation, and simulation does not replac
 ## Validation, audit, and authorization
 
 ```sh
-npx callscout policy validate policy.json
-npx callscout policy audit policy.json
+npx keybound policy validate policy.json
+npx keybound policy audit policy.json
 CALLSCOUT_SIM_PRIMARY='https://trace-a.example' \
 CALLSCOUT_SIM_SECONDARY='https://trace-b.example' \
-npx callscout authorize intent.json --policy policy.json --state state.json --out receipt.json
+npx keybound authorize intent.json --policy policy.json --state state.json --out receipt.json
 ```
 
 `policy validate` applies the full secure activation profile and rejects incomplete drafts. `policy audit` performs structural validation and reports activation gaps, such as missing wallet binding, expiry, signer threshold, RPC quorum, or gas cap, so a draft can be reviewed before it is capable of authorizing a wallet.

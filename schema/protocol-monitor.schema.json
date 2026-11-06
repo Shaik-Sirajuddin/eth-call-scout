@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://callscout.dev/schema/protocol-monitor.schema.json",
-  "title": "CallScout deterministic protocol monitor",
+  "$id": "https://keybound.dev/schema/protocol-monitor.schema.json",
+  "title": "Keybound deterministic protocol monitor",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "chainId", "stateTtlSeconds", "rpcQuorum", "maxBlockSkew", "sources", "protocols"],

@@ -5,31 +5,38 @@
   "description": "Deterministic wallet authorization and monitoring for AI agents.",
   "type": "module",
   "bin": {
-    "callscout": "./bin/eth-call-scout.js",
+    "keybound": "./bin/eth-call-scout.js",
     "eth-call-scout": "./bin/eth-call-scout.js"
   },
   "scripts": {
+    "dev": "npm run contracts:build && npm run next:assets && node ./scripts/app-server.js --dev",
+    "build": "npm run site:build && npm run next:assets && next build",
+    "prestart": "npm run contracts:build && npm run next:assets",
+    "start": "node ./scripts/app-server.js",
+    "next:assets": "node ./scripts/prepare-next-assets.js",
     "scan": "node ./bin/eth-call-scout.js",
     "ruleset:build": "node ./scripts/build-ruleset-page.js",
-    "check": "node --check src/audit-log.js && node --check src/canonical.js && node --check src/cli.js && node --check src/decode.js && node --check src/demo-agent.js && node --check src/demo-runtime.js && node --check src/policy-builder-page.js && node --check src/policy.js && node --check src/project.js && node --check src/protocol-monitor.js && node --check src/protocol-state.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/transaction-simulator.js && node --check src/wallet-guard.js && node --check scripts/build-demo-pages.js && node --check scripts/demo-scenarios.js && node --check scripts/demo-server.js && node --check scripts/run-anvil-demo.js && node --check scripts/check-site.js && node --check scripts/serve-site.js && node --check site/demo.js && node --check bin/eth-call-scout.js && npm run site:check",
+    "check": "node --check src/audit-log.js && node --check src/wallet-policy-gateway.js && node --check src/wallet-gateway-service.js && node --check src/canonical.js && node --check src/cli.js && node --check src/decode.js && node --check src/demo-agent.js && node --check src/policy-builder-page.js && node --check src/policy.js && node --check src/project.js && node --check src/protocol-monitor.js && node --check src/protocol-state.js && node --check src/registry.js && node --check src/report.js && node --check src/ruleset-page.js && node --check src/scanner.js && node --check src/transaction-simulator.js && node --check src/wallet-guard.js && node --check scripts/agent-api-smoke.js && node --check scripts/app-server.js && node --check scripts/build-demo-pages.js && node --check scripts/demo-scenarios.js && node --check scripts/prepare-next-assets.js && node --check scripts/reset-local-runtime.js && node --check scripts/run-anvil-smoke.js && node --check scripts/check-site.js && node --check bin/eth-call-scout.js && npm run site:check",
     "test": "node --test",
     "demo": "node ./scripts/demo-scenarios.js",
-    "demo:build": "forge build --root demo",
-    "predemo:anvil": "npm run demo:build",
-    "demo:anvil": "node ./scripts/run-anvil-demo.js",
-    "predemo:serve": "npm run site:build && npm run demo:build",
-    "demo:serve": "node ./scripts/demo-server.js",
+    "contracts:build": "forge build --root demo",
+    "demo:build": "npm run contracts:build",
+    "preanvil:smoke": "npm run contracts:build",
+    "anvil:smoke": "node ./scripts/run-anvil-smoke.js",
+    "agent:smoke": "node ./scripts/agent-api-smoke.js",
+    "demo:reset": "node ./scripts/reset-local-runtime.js",
     "site:build": "node ./scripts/build-demo-pages.js",
     "site:check": "npm run site:build && node --check ./dist/app.js && node ./scripts/check-site.js dist",
-    "presite:serve": "npm run site:build",
-    "site:serve": "node ./scripts/serve-site.js",
-    "verify": "npm run check && npm test && npm run demo",
+    "verify": "npm run check && npm test && npm run demo && npm run build",
     "report:diff": "node scripts/diff-reports.js",
     "build:parser": "cargo build --release --manifest-path parser-rs/Cargo.toml",
     "prescan": "npm run build:parser"
   },
   "dependencies": {
     "ethers": "^6.17.0",
+    "next": "^16.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.9.3"
   }
 }

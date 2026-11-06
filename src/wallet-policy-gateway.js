@@ -27,6 +27,7 @@ const CHAIN_ID = 31_337;
 const DEFAULT_MNEMONIC = 'test test test test test test test test test test test junk';
 const ZERO_WORD = `0x${'0'.repeat(64)}`;
 const RUN_SCENARIOS = new Set(['safe', 'compromised', 'hidden-call', 'slippage']);
+const AGENT_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 
 function artifactPath(contract) {
   return path.join(DEMO_ROOT, 'artifacts', 'DemoMarket.sol', `${contract}.json`);
@@ -45,15 +46,25 @@ function jsonSafe(value) {
   return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === 'bigint' ? item.toString() : item));
 }
 
-async function rpc(url, method, params = []) {
+async function rpc(url, method, params = [], { timeoutMs = 12_000 } = {}) {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const payload = await response.json();
   if (!response.ok || payload.error) throw new Error(payload.error?.message ?? `RPC ${response.status}`);
   return payload.result;
+}
+
+async function rpcEndpointResponding(url) {
+  try {
+    await rpc(url, 'eth_chainId', [], { timeoutMs: 500 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function waitForRpc(url, child, timeoutMs = 12_000) {
@@ -61,16 +72,30 @@ async function waitForRpc(url, child, timeoutMs = 12_000) {
   while (Date.now() - started < timeoutMs) {
     if (child?.exitCode != null) throw new Error(`Anvil ${child.label ?? ''} exited with code ${child.exitCode}${child.failureDetail?.() ? `: ${child.failureDetail()}` : '.'}`);
     try {
-      if (await rpc(url, 'eth_chainId') === toBeHex(CHAIN_ID)) return;
+      if (await rpc(url, 'eth_chainId') === toBeHex(CHAIN_ID)) {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        if (child?.exitCode != null) throw new Error(`Anvil ${child.label ?? ''} exited with code ${child.exitCode}${child.failureDetail?.() ? `: ${child.failureDetail()}` : '.'}`);
+        return;
+      }
     } catch { /* Retry while Anvil starts. */ }
     await new Promise((resolve) => setTimeout(resolve, 80));
   }
   throw new Error(`Timed out waiting for Anvil at ${url}.`);
 }
 
+async function waitForTransactionReceipt(url, transactionHash, timeoutMs = 12_000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const receipt = await rpc(url, 'eth_getTransactionReceipt', [transactionHash]);
+    if (receipt) return receipt;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for transaction ${transactionHash} to be mined.`);
+}
+
 function startAnvil(port, label) {
   const executable = process.env.ANVIL_BIN || 'anvil';
-  const child = spawn(executable, [
+  const child = spawn(/* turbopackIgnore: true */ executable, [
     '--host', '127.0.0.1',
     '--port', String(port),
     '--chain-id', String(CHAIN_ID),
@@ -150,7 +175,7 @@ function buildPolicy(deployment, stateSigners) {
   const maximumInput = (1_000n * 10n ** 18n).toString();
   return {
     version: 1,
-    name: 'ETHGlobal dual-Anvil trading agent',
+    name: 'Keybound local trading policy',
     defaultAction: 'deny',
     chains: [CHAIN_ID],
     wallets: [deployment.wallet],
@@ -213,7 +238,7 @@ function buildPolicy(deployment, stateSigners) {
     contracts: [{
       chainId: CHAIN_ID,
       address: deployment.contracts.router,
-      protocolId: 'demo-dex',
+      protocolId: 'keybound-local-dex',
       maxNativeValueWei: '0',
       methods: [{
         selector: routerInterface.getFunction('swapExactTokensForTokens').selector,
@@ -242,7 +267,7 @@ async function buildMonitor(deployment) {
       { id: 'anvil-secondary', env: 'CALLSCOUT_DEMO_RPC_SECONDARY' },
     ],
     protocols: [{
-      id: 'demo-dex',
+      id: 'keybound-local-dex',
       contracts: [{
         address: deployment.contracts.router,
         codeHash: keccak256(runtimeCode),
@@ -271,7 +296,16 @@ function publicRun(run) {
   return jsonSafe(run);
 }
 
-export class DemoRuntime {
+function normalizeAgentProposal(proposal) {
+  if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) throw new Error('Agent proposal must be a transaction object.');
+  const required = ['chainId', 'from', 'to', 'data', 'value', 'gas', 'maxFeePerGas', 'maxPriorityFeePerGas', 'nonce', 'type'];
+  for (const field of required) {
+    if (proposal[field] == null || proposal[field] === '') throw new Error(`Agent proposal requires ${field}.`);
+  }
+  return Object.fromEntries(required.map((field) => [field, typeof proposal[field] === 'number' ? proposal[field] : String(proposal[field]) ]));
+}
+
+export class WalletPolicyGateway {
   constructor({ primaryUrl, secondaryUrl, primaryPort = 9545, secondaryPort = 9546, runtimeDirectory = RUNTIME_ROOT } = {}) {
     this.urls = {
       primary: primaryUrl ?? process.env.CALLSCOUT_DEMO_RPC_PRIMARY ?? `http://127.0.0.1:${primaryPort}`,
@@ -280,18 +314,88 @@ export class DemoRuntime {
     this.external = Boolean(primaryUrl || secondaryUrl || process.env.CALLSCOUT_DEMO_RPC_PRIMARY || process.env.CALLSCOUT_DEMO_RPC_SECONDARY);
     this.ports = { primary: primaryPort, secondary: secondaryPort };
     this.runtimeDirectory = runtimeDirectory;
+    this.runDirectory = path.join(runtimeDirectory, 'runs');
     this.children = [];
     this.runs = [];
     this.runCounter = 0;
     this.sequence = 0;
     this.highestStateSequence = 0;
     this.started = false;
+    this.executionTail = Promise.resolve();
+    this.pendingRunWrites = new Map();
+    this.persistenceError = null;
+  }
+
+  async loadRunHistory() {
+    await fsp.mkdir(this.runDirectory, { recursive: true });
+    const entries = await fsp.readdir(this.runDirectory, { withFileTypes: true });
+    const loaded = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      try {
+        const run = JSON.parse(await fsp.readFile(path.join(this.runDirectory, entry.name), 'utf8'));
+        if (!run?.id || !Array.isArray(run.events)) continue;
+        if (run.status === 'queued' || run.status === 'running') {
+          const now = new Date().toISOString();
+          run.status = 'error';
+          run.decision = 'error';
+          run.updatedAt = now;
+          run.events.push({
+            index: run.events.length + 1,
+            at: now,
+            phase: 'system',
+            status: 'error',
+            title: 'Run interrupted before completion',
+            detail: 'The local runtime stopped before this run reached a final wallet decision.',
+            data: null,
+          });
+        }
+        loaded.push(run);
+      } catch {
+        // Ignore malformed history files; they never become wallet authority.
+      }
+    }
+    this.runs = loaded.sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+    await Promise.all(this.runs.map((run) => this.persistRun(run)));
+  }
+
+  persistRun(run) {
+    const snapshot = `${JSON.stringify(publicRun(run), null, 2)}\n`;
+    const target = path.join(this.runDirectory, `${run.id}.json`);
+    const temporary = `${target}.${process.pid}.tmp`;
+    const previous = this.pendingRunWrites.get(run.id) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      await fsp.mkdir(this.runDirectory, { recursive: true });
+      await fsp.writeFile(temporary, snapshot, { encoding: 'utf8', mode: 0o600 });
+      await fsp.rename(temporary, target);
+    });
+    this.pendingRunWrites.set(run.id, next);
+    next.then(() => {
+      if (this.pendingRunWrites.get(run.id) === next) this.pendingRunWrites.delete(run.id);
+    }, (error) => {
+      this.persistenceError = error;
+      if (this.pendingRunWrites.get(run.id) === next) this.pendingRunWrites.delete(run.id);
+    });
+    return next;
+  }
+
+  scheduleRunPersist(run) {
+    void this.persistRun(run).catch(() => {
+      // The error is retained in persistenceError and surfaced by the awaited
+      // terminal write or shutdown. Background snapshots must never produce an
+      // unhandled rejection that can take down the gateway process.
+    });
   }
 
   async start() {
     if (this.started) return this.describe();
     if (this.external && (!this.urls.primary || !this.urls.secondary)) throw new Error('Both external demo RPC URLs are required.');
     if (!this.external) {
+      const occupied = (await Promise.all([
+        rpcEndpointResponding(this.urls.primary),
+        rpcEndpointResponding(this.urls.secondary),
+      ])).map((responding, index) => responding ? [this.urls.primary, this.urls.secondary][index] : null).filter(Boolean);
+      if (occupied.length) throw new Error(`Local Anvil endpoint already in use: ${occupied.join(', ')}. Stop the existing demo process or choose different ports.`);
       const primary = startAnvil(this.ports.primary, 'primary');
       const secondary = startAnvil(this.ports.secondary, 'secondary');
       this.children.push(primary, secondary);
@@ -309,6 +413,7 @@ export class DemoRuntime {
     this.policyAudit = auditPolicy(this.policy);
     this.monitor = await buildMonitor(primary);
     await fsp.mkdir(this.runtimeDirectory, { recursive: true });
+    await this.loadRunHistory();
     this.sessionId = `session_${Date.now().toString(36)}_${process.pid}`;
     this.audit = createAuditLog(path.join(this.runtimeDirectory, `${this.sessionId}.receipts.jsonl`));
     this.started = true;
@@ -324,7 +429,34 @@ export class DemoRuntime {
       wallet: this.chains.primary.wallet,
       contracts: this.chains.primary.contracts,
       policy: { name: this.policy.name, hash: sha256(this.policy), valid: true, findings: this.policyAudit.findings },
-      monitor: { protocolId: 'demo-dex', threshold: this.monitor.rpcQuorum },
+      monitor: { protocolId: 'keybound-local-dex', threshold: this.monitor.rpcQuorum },
+      eip7702: 'denied-by-policy',
+    });
+  }
+
+  async capabilities() {
+    if (!this.started) throw new Error('Keybound Gateway is not ready.');
+    const [primaryNonce, secondaryNonce] = await Promise.all([
+      this.chains.primary.provider.getTransactionCount(this.chains.primary.wallet, 'pending'),
+      this.chains.secondary.provider.getTransactionCount(this.chains.secondary.wallet, 'pending'),
+    ]);
+    if (primaryNonce !== secondaryNonce) throw new Error('Anvil sources disagree on the pending wallet nonce.');
+    const routerInterface = new Interface(readArtifact('DemoRouter').abi);
+    return publicRun({
+      apiVersion: 'v1',
+      chainId: CHAIN_ID,
+      wallet: this.chains.primary.wallet,
+      nextNonce: String(primaryNonce),
+      contracts: this.chains.primary.contracts,
+      actions: [{
+        name: 'swapExactTokensForTokens',
+        target: this.chains.primary.contracts.router,
+        selector: routerInterface.getFunction('swapExactTokensForTokens').selector,
+        signature: 'swapExactTokensForTokens(uint256,uint256,address)',
+      }],
+      transactionTypes: ['2'],
+      deniedMethods: ['eth_sign', 'personal_sign', 'eth_signTypedData_v4', 'eth_sendRawTransaction', 'wallet_switchEthereumChain'],
+      policy: { name: this.policy.name, hash: sha256(this.policy), expiresAt: this.policy.validUntil },
       eip7702: 'denied-by-policy',
     });
   }
@@ -336,6 +468,8 @@ export class DemoRuntime {
       updatedAt: run.updatedAt,
       prompt: run.prompt,
       scenario: run.scenario,
+      source: run.source ?? 'bundled-agent',
+      requestId: run.requestId ?? null,
       status: run.status,
       decision: run.decision,
       eventCount: run.events.length,
@@ -348,9 +482,14 @@ export class DemoRuntime {
     return run ? publicRun(run) : null;
   }
 
-  createRun(prompt, { scenario = 'safe' } = {}) {
-    if (!this.started) throw new Error('Demo runtime is not ready.');
+  createRun(prompt, { scenario = 'safe', source = 'bundled-agent', requestId = null, proposal = null } = {}) {
+    if (!this.started) throw new Error('Keybound Gateway is not ready.');
     if (!RUN_SCENARIOS.has(scenario)) throw new Error(`Unknown demo scenario ${scenario}.`);
+    if (source === 'agent-api') {
+      if (!AGENT_REQUEST_ID.test(requestId ?? '')) throw new Error('Agent requestId must be 8-128 URL-safe characters.');
+      const existing = this.runs.find((entry) => entry.requestId === requestId);
+      if (existing) return this.getRun(existing.id);
+    }
     const now = new Date().toISOString();
     const run = {
       id: `run_${Date.now().toString(36)}_${String(++this.runCounter).padStart(3, '0')}`,
@@ -358,6 +497,9 @@ export class DemoRuntime {
       updatedAt: now,
       prompt,
       scenario,
+      source,
+      requestId,
+      submittedProposal: proposal == null ? null : normalizeAgentProposal(proposal),
       status: 'queued',
       decision: null,
       agent: null,
@@ -368,12 +510,25 @@ export class DemoRuntime {
       events: [],
     };
     this.runs.unshift(run);
-    this.executeRun(run).catch((error) => {
-      run.status = 'error';
-      run.decision = 'error';
-      this.addEvent(run, 'system', 'error', 'Run failed closed', error.message);
-    });
+    this.scheduleRunPersist(run);
+    const execute = async () => {
+      try {
+        await this.executeRun(run);
+      } catch (error) {
+        run.status = 'error';
+        run.decision = 'error';
+        this.addEvent(run, 'system', 'error', 'Run failed closed', error.message);
+        await this.persistRun(run);
+      }
+    };
+    this.executionTail = this.executionTail.then(execute, execute);
     return this.getRun(run.id);
+  }
+
+  createAgentRun({ requestId, goal, proposal }) {
+    const prompt = String(goal ?? '').trim();
+    if (!prompt || prompt.length > 500) throw new Error('Agent goal must be between 1 and 500 characters.');
+    return this.createRun(prompt, { scenario: 'safe', source: 'agent-api', requestId, proposal });
   }
 
   async waitForRun(id, { timeoutMs = 30_000 } = {}) {
@@ -390,6 +545,7 @@ export class DemoRuntime {
   addEvent(run, phase, status, title, detail, data = null) {
     run.events.push({ index: run.events.length + 1, at: new Date().toISOString(), phase, status, title, detail, data: data == null ? null : jsonSafe(data) });
     run.updatedAt = new Date().toISOString();
+    this.scheduleRunPersist(run);
   }
 
   async resetChains(scenario) {
@@ -442,10 +598,12 @@ export class DemoRuntime {
     await this.resetChains(run.scenario);
     this.addEvent(run, 'chain', 'pass', 'Dual-Anvil state restored', 'Both independent local nodes started from the same deterministic snapshot.', { sources: [this.urls.primary, this.urls.secondary] });
 
-    const parsed = parseDemoTradePrompt(run.prompt, { wallet: this.chains.primary.wallet });
+    const parsed = run.submittedProposal
+      ? { source: 'external-agent-api', requestId: run.requestId, summary: run.prompt }
+      : parseDemoTradePrompt(run.prompt, { wallet: this.chains.primary.wallet });
     run.agent = parsed;
-    this.addEvent(run, 'agent', 'pass', 'Agent built structured intent', parsed.summary, parsed);
-    const transaction = await this.buildTransaction(parsed, run.scenario);
+    this.addEvent(run, 'agent', 'pass', run.submittedProposal ? 'Agent submitted exact proposal' : 'Agent built structured intent', parsed.summary, parsed);
+    const transaction = run.submittedProposal ?? await this.buildTransaction(parsed, run.scenario);
     run.transaction = transaction;
     this.addEvent(run, 'agent', 'pass', 'Exact transaction proposed', 'Calldata, recipient, fees, gas, chain, and nonce are fixed before authorization.', transaction);
 
@@ -487,7 +645,7 @@ export class DemoRuntime {
 
     try {
       run.transactionHash = await guard.request({ method: 'eth_sendTransaction', params: [transaction] });
-      run.chainReceipt = jsonSafe(await this.chains.primary.provider.waitForTransaction(run.transactionHash));
+      run.chainReceipt = jsonSafe(await waitForTransactionReceipt(this.urls.primary, run.transactionHash));
     } catch (error) {
       if (!(error instanceof WalletGuardError)) throw error;
     }
@@ -513,15 +671,19 @@ export class DemoRuntime {
     }
     run.status = 'complete';
     run.updatedAt = new Date().toISOString();
+    await this.persistRun(run);
   }
 
   async stop() {
+    await this.executionTail;
+    await Promise.all(this.pendingRunWrites.values());
     for (const child of this.children) {
       if (child.exitCode == null) child.kill('SIGTERM');
     }
     await Promise.all(this.children.map((child) => child.exitCode == null ? new Promise((resolve) => child.once('exit', resolve)) : Promise.resolve()));
     this.children = [];
     this.started = false;
+    if (this.persistenceError) throw this.persistenceError;
   }
 }
 

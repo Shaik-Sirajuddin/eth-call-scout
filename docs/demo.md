@@ -36,11 +36,17 @@ No signing key is written to disk and no network transaction is sent.
 For the judge-facing flow, run the real local chain instead of the mock scenario harness:
 
 ```sh
-npm run demo:serve
-# open http://127.0.0.1:4174/demo.html
+npm run dev
+# open http://127.0.0.1:3000/runs
 ```
 
-The command compiles and deploys the demo market to two distinct Anvil processes, starts the run API, and serves the product. In the control room, a prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. Each run remains selectable with its full nine-stage evidence trail. See [Live dual-Anvil demo](anvil-demo.md) for the full architecture and non-interactive command.
+The command compiles and deploys the demo market to two distinct Anvil processes, starts the Gateway API, and serves the Next.js product. In the control room, a prompt becomes exact swap calldata, then passes through executable policy, a 2-of-2 signed live-state observation, two full call/log/state-diff traces, the guarded provider, and the hash-chained audit log. Safe runs mine on the primary node; compromised protocol state, a hidden internal call, and a reverting slippage path deny without forwarding. Each run remains selectable with its full evidence trail. See [Live dual-Anvil demo](anvil-demo.md) for the architecture and non-interactive command.
+
+In another terminal, run the same flow through the external-agent API:
+
+```sh
+npm run agent:smoke -- --origin http://127.0.0.1:3000
+```
 
 ## Test the security boundary
 
@@ -58,40 +64,35 @@ The tests cover secure activation rejection, policy validation, exact calldata c
 export CALLSCOUT_RPC_PRIMARY='https://first-independent-rpc.example'
 export CALLSCOUT_RPC_SECONDARY='https://second-independent-rpc.example'
 
-npx callscout state collect protocol-monitor.json \
+npx keybound state collect protocol-monitor.json \
   --sequence 42 \
   --out state-payload.json
 ```
 
 Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separate signing and verification steps.
 
-## Monitoring demo
+## Product surfaces
 
-Judge-facing paths on the public Vercel production domain:
+Judge-facing paths in the Next.js app:
 
-- `/demo.html` — agent control room
-- `/report.html` — example interactive report
-- `/ruleset.html` — visual wallet policy builder
+- `/` — product and architecture overview;
+- `/runs` — agent control room and persistent history;
+- `/runs/:id` — complete evidence for a selected run;
+- `/report` — interactive call-surface report; and
+- `/policy` — visual wallet policy builder.
 
-See [Vercel deployment](deployment.md) for the exact import settings and the deployment-protection check required before sharing the URL.
-
-To generate and serve the same pages locally:
-
-```sh
-npm run site:check
-npm run site:serve
-```
+See [Vercel deployment](deployment.md) for the import settings, public-access check, and the explicit boundary between the hosted UI and the later testnet transaction backend.
 
 The policy studio supports draggable blocks, explicit connections, pan, zoom, fit-to-view, a minimap, local persistence, import/export, and continuous structural checks. Exported JSON must still pass the authoritative validator before it can be activated:
 
 ```sh
-npx callscout policy validate path/to/exported-policy.json
+npx keybound policy validate path/to/exported-policy.json
 ```
 
 Or generate a focused report directly:
 
 ```sh
-npx callscout scan examples/variations.ts \
+npx keybound scan examples/variations.ts \
   --out reports/eth-calls.html \
   --json reports/eth-calls.json
 ```

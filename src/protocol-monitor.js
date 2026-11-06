@@ -89,7 +89,7 @@ function validateRpcUrl(value) {
 async function rpc(url, method, params, { fetchImpl, timeoutMs }) {
   const response = await fetchImpl(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'callscout-monitor/0.1' },
+    headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'keybound-monitor/0.1' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),

@@ -7,7 +7,7 @@ const MAX_INPUT = parseUnits('1000', 18);
 
 /**
  * A deliberately narrow demo agent. It converts a natural-language swap request into
- * structured data, but it has no signer and its output remains untrusted input to CallScout.
+ * structured data, but it has no signer and its output remains untrusted input to Keybound.
  */
 export function parseDemoTradePrompt(prompt, { wallet } = {}) {
   if (typeof prompt !== 'string' || prompt.trim().length < 8 || prompt.length > 500) {

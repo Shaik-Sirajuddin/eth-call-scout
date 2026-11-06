@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://callscout.dev/schema/wallet-policy.schema.json",
-  "title": "CallScout executable wallet policy",
+  "$id": "https://keybound.dev/schema/wallet-policy.schema.json",
+  "title": "Keybound executable wallet policy",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "name", "defaultAction", "chains", "wallets", "validUntil", "protocolState", "simulation", "invariants", "contracts"],
