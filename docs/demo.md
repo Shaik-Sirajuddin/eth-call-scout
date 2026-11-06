@@ -56,6 +56,20 @@ Follow [Deterministic protocol monitoring](protocol-monitoring.md) for the separ
 
 ## Monitoring demo
 
+Public judge-ready pages:
+
+- [Example interactive report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
+- [Ruleset builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
+
+To generate and serve the same pages locally:
+
+```sh
+npm run site:check
+npm run site:serve
+```
+
+Or generate a focused report directly:
+
 ```sh
 npx callscout scan examples/variations.ts \
   --out reports/eth-calls.html \

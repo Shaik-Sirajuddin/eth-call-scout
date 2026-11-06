@@ -54,9 +54,15 @@ npm run verify
 
 An `allow` receipt covers only the normalized transaction hash and authenticated state hash printed in that receipt. The intent must carry its chain and pending outer nonce explicitly; CallScout never lets the wallet silently choose them after simulation. Production integrations must use the guarded provider so the copied request checked by CallScout is the request forwarded to the wallet.
 
-## Landing page
+## Web demo
 
-The responsive product site is buildless and lives in `site/`:
+The deployed demo includes the responsive product site plus two outputs generated from the repository's deterministic monitoring tools:
+
+- [CallScout product site](https://shaik-sirajuddin.github.io/eth-call-scout/)
+- [Interactive example call report](https://shaik-sirajuddin.github.io/eth-call-scout/report.html)
+- [Browser-based ruleset builder](https://shaik-sirajuddin.github.io/eth-call-scout/ruleset.html)
+
+Build and serve the same pages locally:
 
 ```sh
 npm run site:check
@@ -64,7 +70,7 @@ npm run site:serve
 # open http://127.0.0.1:4173
 ```
 
-Its interactive decision lab is an illustrative presentation of the real receipt pipeline. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
+`site:check` scans the example sources, applies `.secu`, and creates `dist/report.html` and `dist/ruleset.html` alongside the landing page. The report and ruleset editor are monitoring aids, not transaction authorization. Run `npm run demo` to execute the actual offline policy, live-state, simulation, wallet-guard, and audit flow.
 
 ## Architecture
 
